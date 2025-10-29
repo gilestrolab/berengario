@@ -1,0 +1,150 @@
+"""
+Query handler for processing user queries.
+
+Provides a high-level interface for query processing with logging and error handling.
+"""
+
+import logging
+from datetime import datetime
+from typing import Dict, Optional
+
+from src.rag.rag_engine import RAGEngine
+
+logger = logging.getLogger(__name__)
+
+
+class QueryHandler:
+    """
+    Handles user queries with logging and error handling.
+
+    Provides a wrapper around RAGEngine with additional functionality.
+    """
+
+    def __init__(self, rag_engine: Optional[RAGEngine] = None):
+        """
+        Initialize the query handler.
+
+        Args:
+            rag_engine: RAG engine instance (creates new if None).
+        """
+        self.rag_engine = rag_engine or RAGEngine()
+        logger.info("QueryHandler initialized")
+
+    def process_query(
+        self,
+        query_text: str,
+        user_email: Optional[str] = None,
+        context: Optional[Dict] = None,
+    ) -> Dict[str, any]:
+        """
+        Process a user query.
+
+        Args:
+            query_text: The query string.
+            user_email: Email address of the user (for logging).
+            context: Additional context information.
+
+        Returns:
+            Dictionary containing:
+                - success: Boolean indicating if query succeeded
+                - response: Response text (if successful)
+                - sources: List of sources (if successful)
+                - error: Error message (if failed)
+                - timestamp: Processing timestamp
+                - user_email: User email (if provided)
+
+        """
+        timestamp = datetime.now().isoformat()
+
+        # Log query
+        log_msg = f"Processing query from {user_email or 'unknown'}: {query_text[:100]}"
+        logger.info(log_msg)
+
+        try:
+            # Validate query
+            if not query_text or not query_text.strip():
+                raise ValueError("Query text cannot be empty")
+
+            # Process query through RAG engine
+            result = self.rag_engine.query(query_text)
+
+            # Build response
+            response = {
+                "success": True,
+                "response": result["response"],
+                "sources": result["sources"],
+                "metadata": result["metadata"],
+                "timestamp": timestamp,
+            }
+
+            if user_email:
+                response["user_email"] = user_email
+
+            logger.info(
+                f"Query processed successfully for {user_email or 'unknown'} "
+                f"with {len(result['sources'])} sources"
+            )
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Error processing query: {e}")
+
+            return {
+                "success": False,
+                "error": str(e),
+                "timestamp": timestamp,
+                "user_email": user_email,
+            }
+
+    def format_for_email(self, result: Dict[str, any]) -> str:
+        """
+        Format query result for email response.
+
+        Args:
+            result: Result dictionary from process_query().
+
+        Returns:
+            Formatted email body text.
+        """
+        if not result["success"]:
+            return (
+                "I apologize, but I encountered an error processing your query.\n\n"
+                f"Error: {result.get('error', 'Unknown error')}\n\n"
+                "Please try rephrasing your question or contact support if the issue persists.\n\n"
+                "Best regards,\nDoLS GPT"
+            )
+
+        return self.rag_engine.format_response_for_email(result)
+
+    def format_for_web(self, result: Dict[str, any]) -> Dict[str, any]:
+        """
+        Format query result for web API response.
+
+        Args:
+            result: Result dictionary from process_query().
+
+        Returns:
+            Dictionary formatted for JSON API response.
+        """
+        if not result["success"]:
+            return {
+                "success": False,
+                "error": result.get("error", "Unknown error"),
+                "timestamp": result["timestamp"],
+            }
+
+        web_result = self.rag_engine.format_response_for_web(result)
+        web_result["success"] = True
+        web_result["timestamp"] = result["timestamp"]
+
+        return web_result
+
+    def get_stats(self) -> Dict[str, any]:
+        """
+        Get knowledge base statistics.
+
+        Returns:
+            Dictionary containing KB stats.
+        """
+        return self.rag_engine.get_kb_stats()

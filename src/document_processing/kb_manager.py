@@ -1,0 +1,297 @@
+"""
+Knowledge Base Manager for vector database operations.
+
+Handles ChromaDB storage, retrieval, and updates.
+"""
+
+import logging
+from pathlib import Path
+from typing import List, Optional
+
+import chromadb
+from chromadb.config import Settings as ChromaSettings
+from llama_index.core import StorageContext, VectorStoreIndex
+from llama_index.core.schema import TextNode
+from llama_index.embeddings.openai import OpenAIEmbedding
+from llama_index.vector_stores.chroma import ChromaVectorStore
+
+from src.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+class KnowledgeBaseManager:
+    """
+    Manages the knowledge base using ChromaDB as vector store.
+
+    Handles document storage, retrieval, and index management.
+    """
+
+    def __init__(
+        self,
+        db_path: Optional[Path] = None,
+        collection_name: str = "dols_kb",
+    ):
+        """
+        Initialize the Knowledge Base Manager.
+
+        Args:
+            db_path: Path to ChromaDB storage directory.
+            collection_name: Name of the ChromaDB collection.
+        """
+        self.db_path = db_path or settings.chroma_db_path
+        self.collection_name = collection_name
+
+        # Ensure DB directory exists
+        self.db_path.mkdir(parents=True, exist_ok=True)
+
+        # Initialize embedding model (uses Naga.ac via OpenAI-compatible API)
+        self.embed_model = OpenAIEmbedding(
+            model=settings.openai_embedding_model,
+            api_key=settings.openai_api_key,
+            api_base=settings.openai_api_base,
+        )
+
+        # Initialize ChromaDB client
+        self.chroma_client = chromadb.PersistentClient(
+            path=str(self.db_path),
+            settings=ChromaSettings(
+                anonymized_telemetry=False,
+            ),
+        )
+
+        # Get or create collection
+        self.collection = self.chroma_client.get_or_create_collection(
+            name=self.collection_name
+        )
+
+        # Initialize vector store
+        self.vector_store = ChromaVectorStore(chroma_collection=self.collection)
+
+        # Initialize storage context
+        self.storage_context = StorageContext.from_defaults(
+            vector_store=self.vector_store
+        )
+
+        # Initialize or load index
+        self._initialize_index()
+
+        logger.info(
+            f"KnowledgeBaseManager initialized with {self.get_document_count()} documents"
+        )
+
+    def _initialize_index(self) -> None:
+        """
+        Initialize or load the vector store index.
+
+        Creates a new index if none exists, otherwise loads existing index.
+        """
+        try:
+            # Try to load existing index
+            self.index = VectorStoreIndex.from_vector_store(
+                vector_store=self.vector_store,
+                embed_model=self.embed_model,
+            )
+            logger.info("Loaded existing vector index")
+        except Exception as e:
+            # Create new index if loading fails
+            logger.info(f"Creating new vector index: {e}")
+            self.index = VectorStoreIndex(
+                nodes=[],
+                storage_context=self.storage_context,
+                embed_model=self.embed_model,
+            )
+
+    def add_nodes(self, nodes: List[TextNode]) -> None:
+        """
+        Add text nodes to the knowledge base.
+
+        Args:
+            nodes: List of TextNode objects to add.
+
+        Raises:
+            Exception: If adding nodes fails.
+        """
+        if not nodes:
+            logger.warning("No nodes to add")
+            return
+
+        try:
+            # Insert nodes into index
+            self.index.insert_nodes(nodes)
+            logger.info(f"Added {len(nodes)} nodes to knowledge base")
+        except Exception as e:
+            logger.error(f"Failed to add nodes to knowledge base: {e}")
+            raise
+
+    def document_exists(self, file_hash: str) -> bool:
+        """
+        Check if a document with given hash already exists in KB.
+
+        Args:
+            file_hash: SHA-256 hash of the document file.
+
+        Returns:
+            True if document exists, False otherwise.
+        """
+        try:
+            # Query collection for documents with this hash
+            results = self.collection.get(where={"file_hash": file_hash})
+            return len(results["ids"]) > 0
+        except Exception as e:
+            logger.error(f"Error checking document existence: {e}")
+            return False
+
+    def delete_document_by_hash(self, file_hash: str) -> int:
+        """
+        Delete all nodes associated with a document hash.
+
+        Args:
+            file_hash: SHA-256 hash of the document to delete.
+
+        Returns:
+            Number of nodes deleted.
+
+        Raises:
+            Exception: If deletion fails.
+        """
+        try:
+            # Get all nodes with this hash
+            results = self.collection.get(where={"file_hash": file_hash})
+            node_ids = results["ids"]
+
+            if not node_ids:
+                logger.info(f"No nodes found for hash {file_hash}")
+                return 0
+
+            # Delete nodes
+            self.collection.delete(ids=node_ids)
+            logger.info(f"Deleted {len(node_ids)} nodes for hash {file_hash}")
+
+            return len(node_ids)
+        except Exception as e:
+            logger.error(f"Failed to delete document: {e}")
+            raise
+
+    def delete_document_by_filename(self, filename: str) -> int:
+        """
+        Delete all nodes associated with a filename.
+
+        Args:
+            filename: Name of the file to delete.
+
+        Returns:
+            Number of nodes deleted.
+
+        Raises:
+            Exception: If deletion fails.
+        """
+        try:
+            # Get all nodes with this filename
+            results = self.collection.get(where={"filename": filename})
+            node_ids = results["ids"]
+
+            if not node_ids:
+                logger.info(f"No nodes found for filename {filename}")
+                return 0
+
+            # Delete nodes
+            self.collection.delete(ids=node_ids)
+            logger.info(f"Deleted {len(node_ids)} nodes for filename {filename}")
+
+            return len(node_ids)
+        except Exception as e:
+            logger.error(f"Failed to delete document: {e}")
+            raise
+
+    def get_document_count(self) -> int:
+        """
+        Get the total number of nodes in the knowledge base.
+
+        Returns:
+            Number of nodes stored.
+        """
+        try:
+            return self.collection.count()
+        except Exception as e:
+            logger.error(f"Error getting document count: {e}")
+            return 0
+
+    def get_unique_documents(self) -> List[dict]:
+        """
+        Get list of unique documents in the knowledge base.
+
+        Returns:
+            List of dictionaries containing document metadata.
+        """
+        try:
+            # Get all documents
+            results = self.collection.get(include=["metadatas"])
+
+            # Extract unique documents by file_hash
+            unique_docs = {}
+            for metadata in results["metadatas"]:
+                file_hash = metadata.get("file_hash")
+                if file_hash and file_hash not in unique_docs:
+                    unique_docs[file_hash] = {
+                        "filename": metadata.get("filename"),
+                        "file_hash": file_hash,
+                        "source_type": metadata.get("source_type"),
+                        "file_type": metadata.get("file_type"),
+                    }
+
+            return list(unique_docs.values())
+        except Exception as e:
+            logger.error(f"Error getting unique documents: {e}")
+            return []
+
+    def clear_all(self) -> None:
+        """
+        Clear all documents from the knowledge base.
+
+        WARNING: This operation is irreversible.
+
+        Raises:
+            Exception: If clearing fails.
+        """
+        try:
+            # Delete the collection
+            self.chroma_client.delete_collection(name=self.collection_name)
+
+            # Recreate the collection
+            self.collection = self.chroma_client.create_collection(
+                name=self.collection_name
+            )
+
+            # Reinitialize vector store and index
+            self.vector_store = ChromaVectorStore(chroma_collection=self.collection)
+            self.storage_context = StorageContext.from_defaults(
+                vector_store=self.vector_store
+            )
+            self._initialize_index()
+
+            logger.info("Cleared all documents from knowledge base")
+        except Exception as e:
+            logger.error(f"Failed to clear knowledge base: {e}")
+            raise
+
+    def get_query_engine(self, top_k: Optional[int] = None, llm=None):
+        """
+        Get a query engine for the knowledge base.
+
+        Args:
+            top_k: Number of top results to retrieve (default from settings).
+            llm: LLM to use for query engine (optional).
+
+        Returns:
+            LlamaIndex query engine.
+        """
+        k = top_k or settings.top_k_retrieval
+
+        query_engine = self.index.as_query_engine(
+            similarity_top_k=k,
+            embed_model=self.embed_model,
+            llm=llm,
+        )
+
+        return query_engine

@@ -1,0 +1,45 @@
+# Core RAG Framework (Python 3.13 compatible)
+llama-index-core>=0.12.0
+llama-index-embeddings-openai>=0.3.0
+llama-index-llms-openai>=0.3.0
+llama-index-vector-stores-chroma>=0.3.0
+
+# Vector Database
+chromadb>=0.5.0
+
+# Document Processing
+pypdf>=5.0.0
+python-docx>=1.1.0
+pandas>=2.2.0
+openpyxl>=3.1.0
+
+# Email Handling (Phase 2)
+imap-tools>=1.7.0
+# python-email-validator>=2.2.0  # Not yet compatible with Python 3.13, will add in Phase 2
+
+# Web Framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+python-multipart>=0.0.20
+
+# Configuration & Environment
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+python-dotenv>=1.0.0
+
+# LLM API
+openai>=1.50.0
+
+# Utilities
+watchdog>=6.0.0
+aiofiles>=24.0.0
+
+# Code Quality & Testing
+pytest>=8.3.0
+pytest-asyncio>=0.25.0
+pytest-cov>=6.0.0
+black>=24.10.0
+ruff>=0.8.0
+
+# Logging
+structlog>=24.4.0
