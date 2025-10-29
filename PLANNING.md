@@ -17,13 +17,14 @@ RAGInbox is a configurable RAG (Retrieval-Augmented Generation) infrastructure d
 
 2. **Email-Based KB Ingestion** (Phase 2)
    - IMAP connection to configured inbox
-   - Filter CC'd emails (not primary recipient)
+   - Process CC'd/BCC'd/forwarded emails as KB content
    - Extract email body and attachments
    - Process attachments as documents
    - Mark processed emails to prevent duplicates
+   - Whitelist validation for security
 
 3. **Email Query Handler** (Phase 3)
-   - Monitor emails where target address is primary recipient
+   - Monitor direct emails (To: bot account) as queries
    - Extract query from email body
    - Query RAG system with context retrieval
    - Generate instance-specific LLM responses
@@ -96,7 +97,13 @@ RAGInbox/
 ├── pyproject.toml                 # Package configuration
 ├── PLANNING.md                    # This file
 ├── TASK.md                        # Task tracking
-├── QUICKSTART.md                  # Quick start guide
+├── docs/                          # Documentation
+│   ├── QUICKSTART.md              # Quick start guide
+│   ├── DATA_STRUCTURE.md          # Data directory structure
+│   ├── EMAIL_PROCESSING_RULES.md  # Email processing logic
+│   ├── DATABASE_DESIGN.md         # Database design
+│   ├── EMAIL_AUTH_ISSUE.md        # Authentication troubleshooting
+│   └── PHASE2_PLAN.md             # Phase 2 implementation plan
 └── README.md                      # Setup and usage instructions
 ```
 
@@ -146,12 +153,56 @@ RAGInbox/
 5. Basic query engine
 6. Unit tests
 
-### Phase 2: Email Ingestion
-1. IMAP client setup
-2. Email filtering logic
-3. Attachment extraction
-4. Integration with document processor
-5. Unit tests
+### Phase 2: Email Inbox Integration (Current)
+1. **IMAP Client Implementation**
+   - Connect to IMAP server with SSL/TLS
+   - Authenticate using credentials from .env
+   - Handle connection errors and reconnection
+   - Implement health check mechanism
+
+2. **Email Message Processing**
+   - Fetch unread emails from inbox
+   - Parse email headers (From, To, CC, Subject, Date)
+   - Processing rules:
+     * Direct emails (To: bot) → Query (send RAG reply)
+     * Forwarded emails (Fw:, Fwd:) → KB ingestion (configurable)
+     * CC/BCC emails → KB ingestion (silent)
+   - Extract email body (text/html with HTML-to-text conversion)
+   - Support multilingual forwarded detection (configurable prefixes)
+   - Mark processed emails appropriately
+
+3. **Message Tracking System**
+   - Create SQLite database for tracking processed messages
+   - Store message IDs to prevent duplicate processing
+   - Track processing status and timestamps
+   - Implement cleanup for old records
+
+4. **Attachment Extraction**
+   - Extract attachments from email messages
+   - Support multiple attachment types (PDF, DOCX, TXT, CSV)
+   - Save attachments to temporary directory
+   - Clean up temporary files after processing
+   - Handle attachment errors gracefully
+
+5. **Integration with Document Processor**
+   - Pass extracted attachments to document_processor
+   - Process email body as text document if no attachments (for KB ingestion emails)
+   - Add metadata (sender, date, subject) to chunks
+   - Support duplicate detection via file hash
+   - Update KB with new email content
+
+6. **Email Service Daemon**
+   - Create background service for continuous monitoring
+   - Implement configurable polling interval
+   - Add graceful shutdown handling
+   - Include logging for all email operations
+
+7. **Testing**
+   - Mock IMAP server for unit tests
+   - Test email filtering (TO vs CC)
+   - Test attachment extraction
+   - Test message tracking
+   - Integration tests with document processor
 
 ### Phase 3: Email Response
 1. Query detection and routing

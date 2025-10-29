@@ -15,6 +15,7 @@ openpyxl>=3.1.0
 
 # Email Handling (Phase 2)
 imap-tools>=1.7.0
+html2text>=2024.2.26  # Convert HTML emails to plain text
 # python-email-validator>=2.2.0  # Not yet compatible with Python 3.13, will add in Phase 2
 
 # Web Framework

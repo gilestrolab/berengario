@@ -12,7 +12,7 @@ import pytest
 from llama_index.core.schema import TextNode
 
 from src.document_processing.kb_manager import KnowledgeBaseManager
-from tests.conftest import MockEmbedding
+from conftest import MockEmbedding
 
 
 class TestKnowledgeBaseManager:

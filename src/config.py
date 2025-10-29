@@ -6,7 +6,7 @@ from environment variables. Supports multiple instances with different configura
 """
 
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -83,10 +83,62 @@ class Settings(BaseSettings):
     email_display_name: str = Field(
         default="DoLS GPT assistant", description="Display name for sent emails"
     )
+    email_temp_dir: Path = Field(
+        default=Path("data/temp_attachments"),
+        description="Temporary directory for email attachments",
+    )
+    max_attachment_size: int = Field(
+        default=10485760, description="Maximum attachment size in bytes (10MB default)"
+    )
+
+    # Forwarded Email Detection
+    forward_to_kb_enabled: bool = Field(
+        default=True,
+        description="Treat forwarded emails (To: bot) as KB content instead of queries",
+    )
+    forward_subject_prefixes: str = Field(
+        default="fw,fwd",
+        description="Comma-separated case-insensitive subject prefixes for forwarded emails",
+    )
+
+    # Email Whitelist (Security)
+    email_whitelist: str = Field(
+        default="",
+        description="Comma-separated list of allowed email addresses/domains (e.g., '@imperial.ac.uk,alice@example.com')",
+    )
+    email_whitelist_file: Optional[Path] = Field(
+        default=None,
+        description="Path to file with allowed email addresses/domains (one per line)",
+    )
+    email_whitelist_enabled: bool = Field(
+        default=True,
+        description="Enable email whitelist validation",
+    )
+
+    # Database Configuration (Message Tracking)
+    db_type: str = Field(
+        default="sqlite",
+        description="Database type: 'sqlite' or 'mariadb'",
+    )
+    # SQLite settings
+    sqlite_db_path: Path = Field(
+        default=Path("data/message_tracker.db"),
+        description="SQLite database file path",
+    )
+    # MariaDB/MySQL settings
+    db_host: str = Field(default="localhost", description="Database host")
+    db_port: int = Field(default=3306, description="Database port")
+    db_name: str = Field(default="raginbox", description="Database name")
+    db_user: str = Field(default="raginbox", description="Database username")
+    db_password: str = Field(default="", description="Database password")
+    db_pool_size: int = Field(default=5, description="Connection pool size")
+    db_pool_recycle: int = Field(
+        default=3600, description="Recycle connections after N seconds"
+    )
 
     # Document Processing
     documents_path: Path = Field(
-        default=Path("Documents"), description="Path to documents folder"
+        default=Path("data/documents"), description="Path to documents folder"
     )
     chroma_db_path: Path = Field(
         default=Path("data/chroma_db"), description="Path to ChromaDB storage"
@@ -113,7 +165,7 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
     log_file: Path = Field(
-        default=Path("logs/dols_gpt.log"), description="Log file path"
+        default=Path("data/logs/dols_gpt.log"), description="Log file path"
     )
 
     # Development
@@ -154,6 +206,55 @@ class Settings(BaseSettings):
             raise ValueError(f"Log level must be one of {valid_levels}")
         return v_upper
 
+    @field_validator("db_type")
+    @classmethod
+    def validate_db_type(cls, v: str) -> str:
+        """
+        Validate database type is supported.
+
+        Args:
+            v: Database type string.
+
+        Returns:
+            Validated database type.
+
+        Raises:
+            ValueError: If database type is invalid.
+        """
+        valid_types = ["sqlite", "mariadb", "mysql"]
+        v_lower = v.lower()
+        if v_lower not in valid_types:
+            raise ValueError(f"Database type must be one of {valid_types}")
+        return v_lower
+
+    def get_database_url(self) -> str:
+        """
+        Get SQLAlchemy database URL based on configuration.
+
+        Returns:
+            Database connection URL string.
+
+        Examples:
+            SQLite: "sqlite:///data/message_tracker.db"
+            MariaDB: "mysql+pymysql://user:pass@host:3306/dbname"
+        """
+        if self.db_type == "sqlite":
+            return f"sqlite:///{self.sqlite_db_path}"
+        elif self.db_type in ("mariadb", "mysql"):
+            # Use pymysql driver (pure Python, works in containers)
+            if self.db_password:
+                return (
+                    f"mysql+pymysql://{self.db_user}:{self.db_password}"
+                    f"@{self.db_host}:{self.db_port}/{self.db_name}"
+                )
+            else:
+                return (
+                    f"mysql+pymysql://{self.db_user}"
+                    f"@{self.db_host}:{self.db_port}/{self.db_name}"
+                )
+        else:
+            raise ValueError(f"Unsupported database type: {self.db_type}")
+
     def ensure_directories(self) -> None:
         """
         Create necessary directories if they don't exist.
@@ -162,10 +263,15 @@ class Settings(BaseSettings):
             - Documents directory
             - ChromaDB storage directory
             - Logs directory
+            - Email temp directory
+            - SQLite database directory (if using SQLite)
         """
         self.documents_path.mkdir(parents=True, exist_ok=True)
         self.chroma_db_path.mkdir(parents=True, exist_ok=True)
         self.log_file.parent.mkdir(parents=True, exist_ok=True)
+        self.email_temp_dir.mkdir(parents=True, exist_ok=True)
+        if self.db_type == "sqlite":
+            self.sqlite_db_path.parent.mkdir(parents=True, exist_ok=True)
 
 
 # Global settings instance

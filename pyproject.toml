@@ -41,6 +41,11 @@ dependencies = [
 
     # Email Handling (Phase 2)
     "imap-tools>=1.7.0",
+    "html2text>=2024.2.26",
+
+    # Database (Message Tracking)
+    "sqlalchemy>=2.0.0",  # Already included via llama-index, but explicit for clarity
+    "alembic>=1.13.0",  # Database migrations
 
     # Web Framework
     "fastapi>=0.115.0",
@@ -75,6 +80,12 @@ dev = [
     "pytest-cov>=6.0.0",
     "black>=24.10.0",
     "ruff>=0.8.0",
+]
+
+# MariaDB/MySQL support (optional, SQLite is default)
+mariadb = [
+    "pymysql>=1.1.0",  # Pure Python MySQL driver
+    "cryptography>=42.0.0",  # For pymysql SSL support
 ]
 
 [project.scripts]

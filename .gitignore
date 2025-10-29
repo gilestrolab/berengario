@@ -31,10 +31,12 @@ build/
 logs/
 *.log
 
-# Database and user data
+# Database and user data (all consolidated under data/)
 data/
 *.db
 *.sqlite
+
+# Legacy Documents folder (now at data/documents/)
 Documents/
 
 # OS
@@ -45,3 +47,6 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+
+# Diagnostic and troubleshooting scripts
+accessories/
