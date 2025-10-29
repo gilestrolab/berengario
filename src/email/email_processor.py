@@ -25,6 +25,7 @@ from src.email.email_client import EmailClient
 from src.email.email_parser import EmailMessage, EmailParser
 from src.email.email_sender import EmailSender, format_response_email
 from src.email.message_tracker import MessageTracker
+from src.email.whitelist_validator import WhitelistValidator
 from src.rag.query_handler import QueryHandler
 
 logger = logging.getLogger(__name__)
@@ -83,6 +84,8 @@ class EmailProcessor:
         message_tracker: Optional[MessageTracker] = None,
         email_sender: Optional[EmailSender] = None,
         query_handler: Optional[QueryHandler] = None,
+        teach_validator: Optional[WhitelistValidator] = None,
+        query_validator: Optional[WhitelistValidator] = None,
     ):
         """
         Initialize email processor with components.
@@ -96,6 +99,8 @@ class EmailProcessor:
             message_tracker: Message tracker (creates new if None)
             email_sender: Email sender (creates new if None)
             query_handler: Query handler (creates new if None)
+            teach_validator: Whitelist validator for teaching (KB ingestion)
+            query_validator: Whitelist validator for querying
         """
         self.email_client = email_client or EmailClient()
         self.parser = parser or EmailParser()
@@ -106,7 +111,19 @@ class EmailProcessor:
         self.email_sender = email_sender or EmailSender()
         self.query_handler = query_handler or QueryHandler()
 
-        logger.info("EmailProcessor initialized")
+        # Initialize dual whitelists for teach vs query permissions
+        self.teach_validator = teach_validator or WhitelistValidator(
+            whitelist=settings.email_teach_whitelist,
+            whitelist_file=settings.email_teach_whitelist_file,
+            enabled=settings.email_teach_whitelist_enabled,
+        )
+        self.query_validator = query_validator or WhitelistValidator(
+            whitelist=settings.email_query_whitelist,
+            whitelist_file=settings.email_query_whitelist_file,
+            enabled=settings.email_query_whitelist_enabled,
+        )
+
+        logger.info("EmailProcessor initialized with dual whitelists (teach/query)")
 
     def process_message(
         self, mail_message: MailMessage, mark_seen: bool = True
@@ -150,32 +167,52 @@ class EmailProcessor:
                     action="duplicate",
                 )
 
-            # Check whitelist
-            if not email.is_whitelisted:
-                logger.warning(
-                    f"Message {message_id} from {email.sender.email} rejected (not whitelisted)"
-                )
-                self.message_tracker.mark_processed(
-                    message_id=message_id,
-                    sender=email.sender.email,
-                    subject=email.subject,
-                    status="rejected",
-                    error_message="Sender not whitelisted",
-                )
-                if mark_seen:
-                    self.email_client.mark_seen(mail_message.uid)
-                return ProcessingResult(
-                    message_id=message_id,
-                    success=True,
-                    action="rejected",
-                )
-
-            # Determine action based on recipient type
+            # Determine action based on recipient type and check appropriate whitelist
             if self.parser.should_process_as_query(email):
-                # Direct message (To: bot) = query (send reply)
+                # Direct message (To: bot) = query - check query whitelist
+                if not self.query_validator.is_allowed(email.sender.email):
+                    logger.warning(
+                        f"Message {message_id} from {email.sender.email} rejected "
+                        f"(not in query whitelist)"
+                    )
+                    self.message_tracker.mark_processed(
+                        message_id=message_id,
+                        sender=email.sender.email,
+                        subject=email.subject,
+                        status="rejected",
+                        error_message="Sender not authorized to query",
+                    )
+                    if mark_seen:
+                        self.email_client.mark_seen(mail_message.uid)
+                    return ProcessingResult(
+                        message_id=message_id,
+                        success=False,
+                        error="Sender not authorized to query",
+                        action="rejected",
+                    )
                 result = self._process_query(email)
             elif self.parser.should_process_for_kb(email):
-                # CC'd/BCC'd/forwarded = KB ingestion (add to knowledge base)
+                # CC'd/BCC'd/forwarded = KB ingestion - check teach whitelist
+                if not self.teach_validator.is_allowed(email.sender.email):
+                    logger.warning(
+                        f"Message {message_id} from {email.sender.email} rejected "
+                        f"(not in teach whitelist)"
+                    )
+                    self.message_tracker.mark_processed(
+                        message_id=message_id,
+                        sender=email.sender.email,
+                        subject=email.subject,
+                        status="rejected",
+                        error_message="Sender not authorized to teach",
+                    )
+                    if mark_seen:
+                        self.email_client.mark_seen(mail_message.uid)
+                    return ProcessingResult(
+                        message_id=message_id,
+                        success=False,
+                        error="Sender not authorized to teach",
+                        action="rejected",
+                    )
                 result = self._process_for_kb(email, mail_message)
             else:
                 # Should not happen, but handle gracefully

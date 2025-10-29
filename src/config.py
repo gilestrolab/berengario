@@ -101,18 +101,47 @@ class Settings(BaseSettings):
         description="Comma-separated case-insensitive subject prefixes for forwarded emails",
     )
 
-    # Email Whitelist (Security)
+    # Email Whitelist (Security) - Dual whitelists for teach vs query permissions
+    # Teaching whitelist (for KB ingestion via CC/BCC/forwarding)
+    email_teach_whitelist: str = Field(
+        default="",
+        description="Comma-separated list of email addresses/domains allowed to add content to KB",
+    )
+    email_teach_whitelist_file: Optional[Path] = Field(
+        default=Path("data/config/allowed_teachers.txt"),
+        description="Path to file with email addresses/domains allowed to teach (one per line)",
+    )
+    email_teach_whitelist_enabled: bool = Field(
+        default=True,
+        description="Enable teaching whitelist validation",
+    )
+
+    # Query whitelist (for asking questions and receiving RAG replies)
+    email_query_whitelist: str = Field(
+        default="",
+        description="Comma-separated list of email addresses/domains allowed to query the KB",
+    )
+    email_query_whitelist_file: Optional[Path] = Field(
+        default=Path("data/config/allowed_queriers.txt"),
+        description="Path to file with email addresses/domains allowed to query (one per line)",
+    )
+    email_query_whitelist_enabled: bool = Field(
+        default=True,
+        description="Enable query whitelist validation",
+    )
+
+    # Legacy whitelist support (deprecated - maps to teach whitelist)
     email_whitelist: str = Field(
         default="",
-        description="Comma-separated list of allowed email addresses/domains (e.g., '@imperial.ac.uk,alice@example.com')",
+        description="DEPRECATED: Use email_teach_whitelist or email_query_whitelist instead",
     )
     email_whitelist_file: Optional[Path] = Field(
         default=None,
-        description="Path to file with allowed email addresses/domains (one per line)",
+        description="DEPRECATED: Use email_teach_whitelist_file or email_query_whitelist_file instead",
     )
     email_whitelist_enabled: bool = Field(
         default=True,
-        description="Enable email whitelist validation",
+        description="DEPRECATED: Use email_teach_whitelist_enabled or email_query_whitelist_enabled instead",
     )
 
     # Database Configuration (Message Tracking)

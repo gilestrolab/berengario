@@ -157,7 +157,10 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 | `SMTP_USER` | SMTP username | Same as email address |
 | `SMTP_PASSWORD` | SMTP password | Required |
 | `SMTP_USE_TLS` | Use STARTTLS encryption | `true` |
-| `EMAIL_WHITELIST_FILE` | Path to allowed senders list | `data/config/allowed_senders.txt` |
+| `EMAIL_TEACH_WHITELIST_FILE` | Who can add to KB (teach) | `data/config/allowed_teachers.txt` |
+| `EMAIL_TEACH_WHITELIST_ENABLED` | Enable teaching whitelist | `true` |
+| `EMAIL_QUERY_WHITELIST_FILE` | Who can query KB | `data/config/allowed_queriers.txt` |
+| `EMAIL_QUERY_WHITELIST_ENABLED` | Enable query whitelist | `true` |
 | `FORWARD_TO_KB_ENABLED` | Treat forwarded emails as KB content | `true` |
 | `FORWARD_SUBJECT_PREFIXES` | Forwarding prefixes (e.g., fw,fwd) | `fw,fwd` |
 
@@ -211,10 +214,13 @@ RAGInbox includes comprehensive email integration for automatic knowledge base u
 - **CC/BCC emails** → Silent KB ingestion
 - **Forwarded emails** (Fw:, Fwd:) → KB ingestion (configurable)
 
-**Security:**
-- Whitelist-based sender validation
+**Security (Dual Whitelists):**
+- **Separate permissions** for teaching (KB ingestion) vs querying
+- Teaching whitelist (`allowed_teachers.txt`) - who can add content via CC/BCC/forwarding
+- Query whitelist (`allowed_queriers.txt`) - who can ask questions and get RAG replies
+- Users can be in one list, both lists, or neither
 - Support for domain wildcards (`@imperial.ac.uk`)
-- File-based whitelist configuration
+- File-based configuration for easy management
 
 **Query Response Features:**
 - Automated RAG-powered email replies

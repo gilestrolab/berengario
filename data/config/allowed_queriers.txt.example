@@ -1,0 +1,17 @@
+# Query Whitelist for RAGInbox
+# Users in this list can QUERY the knowledge base and receive automated RAG replies
+# via direct emails (To: bot@domain.com)
+#
+# Copy this file to allowed_queriers.txt and customize for your deployment
+#
+# One email address or domain per line
+# Lines starting with # are comments
+# Domain wildcards: @imperial.ac.uk (allows all @imperial.ac.uk addresses)
+# Individual addresses: alice@example.com
+
+# Example: Department-wide query access
+# @yourorganization.com
+
+# Example: Specific authorized queriers
+# alice@example.com
+# bob@example.com

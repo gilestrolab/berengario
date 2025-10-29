@@ -1,0 +1,18 @@
+# Teaching Whitelist for RAGInbox
+# Users in this list can ADD content to the knowledge base via:
+# - CC/BCC emails
+# - Forwarded emails (if enabled)
+#
+# Copy this file to allowed_teachers.txt and customize for your deployment
+#
+# One email address or domain per line
+# Lines starting with # are comments
+# Domain wildcards: @imperial.ac.uk (allows all @imperial.ac.uk addresses)
+# Individual addresses: alice@example.com
+
+# Example: Department-wide teaching access
+# @yourorganization.com
+
+# Example: Specific authorized teachers
+# alice@example.com
+# bob@example.com
