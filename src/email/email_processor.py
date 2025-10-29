@@ -23,7 +23,9 @@ from src.document_processing.kb_manager import KnowledgeBaseManager
 from src.email.attachment_handler import AttachmentHandler, AttachmentInfo
 from src.email.email_client import EmailClient
 from src.email.email_parser import EmailMessage, EmailParser
+from src.email.email_sender import EmailSender, format_response_email
 from src.email.message_tracker import MessageTracker
+from src.rag.query_handler import QueryHandler
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +81,8 @@ class EmailProcessor:
         doc_processor: Optional[DocumentProcessor] = None,
         kb_manager: Optional[KnowledgeBaseManager] = None,
         message_tracker: Optional[MessageTracker] = None,
+        email_sender: Optional[EmailSender] = None,
+        query_handler: Optional[QueryHandler] = None,
     ):
         """
         Initialize email processor with components.
@@ -90,6 +94,8 @@ class EmailProcessor:
             doc_processor: Document processor (creates new if None)
             kb_manager: Knowledge base manager (creates new if None)
             message_tracker: Message tracker (creates new if None)
+            email_sender: Email sender (creates new if None)
+            query_handler: Query handler (creates new if None)
         """
         self.email_client = email_client or EmailClient()
         self.parser = parser or EmailParser()
@@ -97,6 +103,8 @@ class EmailProcessor:
         self.doc_processor = doc_processor or DocumentProcessor()
         self.kb_manager = kb_manager or KnowledgeBaseManager()
         self.message_tracker = message_tracker or MessageTracker()
+        self.email_sender = email_sender or EmailSender()
+        self.query_handler = query_handler or QueryHandler()
 
         logger.info("EmailProcessor initialized")
 
@@ -421,9 +429,7 @@ class EmailProcessor:
 
     def _process_query(self, email: EmailMessage) -> ProcessingResult:
         """
-        Process email as a query (CC'd without attachments).
-
-        TODO: Implement query processing with RAG pipeline.
+        Process email as a query and send automated RAG response.
 
         Args:
             email: Parsed EmailMessage
@@ -433,23 +439,123 @@ class EmailProcessor:
         """
         message_id = email.message_id
 
-        logger.info(f"Query processing not yet implemented for {message_id}")
+        logger.info(f"Processing query from {email.sender.email}: {email.subject}")
 
-        # Track as processed
-        self.message_tracker.mark_processed(
-            message_id=message_id,
-            sender=email.sender.email,
-            subject=email.subject,
-            status="success",
-            attachment_count=0,
-            chunks_created=0,
-        )
+        try:
+            # Extract query text from email body
+            query_text = email.get_body(prefer_text=True)
 
-        return ProcessingResult(
-            message_id=message_id,
-            success=True,
-            action="query",
-        )
+            if not query_text or not query_text.strip():
+                logger.warning(f"Empty query body in message {message_id}")
+                self.message_tracker.mark_processed(
+                    message_id=message_id,
+                    sender=email.sender.email,
+                    subject=email.subject,
+                    status="error",
+                    error_message="Empty query body",
+                )
+                return ProcessingResult(
+                    message_id=message_id,
+                    success=False,
+                    error="Empty query body",
+                    action="query",
+                )
+
+            # Process query through RAG engine
+            logger.debug(f"Querying RAG engine for message {message_id}")
+            result = self.query_handler.process_query(
+                query_text=query_text,
+                user_email=email.sender.email,
+                context={
+                    "message_id": message_id,
+                    "subject": email.subject,
+                    "date": str(email.date) if email.date else None,
+                },
+            )
+
+            if not result["success"]:
+                logger.error(f"RAG query failed for {message_id}: {result.get('error')}")
+                self.message_tracker.mark_processed(
+                    message_id=message_id,
+                    sender=email.sender.email,
+                    subject=email.subject,
+                    status="error",
+                    error_message=result.get("error", "Query processing failed"),
+                )
+                return ProcessingResult(
+                    message_id=message_id,
+                    success=False,
+                    error=result.get("error"),
+                    action="query",
+                )
+
+            # Format response email
+            subject, plain_text, html_body = format_response_email(
+                response_text=result["response"],
+                sources=result["sources"],
+                instance_name=settings.instance_name,
+                original_subject=email.subject,
+            )
+
+            # Send reply email
+            logger.info(f"Sending reply to {email.sender.email}")
+            send_success = self.email_sender.send_reply(
+                to_address=email.sender.email,
+                subject=subject,
+                body_text=plain_text,
+                body_html=html_body,
+                in_reply_to=message_id,
+                references=[message_id],
+            )
+
+            if not send_success:
+                logger.error(f"Failed to send reply email for {message_id}")
+                self.message_tracker.mark_processed(
+                    message_id=message_id,
+                    sender=email.sender.email,
+                    subject=email.subject,
+                    status="error",
+                    error_message="Failed to send reply email",
+                )
+                return ProcessingResult(
+                    message_id=message_id,
+                    success=False,
+                    error="Failed to send reply email",
+                    action="query",
+                )
+
+            # Track successful processing
+            self.message_tracker.mark_processed(
+                message_id=message_id,
+                sender=email.sender.email,
+                subject=email.subject,
+                status="success",
+                attachment_count=0,
+                chunks_created=0,
+            )
+
+            logger.info(f"Successfully processed query and sent reply for {message_id}")
+            return ProcessingResult(
+                message_id=message_id,
+                success=True,
+                action="query",
+            )
+
+        except Exception as e:
+            logger.error(f"Error processing query {message_id}: {e}", exc_info=True)
+            self.message_tracker.mark_processed(
+                message_id=message_id,
+                sender=email.sender.email,
+                subject=email.subject,
+                status="error",
+                error_message=str(e),
+            )
+            return ProcessingResult(
+                message_id=message_id,
+                success=False,
+                error=str(e),
+                action="query",
+            )
 
     def process_all_unread(self, limit: Optional[int] = None) -> List[ProcessingResult]:
         """

@@ -15,6 +15,8 @@ RAGInbox is a flexible infrastructure that combines document processing, vector 
 - 📧 **Email Integration**:
   - IMAP inbox monitoring with SSL/TLS
   - Automatic KB updates from CC'd/forwarded emails
+  - Automated RAG-powered email replies (NEW!)
+  - SMTP email sending with HTML formatting
   - Email whitelist for security
   - Configurable forwarded email detection
   - Message tracking and deduplication
@@ -94,13 +96,17 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 
 4. **Email Integration** (`src/email/`)
    - IMAP client with SSL/TLS and STARTTLS support
+   - SMTP email sender with TLS encryption
    - Email parser with HTML-to-text conversion
    - Whitelist validation with domain wildcards
    - Attachment handler with file type validation
    - Message tracking (SQLite/MariaDB)
    - Email service daemon with auto-reconnection
+   - Automated RAG-powered query responses
+   - Professional HTML + plain text email formatting
+   - Email threading support (In-Reply-To, References headers)
    - Configurable forwarded email detection
-   - Processing rules: Direct emails → Query, CC/BCC/Forwarded → KB ingestion
+   - Processing rules: Direct emails → RAG Query + Reply, CC/BCC/Forwarded → KB ingestion
 
 ### Tech Stack
 
@@ -143,8 +149,14 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `EMAIL_TARGET_ADDRESS` | Bot's email address | Required |
+| `EMAIL_DISPLAY_NAME` | Bot's display name in emails | Required |
 | `IMAP_SERVER` | IMAP server address | `imap.gmail.com` |
 | `IMAP_PORT` | IMAP port (993 SSL, 143 STARTTLS) | `993` |
+| `SMTP_SERVER` | SMTP server address | `smtp.gmail.com` |
+| `SMTP_PORT` | SMTP port (587 STARTTLS, 465 SSL) | `587` |
+| `SMTP_USER` | SMTP username | Same as email address |
+| `SMTP_PASSWORD` | SMTP password | Required |
+| `SMTP_USE_TLS` | Use STARTTLS encryption | `true` |
 | `EMAIL_WHITELIST_FILE` | Path to allowed senders list | `data/config/allowed_senders.txt` |
 | `FORWARD_TO_KB_ENABLED` | Treat forwarded emails as KB content | `true` |
 | `FORWARD_SUBJECT_PREFIXES` | Forwarding prefixes (e.g., fw,fwd) | `fw,fwd` |
@@ -192,10 +204,10 @@ RAGInbox/
 
 ### Email Integration
 
-RAGInbox includes comprehensive email integration for automatic knowledge base updates:
+RAGInbox includes comprehensive email integration for automatic knowledge base updates and intelligent email replies:
 
 **How it works:**
-- **Direct emails** (To: bot) → Queries (will trigger RAG replies in Phase 3)
+- **Direct emails** (To: bot) → RAG-powered query processing + automated reply
 - **CC/BCC emails** → Silent KB ingestion
 - **Forwarded emails** (Fw:, Fwd:) → KB ingestion (configurable)
 
@@ -204,8 +216,16 @@ RAGInbox includes comprehensive email integration for automatic knowledge base u
 - Support for domain wildcards (`@imperial.ac.uk`)
 - File-based whitelist configuration
 
-**Features:**
-- SSL/TLS and STARTTLS support
+**Query Response Features:**
+- Automated RAG-powered email replies
+- Professional HTML + plain text formatting
+- Source citations with relevance scores
+- Email threading support (proper conversation grouping)
+- Customizable instance branding
+
+**KB Ingestion Features:**
+- IMAP inbox monitoring (SSL/TLS and STARTTLS)
+- SMTP email sending with TLS encryption
 - Attachment processing (PDF, DOCX, TXT, CSV)
 - Email body processing when no attachments
 - Message tracking and deduplication
@@ -229,11 +249,13 @@ All persistent data is stored under `data/` for easy Docker volume mounting. See
 pytest tests/ -v
 
 # Run specific test suites
-pytest tests/test_email_parser.py -v      # Email parsing tests
+pytest tests/test_email_parser.py -v       # Email parsing tests
+pytest tests/test_email_sender.py -v       # Email sender tests (Phase 3)
+pytest tests/test_phase3_integration.py -v # Phase 3 integration tests
 pytest tests/test_document_processor.py -v # Document processing tests
-pytest tests/test_kb_manager.py -v        # Knowledge base tests
+pytest tests/test_kb_manager.py -v         # Knowledge base tests
 
-# Current status: 220 of 226 tests passing
+# Current status: 246 of 252 tests passing (Phase 3 complete)
 ```
 
 ### Code Quality
@@ -256,7 +278,13 @@ ruff check src/ tests/
   - Message tracking and deduplication
   - Email service daemon
   - Configurable forwarded email detection
-- [ ] **Phase 3**: Email query handler (automated replies)
+- [x] **Phase 3**: Email query handler (automated replies) ✓
+  - SMTP email sender with TLS support
+  - RAG-powered query processing
+  - Professional HTML + plain text email formatting
+  - Source citations in responses
+  - Email threading support
+  - Integration with EmailProcessor
 - [ ] **Phase 4**: Web frontend with chat interface
 - [ ] **Phase 5**: Docker deployment with docker-compose
 
