@@ -31,7 +31,7 @@ def get_system_prompt(instance_name: str, instance_description: str, organizatio
     """
     org_text = f" at {organization}" if organization else ""
 
-    return f"""You are {instance_name}, {instance_description}{org_text}.
+    base_prompt = f"""You are {instance_name}, {instance_description}{org_text}.
 
 Your role is to help users by answering questions based on the knowledge base documentation.
 
@@ -41,7 +41,21 @@ Guidelines:
 3. Cite specific sources when providing information
 4. Be professional and concise
 5. Reference relevant documents or policies when answering
-6. If uncertain, acknowledge the limitation
+6. If uncertain, acknowledge the limitation"""
+
+    # Append custom prompt from file if specified
+    if settings.rag_custom_prompt_file and settings.rag_custom_prompt_file.exists():
+        try:
+            with open(settings.rag_custom_prompt_file, 'r', encoding='utf-8') as f:
+                custom_prompt = f.read().strip()
+            if custom_prompt:
+                base_prompt += f"\n\n{custom_prompt}"
+                logger.info(f"Appended custom prompt from {settings.rag_custom_prompt_file}")
+        except Exception as e:
+            logger.warning(f"Failed to load custom prompt file: {e}")
+
+    # Add context and query sections
+    full_prompt = f"""{base_prompt}
 
 Context information is provided below:
 ---------------------
@@ -52,6 +66,8 @@ Based on the context above, please answer the following query:
 Query: {{query_str}}
 
 Answer:"""
+
+    return full_prompt
 
 
 class RAGEngine:

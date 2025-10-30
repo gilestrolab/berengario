@@ -5,11 +5,16 @@ Tests SMTP email sending, response formatting, and error handling.
 """
 
 import smtplib
-from unittest.mock import MagicMock, Mock, patch
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
 
-from src.email.email_sender import EmailSender, format_response_email
+from src.email.email_sender import (
+    EmailSender,
+    format_response_email,
+    load_custom_footer,
+)
 
 
 class TestEmailSender:
@@ -424,3 +429,161 @@ class TestFormatResponseEmail:
         assert isinstance(result[0], str)  # subject
         assert isinstance(result[1], str)  # plain text
         assert isinstance(result[2], str)  # HTML
+
+    @patch("src.email.email_sender.settings")
+    def test_format_text_email_format(self, mock_settings):
+        """Test plain text email format."""
+        mock_settings.email_response_format = "text"
+        mock_settings.email_custom_footer_file = None
+
+        response_text = "This is the answer."
+        sources = [{"filename": "doc.pdf", "score": 0.9}]
+        instance_name = "TestBot"
+        original_subject = "Question"
+
+        _, plain, html = format_response_email(
+            response_text, sources, instance_name, original_subject
+        )
+
+        # Plain text should have simple formatting
+        assert "This is the answer." in plain
+        assert "Sources:\n1. doc.pdf (relevance: 0.90)" in plain
+        assert "---" in plain
+
+        # HTML should be minimal fallback
+        assert "<pre>" in html
+
+    @patch("src.email.email_sender.settings")
+    def test_format_markdown_email_format(self, mock_settings):
+        """Test markdown email format."""
+        mock_settings.email_response_format = "markdown"
+        mock_settings.email_custom_footer_file = None
+
+        response_text = "This is the answer."
+        sources = [{"filename": "doc.pdf", "score": 0.9}]
+        instance_name = "TestBot"
+        original_subject = "Question"
+
+        _, plain, html = format_response_email(
+            response_text, sources, instance_name, original_subject
+        )
+
+        # Plain text should have markdown syntax
+        assert "This is the answer." in plain
+        assert "## Sources" in plain
+        assert "1. **doc.pdf** (relevance: 0.90)" in plain
+
+        # HTML should be minimal fallback
+        assert "<pre>" in html
+
+    @patch("src.email.email_sender.settings")
+    def test_format_html_email_format(self, mock_settings):
+        """Test HTML email format (default)."""
+        mock_settings.email_response_format = "html"
+        mock_settings.email_custom_footer_file = None
+
+        response_text = "This is the answer."
+        sources = [{"filename": "doc.pdf", "score": 0.9}]
+        instance_name = "TestBot"
+        original_subject = "Question"
+
+        _, plain, html = format_response_email(
+            response_text, sources, instance_name, original_subject
+        )
+
+        # HTML should be styled
+        assert "<!DOCTYPE html>" in html
+        assert "<style>" in html
+        assert 'class="response"' in html
+        assert 'class="sources"' in html
+        assert "<h3>Sources:</h3>" in html
+
+
+class TestLoadCustomFooter:
+    """Test suite for load_custom_footer function."""
+
+    @patch("src.email.email_sender.settings")
+    def test_load_default_footer(self, mock_settings):
+        """Test loading default footer when no custom file is configured."""
+        mock_settings.email_custom_footer_file = None
+
+        plain, html = load_custom_footer("TestBot")
+
+        # Check default footer content
+        assert "TestBot" in plain
+        assert "If you have follow-up questions" in plain
+        assert "<strong>TestBot</strong>" in html
+        assert "If you have follow-up questions" in html
+
+    @patch("src.email.email_sender.settings")
+    @patch("builtins.open", new_callable=mock_open, read_data="Custom footer text\nLine 2")
+    def test_load_custom_footer_success(self, mock_file, mock_settings):
+        """Test successfully loading custom footer from file."""
+        mock_settings.email_custom_footer_file = Path("/tmp/footer.txt")
+
+        # Mock path.exists() to return True
+        with patch.object(Path, "exists", return_value=True):
+            plain, html = load_custom_footer("TestBot")
+
+        # Check custom footer is used
+        assert "Custom footer text" in plain
+        assert "Line 2" in plain
+        assert "---" in plain
+
+        # Check HTML conversion (newlines to <br>)
+        assert "Custom footer text<br>Line 2" in html
+        assert 'class="footer"' in html
+
+    @patch("src.email.email_sender.settings")
+    def test_load_custom_footer_file_not_exists(self, mock_settings):
+        """Test fallback to default when custom file doesn't exist."""
+        mock_settings.email_custom_footer_file = Path("/nonexistent/footer.txt")
+
+        # Mock path.exists() to return False
+        with patch.object(Path, "exists", return_value=False):
+            plain, html = load_custom_footer("TestBot")
+
+        # Should fallback to default footer
+        assert "TestBot" in plain
+        assert "If you have follow-up questions" in plain
+
+    @patch("src.email.email_sender.settings")
+    @patch("builtins.open", side_effect=PermissionError("No permission"))
+    def test_load_custom_footer_permission_error(self, mock_file, mock_settings):
+        """Test handling of permission error when reading footer file."""
+        mock_settings.email_custom_footer_file = Path("/tmp/footer.txt")
+
+        with patch.object(Path, "exists", return_value=True):
+            plain, html = load_custom_footer("TestBot")
+
+        # Should fallback to default footer
+        assert "TestBot" in plain
+        assert "If you have follow-up questions" in plain
+
+    @patch("src.email.email_sender.settings")
+    @patch("builtins.open", new_callable=mock_open, read_data="   \n\n   ")
+    def test_load_custom_footer_empty_file(self, mock_file, mock_settings):
+        """Test handling of empty footer file."""
+        mock_settings.email_custom_footer_file = Path("/tmp/footer.txt")
+
+        with patch.object(Path, "exists", return_value=True):
+            plain, html = load_custom_footer("TestBot")
+
+        # Should fallback to default footer (empty after strip)
+        assert "TestBot" in plain
+        assert "If you have follow-up questions" in plain
+
+    @patch("src.email.email_sender.settings")
+    @patch("builtins.open", new_callable=mock_open, read_data="Footer with special chars: <>&\"'")
+    def test_load_custom_footer_special_characters(self, mock_file, mock_settings):
+        """Test footer with special HTML characters."""
+        mock_settings.email_custom_footer_file = Path("/tmp/footer.txt")
+
+        with patch.object(Path, "exists", return_value=True):
+            plain, html = load_custom_footer("TestBot")
+
+        # Plain text should preserve special characters
+        assert "special chars: <>&\"'" in plain
+
+        # HTML should have special characters (MIMEText handles escaping)
+        assert "special chars" in html

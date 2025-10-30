@@ -183,6 +183,22 @@ class Settings(BaseSettings):
         default=0.7, description="Minimum similarity score for retrieval"
     )
 
+    # RAG Customization
+    rag_custom_prompt_file: Optional[Path] = Field(
+        default=None,
+        description="Path to custom system prompt additions (appended to base prompt)",
+    )
+
+    # Email Response Customization
+    email_response_format: str = Field(
+        default="html",
+        description="Email response format: 'text', 'markdown', or 'html'",
+    )
+    email_custom_footer_file: Optional[Path] = Field(
+        default=None,
+        description="Path to custom email footer text (replaces default footer)",
+    )
+
     # Web API Configuration
     api_host: str = Field(default="0.0.0.0", description="API host address")
     api_port: int = Field(default=8000, description="API port")

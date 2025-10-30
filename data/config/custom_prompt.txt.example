@@ -1,0 +1,17 @@
+# Custom System Prompt Additions
+#
+# This file contains additional instructions that will be APPENDED to the
+# base system prompt. Use this to customize the AI's behavior for your
+# specific use case.
+#
+# Copy this file to custom_prompt.txt and customize for your deployment.
+# Then set RAG_CUSTOM_PROMPT_FILE=data/config/custom_prompt.txt in .env
+#
+# Example additions:
+
+Additional instructions:
+- Always use British English spelling
+- Reference specific policy numbers when available
+- Be especially detailed when discussing safety procedures
+- Include links to relevant documentation when possible
+- If a policy has changed recently, mention the effective date
