@@ -175,6 +175,9 @@ class EmailProcessor:
                         f"Message {message_id} from {email.sender.email} rejected "
                         f"(not in query whitelist)"
                     )
+                    # Send rejection email to the sender
+                    self._send_rejection_email(email, "query")
+
                     self.message_tracker.mark_processed(
                         message_id=message_id,
                         sender=email.sender.email,
@@ -198,6 +201,9 @@ class EmailProcessor:
                         f"Message {message_id} from {email.sender.email} rejected "
                         f"(not in teach whitelist)"
                     )
+                    # Send rejection email to the sender
+                    self._send_rejection_email(email, "teach")
+
                     self.message_tracker.mark_processed(
                         message_id=message_id,
                         sender=email.sender.email,
@@ -336,6 +342,10 @@ class EmailProcessor:
                             chunks_created=chunks_created,
                         )
 
+                        # Send acknowledgment email to the contributor
+                        if chunks_created > 0:
+                            self._send_kb_acknowledgment(email, 0, chunks_created)
+
                         return ProcessingResult(
                             message_id=message_id,
                             success=True,
@@ -430,6 +440,10 @@ class EmailProcessor:
                 f"KB ingestion complete: {attachments_processed}/{len(attachments)} "
                 f"attachments, {chunks_created} chunks"
             )
+
+            # Send acknowledgment email to the contributor
+            if chunks_created > 0:
+                self._send_kb_acknowledgment(email, attachments_processed, chunks_created)
 
             return ProcessingResult(
                 message_id=message_id,
@@ -593,6 +607,143 @@ class EmailProcessor:
                 error=str(e),
                 action="query",
             )
+
+    def _send_kb_acknowledgment(
+        self,
+        email: EmailMessage,
+        attachments_processed: int,
+        chunks_created: int
+    ) -> None:
+        """
+        Send acknowledgment email after successful KB ingestion.
+
+        Args:
+            email: Original EmailMessage that was processed
+            attachments_processed: Number of attachments successfully added
+            chunks_created: Number of text chunks created
+        """
+        try:
+            # Format summary of what was added
+            if attachments_processed > 0:
+                content_summary = f"{attachments_processed} document(s)"
+            else:
+                content_summary = "email content"
+
+            # Build acknowledgment message
+            subject = f"Re: {email.subject}"
+
+            body_text = f"""Thank you for contributing to the {settings.instance_name} knowledge base.
+
+The following material has been successfully added:
+- Source: {content_summary}
+- Text chunks created: {chunks_created}
+- Received from: {email.sender.email}
+
+This content is now available for queries from authorized users.
+
+---
+{settings.instance_name}
+{settings.organization}"""
+
+            body_html = f"""<p>Thank you for contributing to the <strong>{settings.instance_name}</strong> knowledge base.</p>
+
+<p>The following material has been successfully added:</p>
+<ul>
+<li><strong>Source:</strong> {content_summary}</li>
+<li><strong>Text chunks created:</strong> {chunks_created}</li>
+<li><strong>Received from:</strong> {email.sender.email}</li>
+</ul>
+
+<p>This content is now available for queries from authorized users.</p>
+
+<hr>
+<p><em>{settings.instance_name}</em><br>
+<em>{settings.organization}</em></p>"""
+
+            # Send acknowledgment
+            self.email_sender.send_reply(
+                to_address=email.sender.email,
+                subject=subject,
+                body_text=body_text,
+                body_html=body_html,
+                in_reply_to=email.message_id,
+            )
+
+            logger.info(f"Sent KB acknowledgment to {email.sender.email}")
+
+        except Exception as e:
+            logger.error(f"Failed to send KB acknowledgment to {email.sender.email}: {e}")
+
+    def _send_rejection_email(
+        self,
+        email: EmailMessage,
+        rejection_type: str
+    ) -> None:
+        """
+        Send rejection email to non-whitelisted sender.
+
+        Args:
+            email: Original EmailMessage that was rejected
+            rejection_type: Type of rejection ("query" or "teach")
+        """
+        try:
+            subject = f"Re: {email.subject}"
+
+            if rejection_type == "query":
+                body_text = f"""Thank you for your message to {settings.instance_name}.
+
+Unfortunately, your email address ({email.sender.email}) is not authorized to query the knowledge base.
+
+If you believe you should have access, please contact the administrator at {settings.organization}.
+
+---
+{settings.instance_name}
+{settings.organization}"""
+
+                body_html = f"""<p>Thank you for your message to <strong>{settings.instance_name}</strong>.</p>
+
+<p>Unfortunately, your email address (<code>{email.sender.email}</code>) is not authorized to query the knowledge base.</p>
+
+<p>If you believe you should have access, please contact the administrator at <em>{settings.organization}</em>.</p>
+
+<hr>
+<p><em>{settings.instance_name}</em><br>
+<em>{settings.organization}</em></p>"""
+
+            else:  # rejection_type == "teach"
+                body_text = f"""Thank you for your message to {settings.instance_name}.
+
+Unfortunately, your email address ({email.sender.email}) is not authorized to add content to the knowledge base.
+
+If you believe you should have access, please contact the administrator at {settings.organization}.
+
+---
+{settings.instance_name}
+{settings.organization}"""
+
+                body_html = f"""<p>Thank you for your message to <strong>{settings.instance_name}</strong>.</p>
+
+<p>Unfortunately, your email address (<code>{email.sender.email}</code>) is not authorized to add content to the knowledge base.</p>
+
+<p>If you believe you should have access, please contact the administrator at <em>{settings.organization}</em>.</p>
+
+<hr>
+<p><em>{settings.instance_name}</em><br>
+<em>{settings.organization}</em></p>"""
+
+            # Send rejection message
+            self.email_sender.send_reply(
+                to_address=email.sender.email,
+                subject=subject,
+                body_text=body_text,
+                body_html=body_html,
+                in_reply_to=email.message_id,
+            )
+
+            logger.info(f"Sent {rejection_type} rejection email to {email.sender.email}")
+
+        except Exception as e:
+            logger.error(f"Failed to send rejection email to {email.sender.email}: {e}")
 
     def process_all_unread(self, limit: Optional[int] = None) -> List[ProcessingResult]:
         """

@@ -48,6 +48,7 @@ services:
       DB_PASSWORD: test_password
 
     volumes:
+      - ./src:/app/src  # Mount src for live code changes during development
       - ./data/documents:/app/data/documents
       - ./data/chroma_db:/app/data/chroma_db
       - ./data/logs:/app/data/logs

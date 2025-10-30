@@ -8,7 +8,11 @@ import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import List, Optional
+from email.mime.base import MIMEBase
+from email import encoders
+from typing import List, Optional, Dict
+from pathlib import Path
+import markdown
 
 from src.config import settings
 
@@ -111,6 +115,7 @@ class EmailSender:
         body_html: Optional[str] = None,
         in_reply_to: Optional[str] = None,
         references: Optional[List[str]] = None,
+        attachments: Optional[List[Dict[str, any]]] = None,
     ) -> bool:
         """
         Send an email reply.
@@ -122,13 +127,19 @@ class EmailSender:
             body_html: HTML email body (optional)
             in_reply_to: Message-ID of email being replied to
             references: List of message IDs in conversation thread
+            attachments: List of attachments, each dict with 'content' (bytes or str),
+                        'filename' (str), and optional 'content_type' (str)
 
         Returns:
             True if email sent successfully, False otherwise.
         """
         try:
-            # Create message
-            msg = MIMEMultipart("alternative")
+            # Create message - use "mixed" if attachments, otherwise "alternative"
+            if attachments:
+                msg = MIMEMultipart("mixed")
+            else:
+                msg = MIMEMultipart("alternative")
+
             msg["From"] = f"{self.from_name} <{self.from_address}>"
             msg["To"] = to_address
             msg["Subject"] = subject
@@ -139,14 +150,43 @@ class EmailSender:
             if references:
                 msg["References"] = " ".join(references)
 
+            # Create body container (for text alternatives)
+            if attachments:
+                body_container = MIMEMultipart("alternative")
+            else:
+                body_container = msg
+
             # Attach plain text version
             text_part = MIMEText(body_text, "plain", "utf-8")
-            msg.attach(text_part)
+            body_container.attach(text_part)
 
             # Attach HTML version if provided
             if body_html:
                 html_part = MIMEText(body_html, "html", "utf-8")
-                msg.attach(html_part)
+                body_container.attach(html_part)
+
+            # Attach body container if we have attachments
+            if attachments:
+                msg.attach(body_container)
+
+            # Attach files
+            if attachments:
+                for attachment in attachments:
+                    content = attachment.get('content')
+                    filename = attachment.get('filename', 'attachment')
+                    content_type = attachment.get('content_type', 'application/octet-stream')
+
+                    # Convert string content to bytes if needed
+                    if isinstance(content, str):
+                        content = content.encode('utf-8')
+
+                    part = MIMEBase(*content_type.split('/', 1))
+                    part.set_payload(content)
+                    encoders.encode_base64(part)
+                    part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+                    msg.attach(part)
+
+                    logger.debug(f"Attached file: {filename} ({content_type})")
 
             # Connect to SMTP server
             logger.info(f"Connecting to SMTP server: {self.smtp_server}:{self.smtp_port}")
@@ -317,14 +357,43 @@ def _format_html_email(
     html_footer: str,
 ) -> tuple[str, str]:
     """Format email with styled HTML."""
+
+    def format_source_display(source: dict) -> tuple[str, str]:
+        """
+        Format source information for display.
+
+        Returns:
+            Tuple of (plain_text_line, html_line)
+        """
+        # Check if this is an email source with metadata
+        sender = source.get("sender")
+        subject = source.get("subject")
+        date = source.get("date")
+        score = source.get("score", 0)
+
+        if sender and subject:
+            # Email source - show sender and subject
+            plain = f"Email from {sender}: \"{subject}\" (relevance: {score:.2f})"
+            html = f"<strong>Email from {sender}:</strong> \"{subject}\" <span style=\"color: #666;\">(relevance: {score:.2f})</span>"
+        elif subject:
+            # Has subject but no sender
+            plain = f"Email: \"{subject}\" (relevance: {score:.2f})"
+            html = f"<strong>Email:</strong> \"{subject}\" <span style=\"color: #666;\">(relevance: {score:.2f})</span>"
+        else:
+            # File source - show filename
+            filename = source.get("filename", "Unknown document")
+            plain = f"{filename} (relevance: {score:.2f})"
+            html = f"<strong>{filename}</strong> <span style=\"color: #666;\">(relevance: {score:.2f})</span>"
+
+        return plain, html
+
     # Format sources for plain text
     sources_text = ""
     if sources:
         sources_text = "\n\nSources:\n"
         for idx, source in enumerate(sources, 1):
-            filename = source.get("filename", "Unknown document")
-            score = source.get("score", 0)
-            sources_text += f"{idx}. {filename} (relevance: {score:.2f})\n"
+            plain, _ = format_source_display(source)
+            sources_text += f"{idx}. {plain}\n"
 
     # Plain text version
     plain_text = f"{response_text}{sources_text}{plain_footer}"
@@ -334,10 +403,15 @@ def _format_html_email(
     if sources:
         sources_html = "<h3>Sources:</h3><ul>"
         for source in sources:
-            filename = source.get("filename", "Unknown document")
-            score = source.get("score", 0)
-            sources_html += f"<li><strong>{filename}</strong> (relevance: {score:.2f})</li>"
+            _, html = format_source_display(source)
+            sources_html += f"<li>{html}</li>"
         sources_html += "</ul>"
+
+    # Convert markdown response to HTML
+    response_html = markdown.markdown(
+        response_text,
+        extensions=['extra', 'nl2br', 'sane_lists']
+    )
 
     # Build HTML version with styling
     html_body = f"""
@@ -355,20 +429,21 @@ def _format_html_email(
             padding: 20px;
         }}
         .response {{
-            background-color: #f9f9f9;
-            border-left: 4px solid #4CAF50;
-            padding: 15px;
             margin-bottom: 20px;
         }}
+        .response h3 {{
+            margin-top: 0;
+            color: #333;
+        }}
+        .response strong {{
+            color: #2c3e50;
+        }}
         .sources {{
-            background-color: #f0f7ff;
-            border-left: 4px solid #2196F3;
-            padding: 15px;
             margin-bottom: 20px;
         }}
         .sources h3 {{
             margin-top: 0;
-            color: #2196F3;
+            color: #333;
         }}
         .sources ul {{
             margin: 10px 0;
@@ -385,7 +460,7 @@ def _format_html_email(
 </head>
 <body>
     <div class="response">
-        {response_text.replace(chr(10), '<br>')}
+        {response_html}
     </div>
 
     {f'<div class="sources">{sources_html}</div>' if sources else ''}

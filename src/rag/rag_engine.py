@@ -170,6 +170,10 @@ class RAGEngine:
                         if len(node.text) > 200
                         else node.text,
                         "source_type": node.metadata.get("source_type", "Unknown"),
+                        # Additional metadata for emails
+                        "sender": node.metadata.get("sender"),
+                        "subject": node.metadata.get("subject"),
+                        "date": node.metadata.get("date"),
                     }
                     sources.append(source_info)
 
