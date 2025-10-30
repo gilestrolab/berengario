@@ -107,6 +107,27 @@ class EmailSender:
             f"(TLS: {self.use_tls})"
         )
 
+    @staticmethod
+    def _format_message_id(msg_id: str) -> str:
+        """
+        Ensure Message-ID is properly formatted with angle brackets.
+
+        Args:
+            msg_id: Message ID string
+
+        Returns:
+            Message ID enclosed in angle brackets if not already.
+        """
+        if not msg_id:
+            return msg_id
+        msg_id = msg_id.strip()
+        # Add angle brackets if not present
+        if not msg_id.startswith('<'):
+            msg_id = '<' + msg_id
+        if not msg_id.endswith('>'):
+            msg_id = msg_id + '>'
+        return msg_id
+
     def send_reply(
         self,
         to_address: str,
@@ -145,10 +166,18 @@ class EmailSender:
             msg["Subject"] = subject
 
             # Add threading headers for proper conversation grouping
+            # Ensure Message-IDs are properly formatted with angle brackets (RFC 5322)
             if in_reply_to:
-                msg["In-Reply-To"] = in_reply_to
+                formatted_in_reply_to = self._format_message_id(in_reply_to)
+                msg["In-Reply-To"] = formatted_in_reply_to
+                logger.info(f"Setting In-Reply-To header: {formatted_in_reply_to}")
             if references:
-                msg["References"] = " ".join(references)
+                # Format each reference and join with space
+                formatted_refs = [self._format_message_id(ref) for ref in references]
+                msg["References"] = " ".join(formatted_refs)
+                logger.info(f"Setting References header: {' '.join(formatted_refs)}")
+
+            logger.info(f"Sending email with Subject: {subject}")
 
             # Create body container (for text alternatives)
             if attachments:

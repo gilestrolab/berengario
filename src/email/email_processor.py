@@ -548,6 +548,11 @@ class EmailProcessor:
                 original_subject=email.subject,
             )
 
+            # Get attachments from result (if any)
+            attachments = result.get("attachments", [])
+            if attachments:
+                logger.info(f"Including {len(attachments)} attachments in reply")
+
             # Send reply email
             logger.info(f"Sending reply to {email.sender.email}")
             send_success = self.email_sender.send_reply(
@@ -557,6 +562,7 @@ class EmailProcessor:
                 body_html=html_body,
                 in_reply_to=message_id,
                 references=[message_id],
+                attachments=attachments,
             )
 
             if not send_success:

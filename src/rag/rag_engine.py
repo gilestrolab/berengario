@@ -4,20 +4,23 @@ RAG (Retrieval-Augmented Generation) engine for query processing.
 Handles query execution, context retrieval, and response generation.
 """
 
+import json
 import logging
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from llama_index.core import PromptTemplate
 from llama_index.core.response_synthesizers import ResponseMode
 from llama_index.llms.openai import OpenAI
+from openai import OpenAI as OpenAIClient
 
 from src.config import settings
 from src.document_processing.kb_manager import KnowledgeBaseManager
+from src.rag.tools import get_registry, ToolExecutor
 
 logger = logging.getLogger(__name__)
 
 
-def get_system_prompt(instance_name: str, instance_description: str, organization: str = "") -> str:
+def get_system_prompt(instance_name: str, instance_description: str, organization: str = "", include_tools: bool = False) -> str:
     """
     Generate system prompt based on instance configuration.
 
@@ -25,6 +28,7 @@ def get_system_prompt(instance_name: str, instance_description: str, organizatio
         instance_name: Name of the instance.
         instance_description: Description of the instance's purpose.
         organization: Organization name (optional).
+        include_tools: Whether to include tool descriptions in the prompt.
 
     Returns:
         Formatted system prompt.
@@ -42,6 +46,21 @@ Guidelines:
 4. Be professional and concise
 5. Reference relevant documents or policies when answering
 6. If uncertain, acknowledge the limitation"""
+
+    # Add tool information if function calling is enabled
+    if include_tools:
+        registry = get_registry()
+        tools = registry.list_tools()
+        if tools:
+            base_prompt += "\n\nAvailable Tools:\n"
+            base_prompt += "You have access to the following tools to help users:\n\n"
+            for tool in tools:
+                base_prompt += f"- {tool.name}: {tool.description}\n"
+            base_prompt += "\n\nTool Usage Guidelines:"
+            base_prompt += "\n- ALWAYS create a calendar event (.ics file) when your response mentions a specific future date, deadline, or scheduled event"
+            base_prompt += "\n- Use create_calendar_event for single events with dates, times, and locations mentioned in the response"
+            base_prompt += "\n- Use export tools (CSV, JSON) when users request data exports or when providing structured information that would benefit from a downloadable format"
+            base_prompt += "\n- Proactively generate attachments to enhance user experience - don't wait to be asked"
 
     # Append custom prompt from file if specified
     if settings.rag_custom_prompt_file and settings.rag_custom_prompt_file.exists():
@@ -81,6 +100,7 @@ class RAGEngine:
         self,
         kb_manager: Optional[KnowledgeBaseManager] = None,
         llm_model: Optional[str] = None,
+        enable_function_calling: bool = True,
     ):
         """
         Initialize the RAG engine.
@@ -88,9 +108,11 @@ class RAGEngine:
         Args:
             kb_manager: Knowledge base manager instance.
             llm_model: LLM model name (default from settings).
+            enable_function_calling: Whether to enable function calling for tools.
         """
         self.kb_manager = kb_manager or KnowledgeBaseManager()
         self.llm_model = llm_model or settings.openrouter_model
+        self.enable_function_calling = enable_function_calling
 
         # Initialize LLM (uses Naga.ac with non-OpenAI models)
         # Provide context_window to bypass OpenAI model validation
@@ -105,11 +127,30 @@ class RAGEngine:
             default_headers={"HTTP-Referer": "https://github.com/imperial-dols/dols-gpt"},
         )
 
+        # Initialize tool system for function calling
+        if self.enable_function_calling:
+            self.tool_registry = get_registry()
+            self.tool_executor = ToolExecutor(self.tool_registry)
+            self.tools = self.tool_registry.get_openai_functions()
+
+            # Create OpenAI client for function calling
+            self.openai_client = OpenAIClient(
+                api_key=settings.openrouter_api_key,
+                base_url=settings.openrouter_api_base,
+            )
+            logger.info(f"Function calling enabled with {len(self.tools)} tools")
+        else:
+            self.tool_registry = None
+            self.tool_executor = None
+            self.tools = []
+            self.openai_client = None
+
         # Create custom prompt template based on instance configuration
         system_prompt = get_system_prompt(
             settings.instance_name,
             settings.instance_description,
             settings.organization,
+            include_tools=self.enable_function_calling,
         )
         self.prompt_template = PromptTemplate(system_prompt)
 
@@ -124,6 +165,64 @@ class RAGEngine:
         )
 
         logger.info(f"RAGEngine initialized with model {self.llm_model}")
+
+    def _check_for_function_calls(self, query_text: str) -> List[Dict[str, Any]]:
+        """
+        Check if the query requires any function calls.
+
+        Args:
+            query_text: The user's query.
+
+        Returns:
+            List of attachments generated from function calls.
+        """
+        if not self.enable_function_calling or not self.tools:
+            return []
+
+        try:
+            # Make initial call to check for function calls
+            response = self.openai_client.chat.completions.create(
+                model=self.llm_model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"You are {settings.instance_name}. Analyze the user's request and determine if you need to use any tools.",
+                    },
+                    {"role": "user", "content": query_text},
+                ],
+                tools=[{"type": "function", "function": tool} for tool in self.tools],
+                tool_choice="auto",
+                extra_headers={"HTTP-Referer": "https://github.com/imperial-dols/dols-gpt"},
+            )
+
+            message = response.choices[0].message
+
+            # Check if there are tool calls
+            if not hasattr(message, "tool_calls") or not message.tool_calls:
+                return []
+
+            # Execute function calls
+            function_calls = []
+            for tool_call in message.tool_calls:
+                function_name = tool_call.function.name
+                arguments = json.loads(tool_call.function.arguments)
+                function_calls.append({"name": function_name, "arguments": arguments})
+                logger.info(f"Function call requested: {function_name}")
+
+            # Execute all function calls
+            execution_result = self.tool_executor.execute_function_calls(function_calls)
+
+            logger.info(
+                f"Executed {len(function_calls)} function calls: "
+                f"{execution_result['success_count']} successful, "
+                f"{execution_result['error_count']} failed"
+            )
+
+            return execution_result.get("attachments", [])
+
+        except Exception as e:
+            logger.error(f"Error checking for function calls: {e}", exc_info=True)
+            return []
 
     def query(
         self,
@@ -141,6 +240,7 @@ class RAGEngine:
             Dictionary containing:
                 - response: Generated response text
                 - sources: List of source documents
+                - attachments: List of attachments from tool calls
                 - metadata: Additional metadata
 
         Raises:
@@ -152,6 +252,9 @@ class RAGEngine:
         logger.info(f"Processing query: {query_text[:100]}...")
 
         try:
+            # Check for function calls and generate attachments
+            attachments = self._check_for_function_calls(query_text)
+
             # Update top_k if provided
             if top_k:
                 self.query_engine.retriever.similarity_top_k = top_k
@@ -180,15 +283,18 @@ class RAGEngine:
             result = {
                 "response": str(response),
                 "sources": sources,
+                "attachments": attachments,
                 "metadata": {
                     "model": self.llm_model,
                     "num_sources": len(sources),
+                    "num_attachments": len(attachments),
                     "query_length": len(query_text),
                 },
             }
 
             logger.info(
-                f"Query processed successfully with {len(sources)} sources"
+                f"Query processed successfully with {len(sources)} sources "
+                f"and {len(attachments)} attachments"
             )
 
             return result

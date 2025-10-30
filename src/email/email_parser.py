@@ -367,10 +367,13 @@ class EmailParser:
             ValueError: If required fields are missing.
         """
         try:
-            # Parse message ID
-            message_id = message.uid or message.headers.get("message-id", [""])[0]
+            # Parse message ID - prefer the actual Message-ID header over IMAP UID
+            # The Message-ID header is what email clients use for threading
+            message_id = message.headers.get("message-id", [""])[0] or message.uid
             if not message_id:
                 raise ValueError("Message has no ID")
+
+            logger.info(f"Extracted Message-ID from email: {message_id}")
 
             # Parse sender
             sender = self.parse_email_address(message.from_)

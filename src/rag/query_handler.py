@@ -49,6 +49,7 @@ class QueryHandler:
                 - success: Boolean indicating if query succeeded
                 - response: Response text (if successful)
                 - sources: List of sources (if successful)
+                - attachments: List of attachments (if any)
                 - error: Error message (if failed)
                 - timestamp: Processing timestamp
                 - user_email: User email (if provided)
@@ -73,6 +74,7 @@ class QueryHandler:
                 "success": True,
                 "response": result["response"],
                 "sources": result["sources"],
+                "attachments": result.get("attachments", []),
                 "metadata": result["metadata"],
                 "timestamp": timestamp,
             }
@@ -80,9 +82,10 @@ class QueryHandler:
             if user_email:
                 response["user_email"] = user_email
 
+            num_attachments = len(response["attachments"])
             logger.info(
                 f"Query processed successfully for {user_email or 'unknown'} "
-                f"with {len(result['sources'])} sources"
+                f"with {len(result['sources'])} sources and {num_attachments} attachments"
             )
 
             return response

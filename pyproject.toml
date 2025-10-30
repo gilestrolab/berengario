@@ -43,6 +43,7 @@ dependencies = [
     "imap-tools>=1.7.0",
     "html2text>=2024.2.26",
     "markdown>=3.7",  # For converting markdown responses to HTML
+    "icalendar>=5.0.0",  # For generating calendar .ics files
 
     # Database (Message Tracking)
     "sqlalchemy>=2.0.0",  # Already included via llama-index, but explicit for clarity
