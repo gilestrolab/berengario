@@ -6,6 +6,9 @@ RAGInbox is a flexible infrastructure that combines document processing, vector 
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/gilestrolab/RAGInbox/workflows/CI/badge.svg)](https://github.com/gilestrolab/RAGInbox/actions/workflows/ci.yml)
+[![Docker Build](https://github.com/gilestrolab/RAGInbox/workflows/Docker%20Build/badge.svg)](https://github.com/gilestrolab/RAGInbox/actions/workflows/docker.yml)
+[![codecov](https://codecov.io/gh/gilestrolab/RAGInbox/branch/main/graph/badge.svg)](https://codecov.io/gh/gilestrolab/RAGInbox)
 
 ## Features
 
@@ -17,10 +20,14 @@ RAGInbox is a flexible infrastructure that combines document processing, vector 
   - Automatic KB updates from CC'd/forwarded emails
   - Automated RAG-powered email replies (NEW!)
   - SMTP email sending with HTML formatting
+  - Customizable email format (text, markdown, or HTML)
+  - Custom email footers
   - Email whitelist for security
   - Configurable forwarded email detection
   - Message tracking and deduplication
 - ⚙️ **Instance Configuration**: Deploy multiple customized instances
+  - Custom system prompts for AI behavior tuning
+  - Instance-specific branding and naming
 - 🔄 **Auto-monitoring**: Watch folders for automatic document updates
 - 📊 **Source Citations**: All responses include source references
 - 🗄️ **Flexible Storage**: SQLite or MariaDB for email tracking
@@ -28,6 +35,40 @@ RAGInbox is a flexible infrastructure that combines document processing, vector 
 ## Quick Start
 
 ### Installation
+
+#### Option 1: Docker (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/gilestrolab/RAGInbox.git
+cd RAGInbox
+
+# Copy and configure environment
+cp .env.example .env
+# Edit .env with your configuration
+
+# Start with docker-compose
+docker-compose up -d
+
+# View logs
+docker-compose logs -f raginbox
+```
+
+Docker images are automatically built and published to GitHub Container Registry:
+
+```bash
+# Pull latest image
+docker pull ghcr.io/gilestrolab/raginbox:latest
+
+# Run with docker
+docker run -d \
+  --name raginbox \
+  --env-file .env \
+  -v $(pwd)/data:/app/data \
+  ghcr.io/gilestrolab/raginbox:latest
+```
+
+#### Option 2: Local Installation
 
 ```bash
 # Clone the repository
@@ -164,6 +205,19 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 | `FORWARD_TO_KB_ENABLED` | Treat forwarded emails as KB content | `true` |
 | `FORWARD_SUBJECT_PREFIXES` | Forwarding prefixes (e.g., fw,fwd) | `fw,fwd` |
 
+### Email Response Customization
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `EMAIL_RESPONSE_FORMAT` | Email format: `text`, `markdown`, or `html` | `html` |
+| `EMAIL_CUSTOM_FOOTER_FILE` | Custom footer text file (optional) | None |
+
+### RAG Customization
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `RAG_CUSTOM_PROMPT_FILE` | Custom system prompt additions (optional) | None |
+
 See [`.env.example`](.env.example) for complete configuration options.
 
 ## Development
@@ -172,6 +226,11 @@ See [`.env.example`](.env.example) for complete configuration options.
 
 ```
 RAGInbox/
+├── .github/
+│   └── workflows/                 # CI/CD pipelines
+│       ├── ci.yml                 # Testing and linting
+│       ├── docker.yml             # Docker build and publish
+│       └── release.yml            # Release automation
 ├── src/
 │   ├── config.py                  # Configuration management
 │   ├── demo_phase1.py            # CLI interface
@@ -182,14 +241,21 @@ RAGInbox/
 │   ├── rag/
 │   │   ├── rag_engine.py         # Query engine
 │   │   └── query_handler.py      # Query processing
-│   ├── email/ (Phase 2)
+│   ├── email/                     # Email integration (Phase 2 & 3)
+│   │   ├── email_client.py        # IMAP inbox monitoring
+│   │   ├── email_sender.py        # SMTP email sending
+│   │   ├── email_parser.py        # Email parsing
+│   │   └── ...
 │   └── api/ (Phase 4)
 ├── tests/                         # Unit tests
 ├── data/                          # All persistent data (Docker volumes)
 │   ├── documents/                 # Source documents (watched folder)
 │   ├── chroma_db/                 # Vector database storage
 │   ├── config/                    # Configuration files
-│   │   └── allowed_senders.txt    # Email whitelist
+│   │   ├── allowed_teachers.txt   # Teaching whitelist
+│   │   ├── allowed_queriers.txt   # Query whitelist
+│   │   ├── custom_prompt.txt      # Custom system prompt (optional)
+│   │   └── email_footer.txt       # Custom email footer (optional)
 │   ├── logs/                      # Application logs
 │   │   └── dols_gpt.log           # Main log file
 │   ├── temp_attachments/          # Temporary email attachments
@@ -199,7 +265,11 @@ RAGInbox/
 │   ├── DATA_STRUCTURE.md          # Data directory structure
 │   ├── EMAIL_PROCESSING_RULES.md  # Email processing logic
 │   └── ...                        # See docs/README.md for full list
+├── Dockerfile                     # Production container image
+├── docker-compose.yml             # Docker Compose configuration
+├── .dockerignore                  # Docker build exclusions
 ├── pyproject.toml                 # Package configuration
+├── .env.example                   # Environment configuration template
 ├── PLANNING.md                    # Architecture documentation
 ├── TASK.md                        # Task tracking
 └── README.md                      # This file
@@ -225,6 +295,9 @@ RAGInbox includes comprehensive email integration for automatic knowledge base u
 **Query Response Features:**
 - Automated RAG-powered email replies
 - Professional HTML + plain text formatting
+- **Customizable email format** (text, markdown, or HTML)
+- **Custom email footers** for branded signatures
+- **Custom system prompts** for AI behavior tuning
 - Source citations with relevance scores
 - Email threading support (proper conversation grouping)
 - Customizable instance branding
@@ -238,6 +311,77 @@ RAGInbox includes comprehensive email integration for automatic knowledge base u
 - Background service daemon with auto-reconnection
 
 See [`docs/EMAIL_PROCESSING_RULES.md`](docs/EMAIL_PROCESSING_RULES.md) for detailed processing logic and configuration.
+
+### Customization
+
+RAGInbox supports extensive customization to match your organization's needs:
+
+#### Custom Email Format
+
+Control the format of email responses by setting `EMAIL_RESPONSE_FORMAT`:
+
+```bash
+# .env
+EMAIL_RESPONSE_FORMAT=html    # Styled HTML (default)
+# EMAIL_RESPONSE_FORMAT=markdown  # Markdown syntax in plain text
+# EMAIL_RESPONSE_FORMAT=text      # Simple plain text
+```
+
+- **html** (default): Professional styled HTML with CSS formatting
+- **markdown**: Plain text with markdown syntax (`## Sources`, `**bold**`)
+- **text**: Simple plain text with minimal formatting
+
+#### Custom Email Footer
+
+Replace the default email footer with your own branding:
+
+1. Copy the example template:
+   ```bash
+   cp data/config/email_footer.txt.example data/config/email_footer.txt
+   ```
+
+2. Edit `data/config/email_footer.txt` with your custom text:
+   ```
+   This response was generated by DoLS-GPT, your AI assistant.
+
+   For more information:
+   - Documentation: https://example.com/docs
+   - Support: support@example.com
+   - Office hours: Monday-Friday, 9AM-5PM GMT
+   ```
+
+3. Enable in `.env`:
+   ```bash
+   EMAIL_CUSTOM_FOOTER_FILE=data/config/email_footer.txt
+   ```
+
+The footer automatically converts newlines to `<br>` tags in HTML emails.
+
+#### Custom System Prompt
+
+Fine-tune the AI's behavior by appending custom instructions to the base system prompt:
+
+1. Copy the example template:
+   ```bash
+   cp data/config/custom_prompt.txt.example data/config/custom_prompt.txt
+   ```
+
+2. Edit `data/config/custom_prompt.txt` with your custom instructions:
+   ```
+   Additional instructions:
+   - Always use British English spelling
+   - Reference specific policy numbers when available
+   - Be especially detailed when discussing safety procedures
+   - Include links to relevant documentation when possible
+   - If a policy has changed recently, mention the effective date
+   ```
+
+3. Enable in `.env`:
+   ```bash
+   RAG_CUSTOM_PROMPT_FILE=data/config/custom_prompt.txt
+   ```
+
+Your custom instructions will be appended to the base system prompt, allowing you to customize AI behavior without modifying code.
 
 ### Data Directory Structure
 
@@ -274,6 +418,54 @@ black src/ tests/
 ruff check src/ tests/
 ```
 
+### CI/CD Pipeline
+
+RAGInbox uses GitHub Actions for automated testing, building, and deployment:
+
+#### Continuous Integration (`.github/workflows/ci.yml`)
+
+Runs on every push and pull request:
+
+- **Linting**: Black formatting check and Ruff linting
+- **Testing**: Pytest on Python 3.11, 3.12, and 3.13
+- **Coverage**: Automated code coverage reporting to Codecov
+- **Status**: Check the CI badge at the top of this README
+
+```bash
+# CI runs these commands automatically:
+black --check src/ tests/
+ruff check src/ tests/
+pytest tests/ -v --cov=src --cov-report=xml
+```
+
+#### Docker Build (`.github/workflows/docker.yml`)
+
+Builds and publishes Docker images:
+
+- **On Push to Main**: Builds multi-platform images (amd64, arm64)
+- **On Tags**: Publishes versioned releases to GitHub Container Registry
+- **Image Testing**: Validates container startup and imports
+- **Registry**: `ghcr.io/gilestrolab/raginbox`
+
+Available tags:
+- `latest` - Latest stable build from main branch
+- `v1.2.3` - Specific version tags
+- `main-abc123` - Branch builds with commit SHA
+
+#### Release Automation (`.github/workflows/release.yml`)
+
+Automated releases when tags are pushed:
+
+- **Changelog Generation**: Automatic from git commits
+- **GitHub Releases**: Created with release notes and artifacts
+- **Python Package**: Built and ready for PyPI (optional)
+
+To create a release:
+```bash
+git tag -a v1.0.0 -m "Release v1.0.0"
+git push origin v1.0.0
+```
+
 ## Roadmap
 
 - [x] **Phase 1**: Core RAG with document processing ✓
@@ -292,7 +484,13 @@ ruff check src/ tests/
   - Email threading support
   - Integration with EmailProcessor
 - [ ] **Phase 4**: Web frontend with chat interface
-- [ ] **Phase 5**: Docker deployment with docker-compose
+- [x] **Phase 5**: Docker deployment and CI/CD ✓
+  - Multi-stage Dockerfile for production
+  - Docker Compose with optional MariaDB
+  - Multi-platform builds (amd64, arm64)
+  - GitHub Actions CI/CD pipeline
+  - Automated testing and linting
+  - Container registry publishing
 
 ## API Providers
 

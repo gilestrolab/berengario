@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  # RAGInbox Email Service
+  raginbox:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: raginbox
+    restart: unless-stopped
+
+    # Environment variables (use .env file)
+    env_file:
+      - .env
+
+    # Volume mounts for persistent data
+    volumes:
+      - ./data/documents:/app/data/documents
+      - ./data/chroma_db:/app/data/chroma_db
+      - ./data/logs:/app/data/logs
+      - ./data/config:/app/data/config
+      - ./data/temp_attachments:/app/data/temp_attachments
+      # SQLite database (if using DB_TYPE=sqlite)
+      - ./data:/app/data
+
+    # API port (if using web interface)
+    ports:
+      - "${API_PORT:-8000}:8000"
+
+    # Depends on database (uncomment if using MariaDB)
+    # depends_on:
+    #   - mariadb
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+    networks:
+      - raginbox-network
+
+  # MariaDB Database (optional - uncomment if using DB_TYPE=mariadb)
+  # mariadb:
+  #   image: mariadb:11.2
+  #   container_name: raginbox-db
+  #   restart: unless-stopped
+  #
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-changeme}
+  #     MYSQL_DATABASE: ${DB_NAME:-raginbox}
+  #     MYSQL_USER: ${DB_USER:-raginbox}
+  #     MYSQL_PASSWORD: ${DB_PASSWORD:-changeme}
+  #
+  #   volumes:
+  #     - mariadb-data:/var/lib/mysql
+  #
+  #   ports:
+  #     - "3306:3306"
+  #
+  #   healthcheck:
+  #     test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 30s
+  #
+  #   networks:
+  #     - raginbox-network
+
+networks:
+  raginbox-network:
+    driver: bridge
+
+# Volumes for persistent data
+volumes:
+  mariadb-data:
+    driver: local

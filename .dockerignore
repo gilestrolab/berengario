@@ -1,0 +1,63 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+dist/
+build/
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Data directories (mounted as volumes)
+data/documents/*
+data/chroma_db/*
+data/logs/*
+data/temp_attachments/*
+data/*.db
+
+# Environment files (secrets)
+.env
+.env.*
+!.env.example
+
+# Task tracking
+TASK.md
+PLANNING.md
+
+# Tests
+tests/
+pytest.ini
+
+# CI/CD
+.github/
+
+# Misc
+*.log
+.DS_Store
+Thumbs.db
