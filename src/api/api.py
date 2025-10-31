@@ -1509,8 +1509,8 @@ async def create_backup(
                 # Clean up old backups (keep last 5, delete older than 7 days)
                 backup_manager.cleanup_old_backups(max_age_days=7, max_count=5)
 
-                # Generate download link
-                download_url = f"{settings.openai_api_base.replace('/api', '')}/api/admin/backups/{backup_path.name}"
+                # Generate download link using web base URL
+                download_url = f"{settings.web_base_url}/api/admin/backups/{backup_path.name}"
 
                 # Send email notification to admin
                 subject = f"[{settings.instance_name}] Data Backup Ready"

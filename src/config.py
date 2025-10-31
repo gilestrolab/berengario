@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     organization: str = Field(
         default="", description="Organization name (optional)"
     )
+    web_base_url: str = Field(
+        default="http://localhost:8000",
+        description="Base URL for web interface (used in email links)",
+    )
 
     # OpenAI Configuration (for embeddings via Naga.ac)
     openai_api_key: str = Field(..., description="OpenAI API key (or Naga.ac)")
