@@ -25,7 +25,7 @@ RAGInbox is a flexible infrastructure that combines document processing, vector 
   - Email whitelist for security
   - Configurable forwarded email detection
   - Message tracking and deduplication
-- 🌐 **Web Interface** (NEW!):
+- 🌐 **Web Interface**:
   - Modern chat interface with real-time query processing
   - OTP-based passwordless authentication via email
   - Session management with configurable timeout
@@ -33,6 +33,12 @@ RAGInbox is a flexible infrastructure that combines document processing, vector 
   - Conversation history persistence
   - Mobile-responsive design
   - Dynamic branding from environment variables
+- 🔧 **Admin Panel**:
+  - Whitelist management (queriers, teachers, admins)
+  - Document browser with view/download/delete
+  - Data backup with email notifications
+  - Audit logging for all admin actions
+  - Role-based access control
 - ⚙️ **Instance Configuration**: Deploy multiple customized instances
   - Custom system prompts for AI behavior tuning
   - Instance-specific branding and naming
@@ -125,6 +131,7 @@ The web interface provides:
 - **Conversation History**: Persistent session management
 - **Attachments**: Download generated files (calendar events, etc.)
 - **Dynamic Branding**: Instance name and description from .env
+- **Admin Panel**: Whitelist and document management (for admin users)
 
 #### CLI Interface
 
@@ -190,6 +197,11 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
    - Conversation history management
    - Attachment handling and downloads
    - Modern chat interface with responsive design
+   - Admin panel with role-based access control
+   - Whitelist management (queriers, teachers, admins)
+   - Document browser with view/download/delete
+   - Data backup with email notifications
+   - Audit logging for admin actions
 
 ### Tech Stack
 
@@ -209,6 +221,7 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 | `INSTANCE_NAME` | Name of your assistant | `DoLS-GPT` |
 | `INSTANCE_DESCRIPTION` | Purpose description | `AI assistant for...` |
 | `ORGANIZATION` | Organization name | `Imperial College` |
+| `WEB_BASE_URL` | Base URL for web interface | `http://localhost:8000` |
 
 ### API Settings
 
@@ -245,6 +258,8 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 | `EMAIL_TEACH_WHITELIST_ENABLED` | Enable teaching whitelist | `true` |
 | `EMAIL_QUERY_WHITELIST_FILE` | Who can query KB | `data/config/allowed_queriers.txt` |
 | `EMAIL_QUERY_WHITELIST_ENABLED` | Enable query whitelist | `true` |
+| `EMAIL_ADMIN_WHITELIST_FILE` | Admin panel access | `data/config/allowed_admins.txt` |
+| `EMAIL_ADMIN_WHITELIST_ENABLED` | Enable admin whitelist | `true` |
 | `FORWARD_TO_KB_ENABLED` | Treat forwarded emails as KB content | `true` |
 | `FORWARD_SUBJECT_PREFIXES` | Forwarding prefixes (e.g., fw,fwd) | `fw,fwd` |
 
@@ -301,13 +316,20 @@ RAGInbox/
 │   │   └── ...
 │   └── api/                        # Web interface (Phase 4)
 │       ├── api.py                  # FastAPI endpoints
+│       ├── admin/                  # Admin panel modules
+│       │   ├── whitelist_manager.py # Whitelist management
+│       │   ├── document_manager.py  # Document management
+│       │   ├── backup_manager.py    # Data backup
+│       │   └── audit_logger.py      # Admin audit logging
 │       └── static/                 # Frontend files
 │           ├── index.html          # Chat interface
 │           ├── login.html          # Login page
 │           ├── verify.html         # OTP verification
+│           ├── admin.html          # Admin panel
 │           ├── app.js              # Chat app logic
 │           ├── login.js            # Login logic
 │           ├── verify.js           # Verification logic
+│           ├── admin.js            # Admin panel logic
 │           ├── style.css           # Chat interface styles
 │           └── auth.css            # Authentication styles
 ├── tests/                         # Unit tests
@@ -317,10 +339,13 @@ RAGInbox/
 │   ├── config/                    # Configuration files
 │   │   ├── allowed_teachers.txt   # Teaching whitelist
 │   │   ├── allowed_queriers.txt   # Query whitelist
+│   │   ├── allowed_admins.txt     # Admin whitelist
 │   │   ├── custom_prompt.txt      # Custom system prompt (optional)
 │   │   └── email_footer.txt       # Custom email footer (optional)
 │   ├── logs/                      # Application logs
-│   │   └── dols_gpt.log           # Main log file
+│   │   ├── dols_gpt.log           # Main log file
+│   │   └── admin_audit.log        # Admin actions audit log
+│   ├── backups/                   # Data backups (ZIP files)
 │   ├── temp_attachments/          # Temporary email attachments
 │   └── message_tracker.db         # Email processing tracking
 ├── docs/                          # Documentation
@@ -406,6 +431,51 @@ user@example.com
 ```
 
 Users must be in the query whitelist to receive OTP codes. The system uses your existing SMTP configuration for sending authentication emails.
+
+### Admin Panel
+
+RAGInbox includes a comprehensive admin panel for managing your instance:
+
+**Access:** Users in the admin whitelist (`allowed_admins.txt`) will see an admin button after logging in to the web interface.
+
+**Features:**
+
+1. **Whitelist Management**
+   - Add/remove users from query, teacher, and admin whitelists
+   - Support for email addresses and domain wildcards
+   - Real-time whitelist updates without service restart
+
+2. **Document Management**
+   - Browse all documents in the knowledge base
+   - View email content that was ingested
+   - Download original document files (PDF, DOCX, etc.)
+   - Delete documents from the knowledge base
+   - See document metadata (type, source, hash)
+
+3. **Data Backup**
+   - Create full backups of the data directory
+   - Backups created asynchronously (non-blocking)
+   - Email notification with download link when complete
+   - List and download previous backups
+   - Automatic cleanup (keeps last 5, deletes older than 7 days)
+   - Backup files named with instance: `dols_gpt_backup_YYYYMMDD_HHMMSS.zip`
+
+4. **Audit Logging**
+   - All admin actions logged to `data/logs/admin_audit.log`
+   - Includes user, action, timestamp, and outcome
+   - Helps track changes and troubleshoot issues
+
+**Configuration:**
+```bash
+# .env
+EMAIL_ADMIN_WHITELIST_FILE=data/config/allowed_admins.txt
+EMAIL_ADMIN_WHITELIST_ENABLED=true
+WEB_BASE_URL=http://localhost:8000  # Used in backup notification emails
+
+# data/config/allowed_admins.txt
+admin@example.com
+@admin-domain.com  # All users at admin-domain.com
+```
 
 ### Customization
 
@@ -587,6 +657,9 @@ git push origin v1.0.0
   - Source citations and attachment downloads
   - Mobile-responsive design
   - Dynamic branding from environment variables
+  - Admin panel with whitelist and document management
+  - Data backup functionality with email notifications
+  - Audit logging for administrative actions
 - [x] **Phase 5**: Docker deployment and CI/CD ✓
   - Multi-stage Dockerfile for production
   - Docker Compose with optional MariaDB
