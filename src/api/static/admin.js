@@ -235,26 +235,34 @@ class AdminPanel {
             return;
         }
 
-        container.innerHTML = this.documents.map(doc => `
-            <div class="document-item">
-                <div class="document-info">
-                    <div class="filename">${this.escapeHtml(doc.filename)}</div>
-                    <div class="metadata">
-                        Type: ${this.escapeHtml(doc.file_type || 'unknown')} |
-                        Source: ${this.escapeHtml(doc.source_type || 'unknown')} |
-                        Hash: ${this.escapeHtml(doc.file_hash.substring(0, 16))}...
+        container.innerHTML = this.documents.map(doc => {
+            // Only show download button for file/manual sources (not email)
+            const canDownload = ['manual', 'file'].includes(doc.source_type);
+            const downloadButton = canDownload ? `
+                <button class="btn-download" onclick="adminPanel.downloadDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
+                    Download
+                </button>
+            ` : '';
+
+            return `
+                <div class="document-item">
+                    <div class="document-info">
+                        <div class="filename">${this.escapeHtml(doc.filename)}</div>
+                        <div class="metadata">
+                            Type: ${this.escapeHtml(doc.file_type || 'unknown')} |
+                            Source: ${this.escapeHtml(doc.source_type || 'unknown')} |
+                            Hash: ${this.escapeHtml(doc.file_hash.substring(0, 16))}...
+                        </div>
+                    </div>
+                    <div class="document-actions">
+                        ${downloadButton}
+                        <button class="btn-delete" onclick="adminPanel.deleteDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
+                            Delete
+                        </button>
                     </div>
                 </div>
-                <div class="document-actions">
-                    <button class="btn-download" onclick="adminPanel.downloadDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
-                        Download
-                    </button>
-                    <button class="btn-delete" onclick="adminPanel.deleteDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
-                        Delete
-                    </button>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     renderDocumentsError(message) {
