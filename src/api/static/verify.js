@@ -15,6 +15,9 @@ class VerifyPage {
     }
 
     async init() {
+        // Load instance configuration
+        await this.loadConfig();
+
         // Get email from session storage
         this.email = sessionStorage.getItem('verify_email');
 
@@ -32,6 +35,20 @@ class VerifyPage {
 
         // Setup event listeners
         this.setupEventListeners();
+    }
+
+    async loadConfig() {
+        try {
+            const response = await fetch('/api/config');
+            const config = await response.json();
+
+            // Update page title and headers
+            document.title = `Verify - ${config.instance_name}`;
+            document.getElementById('instance-name').textContent = config.instance_name;
+            document.getElementById('instance-description').textContent = config.instance_description;
+        } catch (error) {
+            console.error('Error loading config:', error);
+        }
     }
 
     async checkAuth() {

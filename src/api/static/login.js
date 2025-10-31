@@ -12,6 +12,9 @@ class LoginPage {
     }
 
     async init() {
+        // Load instance configuration
+        await this.loadConfig();
+
         // Check if already authenticated
         await this.checkAuth();
 
@@ -20,6 +23,20 @@ class LoginPage {
 
         // Setup event listeners
         this.setupEventListeners();
+    }
+
+    async loadConfig() {
+        try {
+            const response = await fetch('/api/config');
+            const config = await response.json();
+
+            // Update page title and headers
+            document.title = `Login - ${config.instance_name}`;
+            document.getElementById('instance-name').textContent = config.instance_name;
+            document.getElementById('instance-description').textContent = config.instance_description;
+        } catch (error) {
+            console.error('Error loading config:', error);
+        }
     }
 
     async checkAuth() {

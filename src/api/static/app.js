@@ -14,6 +14,7 @@ class ChatApp {
         this.isLoading = false;
         this.sessionId = null;
         this.userEmail = null;
+        this.config = null; // Store instance configuration
 
         this.init();
     }
@@ -27,6 +28,9 @@ class ChatApp {
             return;
         }
 
+        // Load instance configuration
+        await this.loadConfig();
+
         // Load KB stats
         await this.loadStats();
 
@@ -38,6 +42,30 @@ class ChatApp {
 
         // Focus input
         this.queryInput.focus();
+    }
+
+    async loadConfig() {
+        try {
+            const response = await fetch('/api/config');
+            this.config = await response.json();
+
+            // Update page title and headers
+            document.title = this.config.instance_name;
+            document.getElementById('instance-name').textContent = this.config.instance_name;
+            document.getElementById('instance-description').textContent = this.config.instance_description;
+
+            // Update welcome message if present
+            const welcomeTitle = document.getElementById('welcome-title');
+            const welcomeDescription = document.getElementById('welcome-description');
+            if (welcomeTitle) {
+                welcomeTitle.textContent = `Welcome to ${this.config.instance_name}`;
+            }
+            if (welcomeDescription && this.config.instance_description) {
+                welcomeDescription.textContent = this.config.instance_description;
+            }
+        } catch (error) {
+            console.error('Error loading config:', error);
+        }
     }
 
     async checkAuth() {
@@ -345,12 +373,15 @@ class ChatApp {
             const data = await response.json();
 
             if (data.success) {
-                // Clear messages
+                // Clear messages with dynamic instance name
+                const instanceName = this.config ? this.config.instance_name : 'RAGInbox';
+                const instanceDescription = this.config ? this.config.instance_description : 'Ask me anything about the knowledge base documents.';
+
                 this.messagesContainer.innerHTML = `
                     <div class="welcome-message">
                         <div class="welcome-icon">💬</div>
-                        <h2>Welcome to RAGInbox</h2>
-                        <p>Ask me anything about the knowledge base documents.</p>
+                        <h2 id="welcome-title">Welcome to ${instanceName}</h2>
+                        <p id="welcome-description">${instanceDescription}</p>
                         <p class="welcome-hint">Your conversation history will be saved during this session.</p>
                     </div>
                 `;

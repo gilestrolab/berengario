@@ -966,6 +966,21 @@ async def get_stats():
         return StatsResponse(total_chunks=0, unique_documents=0, documents=[])
 
 
+@app.get("/api/config")
+async def get_config():
+    """
+    Get public instance configuration.
+
+    Returns:
+        Instance name, description, and organization
+    """
+    return {
+        "instance_name": settings.instance_name,
+        "instance_description": settings.instance_description,
+        "organization": settings.organization,
+    }
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Docker."""
