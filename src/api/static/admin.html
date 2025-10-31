@@ -339,6 +339,108 @@
         .btn-view:hover {
             background: var(--success-dark, #218838);
         }
+
+        /* Backup section styles */
+        .backup-section {
+            padding: 1rem 0;
+        }
+
+        .backup-section h3 {
+            margin-bottom: 1rem;
+            color: var(--text-primary, #333);
+        }
+
+        .btn-create-backup {
+            padding: 0.75rem 1.5rem;
+            background: var(--success, #28a745);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: background 0.3s;
+            margin-bottom: 1rem;
+        }
+
+        .btn-create-backup:hover {
+            background: var(--success-dark, #218838);
+        }
+
+        .btn-create-backup:disabled {
+            background: var(--text-secondary, #666);
+            cursor: not-allowed;
+        }
+
+        .backups-list {
+            background: var(--bg-secondary, #f8f9fa);
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+            padding: 1rem;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .backup-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: white;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+        }
+
+        .backup-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .backup-info {
+            flex: 1;
+        }
+
+        .backup-info .backup-name {
+            font-weight: 500;
+            color: var(--text-primary, #333);
+            margin-bottom: 0.25rem;
+        }
+
+        .backup-info .backup-metadata {
+            font-size: 0.875rem;
+            color: var(--text-secondary, #666);
+        }
+
+        .backup-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .backup-actions button {
+            padding: 0.5rem 1rem;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-size: 0.875rem;
+        }
+
+        .backup-actions .btn-download-backup {
+            background: var(--primary, #007bff);
+        }
+
+        .backup-actions .btn-download-backup:hover {
+            background: var(--primary-dark, #0056b3);
+        }
+
+        .backup-actions .btn-delete-backup {
+            background: var(--danger, #dc3545);
+        }
+
+        .backup-actions .btn-delete-backup:hover {
+            background: var(--danger-dark, #c82333);
+        }
     </style>
 </head>
 <body>
@@ -351,6 +453,7 @@
         <div class="tabs">
             <button class="tab active" data-tab="whitelists">Whitelists</button>
             <button class="tab" data-tab="documents">Documents</button>
+            <button class="tab" data-tab="backups">Backups</button>
         </div>
 
         <!-- Whitelists Tab -->
@@ -402,6 +505,24 @@
         <div id="documents-tab" class="tab-content">
             <div class="documents-list" id="documents-list">
                 <div class="loading">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Backups Tab -->
+        <div id="backups-tab" class="tab-content">
+            <div class="backup-section">
+                <h3>Data Backup</h3>
+                <p style="margin-bottom: 1rem; color: var(--text-secondary, #666); font-size: 0.875rem;">
+                    Create a backup of the entire data directory. The backup will be created as a ZIP file and you'll receive a download link via email.
+                </p>
+                <button class="btn-create-backup" onclick="adminPanel.createBackup()">
+                    Create New Backup
+                </button>
+
+                <h3 style="margin-top: 2rem;">Available Backups</h3>
+                <div class="backups-list" id="backups-list">
+                    <div class="loading">Loading...</div>
+                </div>
             </div>
         </div>
     </div>

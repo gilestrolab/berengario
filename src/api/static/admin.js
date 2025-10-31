@@ -11,6 +11,7 @@ class AdminPanel {
             admins: []
         };
         this.documents = [];
+        this.backups = [];
         this.init();
     }
 
@@ -27,6 +28,7 @@ class AdminPanel {
         // Load initial data
         await this.loadAllWhitelists();
         await this.loadDocuments();
+        await this.loadBackups();
     }
 
     async checkAuth() {
@@ -391,6 +393,153 @@ class AdminPanel {
             await this.loadDocuments();
         } catch (error) {
             console.error('Error deleting document:', error);
+            this.showToast(error.message, 'error');
+        }
+    }
+
+    async loadBackups() {
+        try {
+            const response = await fetch('/api/admin/backups');
+
+            if (!response.ok) {
+                throw new Error('Failed to load backups');
+            }
+
+            const data = await response.json();
+            this.backups = data.backups;
+            this.renderBackups();
+        } catch (error) {
+            console.error('Error loading backups:', error);
+            this.renderBackupsError(error.message);
+        }
+    }
+
+    renderBackups() {
+        const container = document.getElementById('backups-list');
+        if (!container) return;
+
+        if (this.backups.length === 0) {
+            container.innerHTML = '<div class="empty-state">No backups available</div>';
+            return;
+        }
+
+        container.innerHTML = this.backups.map(backup => {
+            const createdDate = new Date(backup.created).toLocaleString();
+
+            return `
+                <div class="backup-item">
+                    <div class="backup-info">
+                        <div class="backup-name">${this.escapeHtml(backup.filename)}</div>
+                        <div class="backup-metadata">
+                            Size: ${backup.size_mb} MB | Created: ${createdDate}
+                        </div>
+                    </div>
+                    <div class="backup-actions">
+                        <button class="btn-download-backup" onclick="adminPanel.downloadBackup('${this.escapeHtml(backup.filename)}')">
+                            Download
+                        </button>
+                        <button class="btn-delete-backup" onclick="adminPanel.deleteBackup('${this.escapeHtml(backup.filename)}')">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    renderBackupsError(message) {
+        const container = document.getElementById('backups-list');
+        if (!container) return;
+
+        container.innerHTML = `<div class="error-message">Error: ${this.escapeHtml(message)}</div>`;
+    }
+
+    async createBackup() {
+        if (!confirm('Create a data backup?\n\nThis will create a ZIP file of the entire data directory. You will receive an email with a download link when the backup is complete.\n\nNote: This may take a few minutes for large knowledge bases.')) {
+            return;
+        }
+
+        try {
+            // Disable the button to prevent multiple clicks
+            const button = document.querySelector('.btn-create-backup');
+            if (button) {
+                button.disabled = true;
+                button.textContent = 'Creating backup...';
+            }
+
+            const response = await fetch('/api/admin/backup/create', {
+                method: 'POST',
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to create backup');
+            }
+
+            this.showToast(data.message, 'success');
+
+            // Re-enable button after a delay
+            setTimeout(() => {
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = 'Create New Backup';
+                }
+                // Reload backups list after some time to show the new backup
+                setTimeout(() => this.loadBackups(), 5000);
+            }, 2000);
+
+        } catch (error) {
+            console.error('Error creating backup:', error);
+            this.showToast(error.message, 'error');
+
+            // Re-enable button on error
+            const button = document.querySelector('.btn-create-backup');
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Create New Backup';
+            }
+        }
+    }
+
+    downloadBackup(filename) {
+        // Create a download link and trigger it
+        const downloadUrl = `/api/admin/backups/${filename}`;
+
+        // Create temporary link element
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = filename;
+        link.style.display = 'none';
+
+        // Add to DOM, click, and remove
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        this.showToast(`Downloading ${filename}...`, 'success');
+    }
+
+    async deleteBackup(filename) {
+        if (!confirm(`Delete backup "${filename}"?\n\nThis action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/backups/${filename}`, {
+                method: 'DELETE',
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to delete backup');
+            }
+
+            this.showToast(data.message, 'success');
+            await this.loadBackups();
+        } catch (error) {
+            console.error('Error deleting backup:', error);
             this.showToast(error.message, 'error');
         }
     }

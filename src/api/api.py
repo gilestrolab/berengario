@@ -26,6 +26,7 @@ from src.document_processing.document_processor import DocumentProcessor
 from src.api.admin.whitelist_manager import WhitelistManager
 from src.api.admin.document_manager import DocumentManager
 from src.api.admin.audit_logger import AdminAuditLogger
+from src.api.admin.backup_manager import BackupManager
 
 logger = logging.getLogger(__name__)
 
@@ -467,6 +468,7 @@ document_manager = DocumentManager(
     document_processor=document_processor,
 )
 audit_logger = AdminAuditLogger()
+backup_manager = BackupManager()
 
 # Mount static files
 static_dir = Path(__file__).parent / "static"
@@ -1472,6 +1474,247 @@ async def download_document(
     except Exception as e:
         logger.error(f"Error downloading document {file_hash}: {e}")
         raise HTTPException(status_code=500, detail=f"Error downloading document: {str(e)}")
+
+
+# Backup endpoints
+@app.post("/api/admin/backup/create")
+async def create_backup(
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(require_admin),
+):
+    """
+    Create a backup of the data directory.
+
+    Backup is created asynchronously and a download link is emailed to the admin.
+
+    Requires admin privileges.
+
+    Args:
+        background_tasks: FastAPI background tasks
+        session: Admin session (injected by dependency)
+
+    Returns:
+        Success message with backup info
+
+    Raises:
+        HTTPException: If backup creation fails
+    """
+    try:
+        # Start backup creation in the background
+        async def create_and_notify():
+            try:
+                # Create the backup
+                backup_path = await backup_manager.create_backup(exclude_backups=True)
+
+                # Clean up old backups (keep last 5, delete older than 7 days)
+                backup_manager.cleanup_old_backups(max_age_days=7, max_count=5)
+
+                # Generate download link
+                download_url = f"{settings.openai_api_base.replace('/api', '')}/api/admin/backups/{backup_path.name}"
+
+                # Send email notification to admin
+                subject = f"[{settings.instance_name}] Data Backup Ready"
+                body = f"""
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <h2 style="color: #333;">Data Backup Complete</h2>
+
+    <p>Your data backup has been created successfully.</p>
+
+    <div style="background-color: #f8f9fa; border-left: 4px solid #007bff; padding: 15px; margin: 20px 0;">
+        <p style="margin: 0;"><strong>Backup Details:</strong></p>
+        <p style="margin: 5px 0;">Filename: {backup_path.name}</p>
+        <p style="margin: 5px 0;">Size: {backup_path.stat().st_size / (1024*1024):.2f} MB</p>
+        <p style="margin: 5px 0;">Created: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+    </div>
+
+    <p>
+        <a href="{download_url}"
+           style="display: inline-block; padding: 12px 24px; background-color: #007bff; color: white;
+                  text-decoration: none; border-radius: 4px; font-weight: bold;">
+            Download Backup
+        </a>
+    </p>
+
+    <p style="color: #666; font-size: 0.9em;">
+        Note: Backup files are automatically cleaned up after 7 days or when more than 5 backups exist.
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+    <p style="color: #999; font-size: 0.85em;">
+        {settings.instance_name}
+        {f"<br>{settings.organization}" if settings.organization else ""}
+    </p>
+</body>
+</html>
+                """
+
+                await email_sender.send_email(
+                    to_addresses=[session.email],
+                    subject=subject,
+                    body=body,
+                    is_html=True,
+                )
+
+                # Log the action
+                audit_logger.log_action(
+                    session.email,
+                    "backup_create",
+                    backup_path.name,
+                    "success",
+                    f"size:{backup_path.stat().st_size}"
+                )
+
+                logger.info(f"Admin {session.email} created backup: {backup_path.name}")
+
+            except Exception as e:
+                logger.error(f"Error in backup creation task: {e}")
+                # Try to send error notification
+                try:
+                    await email_sender.send_email(
+                        to_addresses=[session.email],
+                        subject=f"[{settings.instance_name}] Backup Failed",
+                        body=f"Backup creation failed: {str(e)}",
+                        is_html=False,
+                    )
+                except:
+                    pass
+
+        # Add to background tasks
+        background_tasks.add_task(create_and_notify)
+
+        return {
+            "success": True,
+            "message": "Backup creation started. You will receive an email with the download link when complete.",
+        }
+
+    except Exception as e:
+        logger.error(f"Error starting backup: {e}")
+        raise HTTPException(status_code=500, detail=f"Error starting backup: {str(e)}")
+
+
+@app.get("/api/admin/backups")
+async def list_backups(session: Session = Depends(require_admin)):
+    """
+    List all available backup files.
+
+    Requires admin privileges.
+
+    Args:
+        session: Admin session (injected by dependency)
+
+    Returns:
+        List of backup files with metadata
+    """
+    try:
+        backups = backup_manager.list_backups()
+        return {
+            "success": True,
+            "backups": backups,
+            "count": len(backups),
+        }
+    except Exception as e:
+        logger.error(f"Error listing backups: {e}")
+        raise HTTPException(status_code=500, detail=f"Error listing backups: {str(e)}")
+
+
+@app.get("/api/admin/backups/{filename}")
+async def download_backup(
+    filename: str,
+    session: Session = Depends(require_admin),
+):
+    """
+    Download a specific backup file.
+
+    Requires admin privileges.
+
+    Args:
+        filename: Name of the backup file
+        session: Admin session (injected by dependency)
+
+    Returns:
+        Backup file download response
+
+    Raises:
+        HTTPException: If backup file not found
+    """
+    try:
+        # Get backup path
+        backup_path = backup_manager.get_backup_path(filename)
+
+        if not backup_path:
+            raise HTTPException(status_code=404, detail=f"Backup file not found: {filename}")
+
+        # Log the download
+        audit_logger.log_action(
+            session.email,
+            "backup_download",
+            filename,
+            "success",
+            f"size:{backup_path.stat().st_size}"
+        )
+
+        logger.info(f"Admin {session.email} downloaded backup: {filename}")
+
+        return FileResponse(
+            backup_path,
+            media_type="application/zip",
+            filename=filename,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading backup {filename}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error downloading backup: {str(e)}")
+
+
+@app.delete("/api/admin/backups/{filename}")
+async def delete_backup(
+    filename: str,
+    session: Session = Depends(require_admin),
+):
+    """
+    Delete a specific backup file.
+
+    Requires admin privileges.
+
+    Args:
+        filename: Name of the backup file to delete
+        session: Admin session (injected by dependency)
+
+    Returns:
+        Success message
+
+    Raises:
+        HTTPException: If deletion fails
+    """
+    try:
+        success = backup_manager.delete_backup(filename)
+
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Backup file not found: {filename}")
+
+        # Log the action
+        audit_logger.log_action(
+            session.email,
+            "backup_delete",
+            filename,
+            "success",
+        )
+
+        logger.info(f"Admin {session.email} deleted backup: {filename}")
+
+        return {
+            "success": True,
+            "message": f"Backup '{filename}' deleted successfully",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting backup {filename}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error deleting backup: {str(e)}")
 
 
 @app.get("/api/config")
