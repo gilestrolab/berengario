@@ -90,6 +90,7 @@ class AuthStatusResponse(BaseModel):
     authenticated: bool
     email: Optional[str] = None
     session_id: Optional[str] = None
+    is_admin: bool = False
 
 
 # OTP Management
@@ -227,6 +228,7 @@ class Session:
         last_activity: Last activity timestamp
         authenticated: Whether session is authenticated
         email: Authenticated email address (if authenticated)
+        is_admin: Whether user has admin privileges
     """
 
     session_id: str
@@ -236,18 +238,22 @@ class Session:
     last_activity: datetime = field(default_factory=datetime.now)
     authenticated: bool = False
     email: Optional[str] = None
+    is_admin: bool = False
 
-    def authenticate(self, email: str):
+    def authenticate(self, email: str, is_admin: bool = False):
         """
         Authenticate session with email.
 
         Args:
             email: Authenticated email address
+            is_admin: Whether user has admin privileges
         """
         self.authenticated = True
         self.email = email.lower()
+        self.is_admin = is_admin
         self.last_activity = datetime.now()
-        logger.info(f"Session {self.session_id} authenticated for {email}")
+        admin_status = " (admin)" if is_admin else ""
+        logger.info(f"Session {self.session_id} authenticated for {email}{admin_status}")
 
     def is_authenticated(self) -> bool:
         """Check if session is authenticated."""
@@ -398,11 +404,17 @@ query_handler = QueryHandler()
 otp_manager = OTPManager()
 email_sender = EmailSender()
 
-# Initialize whitelist validator for authentication
+# Initialize whitelist validators for authentication
 query_whitelist = WhitelistValidator(
     whitelist_file=settings.email_query_whitelist_file,
     whitelist=settings.email_query_whitelist,
     enabled=settings.email_query_whitelist_enabled,
+)
+
+admin_whitelist = WhitelistValidator(
+    whitelist_file=settings.email_admin_whitelist_file,
+    whitelist=settings.email_admin_whitelist,
+    enabled=settings.email_admin_whitelist_enabled,
 )
 
 # Mount static files
@@ -590,6 +602,32 @@ async def require_auth(request: Request) -> Session:
     return session
 
 
+async def require_admin(request: Request) -> Session:
+    """
+    Dependency to require admin privileges for endpoints.
+
+    Args:
+        request: FastAPI request object
+
+    Returns:
+        Authenticated admin session
+
+    Raises:
+        HTTPException: If not authenticated or not an admin
+    """
+    # First check authentication
+    session = await require_auth(request)
+
+    # Then check admin status
+    if not session.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden. Admin privileges required.",
+        )
+
+    return session
+
+
 # API Endpoints
 
 # Authentication Endpoints
@@ -660,13 +698,17 @@ async def verify_otp(
         session_id = get_session_id(request)
         session = session_manager.get_or_create_session(session_id)
 
-        # Authenticate session
-        session.authenticate(email)
+        # Check if user is admin
+        is_admin = admin_whitelist.is_allowed(email)
+
+        # Authenticate session with admin status
+        session.authenticate(email, is_admin=is_admin)
 
         # Set session cookie
         set_session_cookie(response, session.session_id)
 
-        logger.info(f"Successfully authenticated {email}")
+        admin_status = " (admin)" if is_admin else ""
+        logger.info(f"Successfully authenticated {email}{admin_status}")
 
         return AuthResponse(
             success=True,
@@ -725,6 +767,7 @@ async def auth_status(request: Request):
         authenticated=True,
         email=session.email,
         session_id=session.session_id,
+        is_admin=session.is_admin,
     )
 
 
