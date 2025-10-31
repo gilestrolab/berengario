@@ -6,7 +6,7 @@ Handles creating zip archives of the data directory and sending download links.
 
 import asyncio
 import logging
-import shutil
+import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -94,44 +94,38 @@ class BackupManager:
             Exception: If zip creation fails.
         """
         try:
-            # Create a temporary directory for the zip
-            temp_backup = backup_path.with_suffix('.tmp')
+            # Create zip file
+            with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                # Walk through the data directory
+                for item in self.data_dir.rglob('*'):
+                    # Skip if it's the backup file itself
+                    if item == backup_path:
+                        continue
 
-            # Define ignore function
-            def ignore_patterns(directory, files):
-                ignored = []
-                if exclude_backups and Path(directory) == self.data_dir:
-                    # Exclude backups directory and temp files
-                    ignored.extend([
-                        f for f in files
-                        if f == 'backups' or f.startswith('.') or f.endswith('.tmp')
-                    ])
-                elif Path(directory).name == 'backups':
-                    # Skip entire backups directory
-                    ignored.extend(files)
-                return ignored
+                    # Skip backups directory if requested
+                    if exclude_backups:
+                        # Check if this path is inside the backups directory
+                        try:
+                            item.relative_to(self.backup_dir)
+                            continue  # Skip files in backups directory
+                        except ValueError:
+                            pass  # Not in backups directory, include it
 
-            # Create the zip archive
-            shutil.make_archive(
-                str(temp_backup.with_suffix('')),
-                'zip',
-                root_dir=self.data_dir.parent,
-                base_dir=self.data_dir.name,
-                ignore=ignore_patterns
-            )
+                    # Skip hidden files and temp files
+                    if item.name.startswith('.') or item.name.endswith('.tmp'):
+                        continue
 
-            # Rename temp file to final name
-            temp_zip = temp_backup.with_suffix('.zip')
-            temp_zip.rename(backup_path)
+                    # Add file or directory to zip
+                    if item.is_file():
+                        # Calculate relative path from data directory
+                        arcname = item.relative_to(self.data_dir.parent)
+                        zipf.write(item, arcname)
 
         except Exception as e:
             logger.error(f"Error creating zip archive: {e}")
-            # Clean up temp files
-            if temp_backup.exists():
-                temp_backup.unlink()
-            temp_zip = temp_backup.with_suffix('.zip')
-            if temp_zip.exists():
-                temp_zip.unlink()
+            # Clean up partial backup file
+            if backup_path.exists():
+                backup_path.unlink()
             raise
 
     def get_backup_path(self, filename: str) -> Optional[Path]:
