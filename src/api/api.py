@@ -1333,6 +1333,67 @@ async def delete_document(
         raise HTTPException(status_code=500, detail=f"Error deleting document: {str(e)}")
 
 
+@app.get("/api/admin/documents/{file_hash}/view")
+async def view_document(
+    file_hash: str,
+    session: Session = Depends(require_admin),
+):
+    """
+    View the text content of a document from the knowledge base.
+
+    Requires admin privileges.
+
+    Args:
+        file_hash: SHA-256 hash of document to view
+        session: Admin session (injected by dependency)
+
+    Returns:
+        JSON with document content and metadata
+
+    Raises:
+        HTTPException: If document not found
+    """
+    try:
+        # Get document info
+        documents = document_manager.list_documents()
+        doc = next((d for d in documents if d.get('file_hash') == file_hash), None)
+
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"Document not found with hash: {file_hash}")
+
+        # Get content from KB
+        content = kb_manager.get_document_content(file_hash)
+
+        if not content:
+            raise HTTPException(status_code=404, detail=f"No content found for document: {doc['filename']}")
+
+        # Log the view action
+        audit_logger.log_action(
+            session.email,
+            "document_view",
+            doc['filename'],
+            "success",
+            f"hash:{file_hash}"
+        )
+
+        logger.info(f"Admin {session.email} viewed document: {doc['filename']}")
+
+        return {
+            "success": True,
+            "filename": doc['filename'],
+            "file_hash": file_hash,
+            "source_type": doc.get('source_type'),
+            "file_type": doc.get('file_type'),
+            "content": content,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error viewing document {file_hash}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error viewing document: {str(e)}")
+
+
 @app.get("/api/admin/documents/{file_hash}/download")
 async def download_document(
     file_hash: str,

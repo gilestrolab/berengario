@@ -236,11 +236,19 @@ class AdminPanel {
         }
 
         container.innerHTML = this.documents.map(doc => {
-            // Only show download button for file/manual sources (not email)
+            // Determine which buttons to show based on source type
             const canDownload = ['manual', 'file'].includes(doc.source_type);
+            const canView = doc.source_type === 'email';
+
             const downloadButton = canDownload ? `
                 <button class="btn-download" onclick="adminPanel.downloadDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
                     Download
+                </button>
+            ` : '';
+
+            const viewButton = canView ? `
+                <button class="btn-view" onclick="adminPanel.viewDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
+                    View
                 </button>
             ` : '';
 
@@ -255,6 +263,7 @@ class AdminPanel {
                         </div>
                     </div>
                     <div class="document-actions">
+                        ${viewButton}
                         ${downloadButton}
                         <button class="btn-delete" onclick="adminPanel.deleteDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
                             Delete
@@ -270,6 +279,39 @@ class AdminPanel {
         if (!container) return;
 
         container.innerHTML = `<div class="error-message">Error: ${this.escapeHtml(message)}</div>`;
+    }
+
+    async viewDocument(fileHash, filename) {
+        try {
+            const response = await fetch(`/api/admin/documents/${fileHash}/view`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to load document content');
+            }
+
+            // Update modal content
+            document.getElementById('modal-title').textContent = `View: ${filename}`;
+            document.getElementById('modal-content').textContent = data.content;
+
+            // Show modal
+            document.getElementById('view-modal').classList.add('active');
+
+            // Close modal on background click
+            document.getElementById('view-modal').onclick = (e) => {
+                if (e.target.id === 'view-modal') {
+                    this.closeViewModal();
+                }
+            };
+
+        } catch (error) {
+            console.error('Error viewing document:', error);
+            this.showToast(error.message, 'error');
+        }
+    }
+
+    closeViewModal() {
+        document.getElementById('view-modal').classList.remove('active');
     }
 
     downloadDocument(fileHash, filename) {

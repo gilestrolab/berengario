@@ -142,6 +142,40 @@ class KnowledgeBaseManager:
             logger.error(f"Error checking document existence: {e}")
             return False
 
+    def get_document_content(self, file_hash: str) -> str:
+        """
+        Get the full text content of a document by reconstructing from chunks.
+
+        Args:
+            file_hash: SHA-256 hash of the document.
+
+        Returns:
+            Concatenated text from all chunks.
+
+        Raises:
+            Exception: If retrieval fails.
+        """
+        try:
+            # Get all chunks with this hash
+            results = self.collection.get(
+                where={"file_hash": file_hash},
+                include=["documents", "metadatas"]
+            )
+
+            if not results["documents"]:
+                logger.warning(f"No content found for hash {file_hash}")
+                return ""
+
+            # Concatenate all chunk texts
+            # Note: Chunks may have overlap, but this gives the full content
+            full_text = "\n\n".join(results["documents"])
+            logger.info(f"Retrieved {len(results['documents'])} chunks for hash {file_hash}")
+
+            return full_text
+        except Exception as e:
+            logger.error(f"Failed to get document content: {e}")
+            raise
+
     def delete_document_by_hash(self, file_hash: str) -> int:
         """
         Delete all nodes associated with a document hash.
