@@ -61,7 +61,22 @@ class AdminPanel {
 
             // Update page title
             document.title = `Admin Panel - ${config.instance_name}`;
-            document.getElementById('admin-title').textContent = `${config.instance_name} - Admin Panel`;
+
+            // Update header with organization if available
+            let headerText = `${config.instance_name} - Admin Panel`;
+            if (config.organization) {
+                headerText = `${config.instance_name} - Admin Panel`;
+                // Add organization as subtitle
+                const adminTitle = document.getElementById('admin-title');
+                adminTitle.innerHTML = `
+                    ${config.instance_name} - Admin Panel
+                    <div style="font-size: 0.6em; font-weight: normal; color: var(--text-secondary, #666); margin-top: 0.25rem;">
+                        ${config.organization}
+                    </div>
+                `;
+            } else {
+                document.getElementById('admin-title').textContent = headerText;
+            }
         } catch (error) {
             console.error('Error loading config:', error);
         }
