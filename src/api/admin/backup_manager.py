@@ -11,8 +11,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from src.config import settings
-
 logger = logging.getLogger(__name__)
 
 
@@ -28,10 +26,10 @@ class BackupManager:
         Initialize the Backup Manager.
 
         Args:
-            data_dir: Path to the data directory to backup (default: settings.data_dir).
+            data_dir: Path to the data directory to backup (default: data/).
             backup_dir: Path to store backup files (default: data_dir/backups).
         """
-        self.data_dir = data_dir or Path(settings.data_dir)
+        self.data_dir = data_dir or Path("data")
         self.backup_dir = backup_dir or (self.data_dir / "backups")
 
         # Ensure backup directory exists
@@ -47,8 +45,7 @@ class BackupManager:
             Backup filename with timestamp.
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        instance_name = settings.instance_name.replace(" ", "_").lower()
-        return f"{instance_name}_backup_{timestamp}.zip"
+        return f"raginbox_backup_{timestamp}.zip"
 
     async def create_backup(self, exclude_backups: bool = True) -> Path:
         """
