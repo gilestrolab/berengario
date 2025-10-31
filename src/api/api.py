@@ -21,6 +21,11 @@ from src.config import settings
 from src.rag.query_handler import QueryHandler
 from src.email.email_sender import EmailSender
 from src.email.whitelist_validator import WhitelistValidator
+from src.document_processing.kb_manager import KnowledgeBaseManager
+from src.document_processing.document_processor import DocumentProcessor
+from src.api.admin.whitelist_manager import WhitelistManager
+from src.api.admin.document_manager import DocumentManager
+from src.api.admin.audit_logger import AdminAuditLogger
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +96,42 @@ class AuthStatusResponse(BaseModel):
     email: Optional[str] = None
     session_id: Optional[str] = None
     is_admin: bool = False
+
+
+# Admin Models
+class WhitelistEntryRequest(BaseModel):
+    """Request model for whitelist entry operations."""
+
+    entry: str
+
+
+class WhitelistResponse(BaseModel):
+    """Response model for whitelist data."""
+
+    entries: List[str]
+    whitelist_type: str
+
+
+class AdminActionResponse(BaseModel):
+    """Response model for admin actions."""
+
+    success: bool
+    message: str
+    details: Optional[Dict] = None
+
+
+class DocumentListResponse(BaseModel):
+    """Response model for document list."""
+
+    documents: List[Dict]
+    total_count: int
+
+
+class DocumentDeleteRequest(BaseModel):
+    """Request model for document deletion."""
+
+    file_hash: str
+    archive: bool = True
 
 
 # OTP Management
@@ -416,6 +457,16 @@ admin_whitelist = WhitelistValidator(
     whitelist=settings.email_admin_whitelist,
     enabled=settings.email_admin_whitelist_enabled,
 )
+
+# Initialize admin managers
+kb_manager = KnowledgeBaseManager()
+document_processor = DocumentProcessor(kb_manager=kb_manager)
+whitelist_manager = WhitelistManager()
+document_manager = DocumentManager(
+    kb_manager=kb_manager,
+    document_processor=document_processor,
+)
+audit_logger = AdminAuditLogger()
 
 # Mount static files
 static_dir = Path(__file__).parent / "static"
@@ -1007,6 +1058,265 @@ async def get_stats():
     except Exception as e:
         logger.error(f"Error getting stats: {e}")
         return StatsResponse(total_chunks=0, unique_documents=0, documents=[])
+
+
+# Admin Endpoints
+@app.get("/api/admin/whitelists/{whitelist_type}", response_model=WhitelistResponse)
+async def get_whitelist(
+    whitelist_type: str,
+    session: Session = Depends(require_admin),
+):
+    """
+    Get whitelist entries.
+
+    Requires admin privileges.
+
+    Args:
+        whitelist_type: Type of whitelist (queriers, teachers, admins)
+        session: Admin session (injected by dependency)
+
+    Returns:
+        WhitelistResponse with entries
+
+    Raises:
+        HTTPException: If whitelist type is invalid
+    """
+    try:
+        data = whitelist_manager.read_whitelist(whitelist_type)
+        logger.info(
+            f"Admin {session.email} read {whitelist_type} whitelist "
+            f"({len(data['entries'])} entries)"
+        )
+        return WhitelistResponse(
+            entries=data["entries"],
+            whitelist_type=whitelist_type,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error reading whitelist {whitelist_type}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error reading whitelist: {str(e)}")
+
+
+@app.post("/api/admin/whitelists/{whitelist_type}/add", response_model=AdminActionResponse)
+async def add_whitelist_entry(
+    whitelist_type: str,
+    request: WhitelistEntryRequest,
+    session: Session = Depends(require_admin),
+):
+    """
+    Add entry to whitelist.
+
+    Requires admin privileges.
+
+    Args:
+        whitelist_type: Type of whitelist (queriers, teachers, admins)
+        request: Entry to add
+        session: Admin session (injected by dependency)
+
+    Returns:
+        AdminActionResponse with success status
+
+    Raises:
+        HTTPException: If entry is invalid or operation fails
+    """
+    try:
+        added = whitelist_manager.add_entry(whitelist_type, request.entry)
+
+        # Log the action
+        audit_logger.log_whitelist_add(
+            session.email,
+            whitelist_type,
+            request.entry,
+            success=True,
+        )
+
+        message = (
+            f"Entry '{request.entry}' added to {whitelist_type} whitelist"
+            if added
+            else f"Entry '{request.entry}' already exists in {whitelist_type} whitelist"
+        )
+
+        logger.info(f"Admin {session.email}: {message}")
+
+        return AdminActionResponse(
+            success=True,
+            message=message,
+            details={"entry": request.entry, "was_new": added},
+        )
+
+    except ValueError as e:
+        audit_logger.log_whitelist_add(
+            session.email,
+            whitelist_type,
+            request.entry,
+            success=False,
+        )
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        audit_logger.log_whitelist_add(
+            session.email,
+            whitelist_type,
+            request.entry,
+            success=False,
+        )
+        logger.error(f"Error adding to whitelist {whitelist_type}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error adding entry: {str(e)}")
+
+
+@app.delete("/api/admin/whitelists/{whitelist_type}/remove", response_model=AdminActionResponse)
+async def remove_whitelist_entry(
+    whitelist_type: str,
+    request: WhitelistEntryRequest,
+    session: Session = Depends(require_admin),
+):
+    """
+    Remove entry from whitelist.
+
+    Requires admin privileges.
+
+    Args:
+        whitelist_type: Type of whitelist (queriers, teachers, admins)
+        request: Entry to remove
+        session: Admin session (injected by dependency)
+
+    Returns:
+        AdminActionResponse with success status
+
+    Raises:
+        HTTPException: If entry not found or operation fails
+    """
+    try:
+        removed = whitelist_manager.remove_entry(whitelist_type, request.entry)
+
+        # Log the action
+        audit_logger.log_whitelist_remove(
+            session.email,
+            whitelist_type,
+            request.entry,
+            success=True,
+        )
+
+        message = (
+            f"Entry '{request.entry}' removed from {whitelist_type} whitelist"
+            if removed
+            else f"Entry '{request.entry}' not found in {whitelist_type} whitelist"
+        )
+
+        logger.info(f"Admin {session.email}: {message}")
+
+        return AdminActionResponse(
+            success=True,
+            message=message,
+            details={"entry": request.entry, "was_removed": removed},
+        )
+
+    except ValueError as e:
+        audit_logger.log_whitelist_remove(
+            session.email,
+            whitelist_type,
+            request.entry,
+            success=False,
+        )
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        audit_logger.log_whitelist_remove(
+            session.email,
+            whitelist_type,
+            request.entry,
+            success=False,
+        )
+        logger.error(f"Error removing from whitelist {whitelist_type}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error removing entry: {str(e)}")
+
+
+@app.get("/api/admin/documents", response_model=DocumentListResponse)
+async def list_documents(
+    session: Session = Depends(require_admin),
+):
+    """
+    List all documents in knowledge base.
+
+    Requires admin privileges.
+
+    Args:
+        session: Admin session (injected by dependency)
+
+    Returns:
+        DocumentListResponse with document list
+    """
+    try:
+        documents = document_manager.list_documents()
+        logger.info(
+            f"Admin {session.email} listed documents ({len(documents)} found)"
+        )
+        return DocumentListResponse(
+            documents=documents,
+            total_count=len(documents),
+        )
+    except Exception as e:
+        logger.error(f"Error listing documents: {e}")
+        raise HTTPException(status_code=500, detail=f"Error listing documents: {str(e)}")
+
+
+@app.delete("/api/admin/documents/{file_hash}", response_model=AdminActionResponse)
+async def delete_document(
+    file_hash: str,
+    archive: bool = True,
+    session: Session = Depends(require_admin),
+):
+    """
+    Delete document from knowledge base.
+
+    Requires admin privileges.
+
+    Args:
+        file_hash: SHA-256 hash of document to delete
+        archive: Whether to archive the file (default: True)
+        session: Admin session (injected by dependency)
+
+    Returns:
+        AdminActionResponse with deletion details
+
+    Raises:
+        HTTPException: If document not found or operation fails
+    """
+    try:
+        result = document_manager.delete_document(file_hash, archive=archive)
+
+        # Log the action
+        audit_logger.log_document_delete(
+            session.email,
+            result["filename"],
+            file_hash,
+            success=True,
+        )
+
+        message = (
+            f"Document '{result['filename']}' deleted "
+            f"({'archived' if result['archived'] else 'permanently removed'}). "
+            f"{result['chunks_removed']} chunks removed from KB."
+        )
+
+        logger.info(f"Admin {session.email}: {message}")
+
+        return AdminActionResponse(
+            success=True,
+            message=message,
+            details=result,
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        audit_logger.log_document_delete(
+            session.email,
+            f"hash:{file_hash}",
+            file_hash,
+            success=False,
+        )
+        logger.error(f"Error deleting document {file_hash}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error deleting document: {str(e)}")
 
 
 @app.get("/api/config")
