@@ -18,16 +18,25 @@ RAGInbox is a flexible infrastructure that combines document processing, vector 
 - 📧 **Email Integration**:
   - IMAP inbox monitoring with SSL/TLS
   - Automatic KB updates from CC'd/forwarded emails
-  - Automated RAG-powered email replies (NEW!)
+  - Automated RAG-powered email replies
   - SMTP email sending with HTML formatting
   - Customizable email format (text, markdown, or HTML)
   - Custom email footers
   - Email whitelist for security
   - Configurable forwarded email detection
   - Message tracking and deduplication
+- 🌐 **Web Interface** (NEW!):
+  - Modern chat interface with real-time query processing
+  - OTP-based passwordless authentication via email
+  - Session management with configurable timeout
+  - Source citations and attachment downloads
+  - Conversation history persistence
+  - Mobile-responsive design
+  - Dynamic branding from environment variables
 - ⚙️ **Instance Configuration**: Deploy multiple customized instances
   - Custom system prompts for AI behavior tuning
   - Instance-specific branding and naming
+  - Dynamic frontend customization from .env
 - 🔄 **Auto-monitoring**: Watch folders for automatic document updates
 - 📊 **Source Citations**: All responses include source references
 - 🗄️ **Flexible Storage**: SQLite or MariaDB for email tracking
@@ -100,6 +109,25 @@ OPENAI_API_BASE=https://api.openai.com/v1  # or https://api.naga.ac/v1
 
 ### Usage
 
+#### Web Interface (Recommended)
+
+```bash
+# Run web service with Docker Compose
+docker-compose -f docker-compose.mariadb.yml up -d
+
+# Access the web interface at http://localhost:8000
+# Login with your whitelisted email to receive an OTP code
+```
+
+The web interface provides:
+- **Authentication**: OTP-based passwordless login via email
+- **Chat Interface**: Real-time queries with source citations
+- **Conversation History**: Persistent session management
+- **Attachments**: Download generated files (calendar events, etc.)
+- **Dynamic Branding**: Instance name and description from .env
+
+#### CLI Interface
+
 ```bash
 # Process documents from data/documents folder
 python src/demo_phase1.py --mode process
@@ -112,6 +140,9 @@ python src/demo_phase1.py --mode watch
 
 # Run email service (monitors inbox for KB updates)
 python run_email_service.py
+
+# Run web service (chat interface with authentication)
+python run_web_service.py
 ```
 
 See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
@@ -149,12 +180,24 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
    - Configurable forwarded email detection
    - Processing rules: Direct emails → RAG Query + Reply, CC/BCC/Forwarded → KB ingestion
 
+5. **Web API** (`src/api/`)
+   - FastAPI REST endpoints for queries and configuration
+   - OTP-based authentication system
+   - Session management with configurable timeout
+   - Cookie-based authentication
+   - Protected routes with authentication middleware
+   - Real-time query processing
+   - Conversation history management
+   - Attachment handling and downloads
+   - Modern chat interface with responsive design
+
 ### Tech Stack
 
 - **Python 3.11+**
 - **LlamaIndex**: RAG framework
 - **ChromaDB**: Vector database
-- **FastAPI**: Web framework (Phase 4)
+- **FastAPI**: Web API and authentication
+- **Uvicorn**: ASGI web server
 - **OpenAI-compatible APIs**: Naga.ac, OpenAI, etc.
 
 ## Configuration Options
@@ -212,6 +255,16 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 | `EMAIL_RESPONSE_FORMAT` | Email format: `text`, `markdown`, or `html` | `html` |
 | `EMAIL_CUSTOM_FOOTER_FILE` | Custom footer text file (optional) | None |
 
+### Web Interface Settings
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `WEB_SESSION_TIMEOUT` | Session timeout in seconds | `86400` (24 hours) |
+| `WEB_HOST` | Web server host | `0.0.0.0` |
+| `WEB_PORT` | Web server port | `8000` |
+
+**Authentication:** Web interface uses OTP-based passwordless authentication. Users must be whitelisted in `EMAIL_QUERY_WHITELIST_FILE` to access the web interface.
+
 ### RAG Customization
 
 | Variable | Description | Default |
@@ -246,7 +299,17 @@ RAGInbox/
 │   │   ├── email_sender.py        # SMTP email sending
 │   │   ├── email_parser.py        # Email parsing
 │   │   └── ...
-│   └── api/ (Phase 4)
+│   └── api/                        # Web interface (Phase 4)
+│       ├── api.py                  # FastAPI endpoints
+│       └── static/                 # Frontend files
+│           ├── index.html          # Chat interface
+│           ├── login.html          # Login page
+│           ├── verify.html         # OTP verification
+│           ├── app.js              # Chat app logic
+│           ├── login.js            # Login logic
+│           ├── verify.js           # Verification logic
+│           ├── style.css           # Chat interface styles
+│           └── auth.css            # Authentication styles
 ├── tests/                         # Unit tests
 ├── data/                          # All persistent data (Docker volumes)
 │   ├── documents/                 # Source documents (watched folder)
@@ -311,6 +374,38 @@ RAGInbox includes comprehensive email integration for automatic knowledge base u
 - Background service daemon with auto-reconnection
 
 See [`docs/EMAIL_PROCESSING_RULES.md`](docs/EMAIL_PROCESSING_RULES.md) for detailed processing logic and configuration.
+
+### Web Authentication
+
+RAGInbox's web interface uses OTP-based passwordless authentication for secure access:
+
+**How it works:**
+1. User enters their email address on the login page
+2. System validates email against query whitelist (`allowed_queriers.txt`)
+3. If authorized, generates a 6-digit one-time code
+4. Sends OTP code via email using your configured SMTP settings
+5. User enters the code to authenticate and access the chat interface
+
+**Security Features:**
+- **Whitelist Validation**: Only users in `allowed_queriers.txt` can access the web interface
+- **OTP Expiry**: Codes expire after 5 minutes
+- **Attempt Limiting**: Maximum 5 verification attempts per code
+- **Session Management**: Configurable timeout (default 24 hours via `WEB_SESSION_TIMEOUT`)
+- **Secure Cookies**: HTTP-only cookies for session management
+- **No Password Storage**: Completely passwordless system
+
+**Configuration:**
+```bash
+# .env
+WEB_SESSION_TIMEOUT=86400  # Session timeout in seconds (24 hours)
+
+# data/config/allowed_queriers.txt
+# Add authorized users (one per line)
+user@example.com
+@example.com  # Domain wildcard for all users at example.com
+```
+
+Users must be in the query whitelist to receive OTP codes. The system uses your existing SMTP configuration for sending authentication emails.
 
 ### Customization
 
@@ -483,7 +578,15 @@ git push origin v1.0.0
   - Source citations in responses
   - Email threading support
   - Integration with EmailProcessor
-- [ ] **Phase 4**: Web frontend with chat interface
+- [x] **Phase 4**: Web frontend with chat interface ✓
+  - FastAPI REST API with authentication
+  - OTP-based passwordless authentication via email
+  - Modern chat interface with real-time queries
+  - Session management with configurable timeout
+  - Conversation history persistence
+  - Source citations and attachment downloads
+  - Mobile-responsive design
+  - Dynamic branding from environment variables
 - [x] **Phase 5**: Docker deployment and CI/CD ✓
   - Multi-stage Dockerfile for production
   - Docker Compose with optional MariaDB
