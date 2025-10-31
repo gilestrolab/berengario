@@ -335,6 +335,74 @@ class AttachmentHandler:
 
         return sanitized
 
+    def archive_attachments(
+        self, attachments: List[AttachmentInfo], documents_path: Optional[Path] = None
+    ) -> int:
+        """
+        Archive attachment files to permanent documents folder.
+
+        Copies attachment files from temporary storage to the permanent documents
+        folder for future reference and re-processing. Handles filename conflicts
+        by appending timestamp suffix.
+
+        Args:
+            attachments: List of AttachmentInfo to archive
+            documents_path: Path to documents folder (defaults to settings)
+
+        Returns:
+            Number of files successfully archived.
+        """
+        import shutil
+
+        documents_path = documents_path or settings.documents_path
+        archived = 0
+
+        # Ensure documents folder exists
+        documents_path.mkdir(parents=True, exist_ok=True)
+
+        for attachment in attachments:
+            try:
+                if not attachment.filepath.exists():
+                    logger.warning(f"Attachment file not found for archival: {attachment.filepath}")
+                    continue
+
+                # Determine destination filename
+                dest_filename = attachment.filepath.name
+                dest_path = documents_path / dest_filename
+
+                # Handle filename conflicts by appending timestamp
+                if dest_path.exists():
+                    # Check if files are identical (same hash)
+                    import hashlib
+                    with open(attachment.filepath, 'rb') as f1:
+                        hash1 = hashlib.sha256(f1.read()).hexdigest()
+                    with open(dest_path, 'rb') as f2:
+                        hash2 = hashlib.sha256(f2.read()).hexdigest()
+
+                    if hash1 == hash2:
+                        logger.info(f"Identical file already exists in documents: {dest_filename}")
+                        archived += 1
+                        continue
+
+                    # Files differ - add timestamp suffix
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    stem = dest_path.stem
+                    suffix = dest_path.suffix
+                    dest_path = documents_path / f"{stem}_{timestamp}{suffix}"
+
+                    logger.info(f"File exists with different content, archiving as: {dest_path.name}")
+
+                # Copy file to documents folder
+                shutil.copy2(attachment.filepath, dest_path)
+                archived += 1
+                logger.info(f"Archived attachment: {attachment.filename} -> {dest_path}")
+
+            except Exception as e:
+                logger.error(f"Error archiving attachment {attachment.filepath}: {e}")
+
+        logger.info(f"Archived {archived}/{len(attachments)} attachments to {documents_path}")
+        return archived
+
     def cleanup_attachments(self, attachments: List[AttachmentInfo]) -> int:
         """
         Delete attachment files from disk.

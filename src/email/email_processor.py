@@ -474,8 +474,11 @@ class EmailProcessor:
             )
 
         finally:
-            # Cleanup attachments
+            # Archive attachments to permanent documents folder before cleanup
             if attachments:
+                logger.info(f"Archiving {len(attachments)} attachments to documents folder")
+                self.attachment_handler.archive_attachments(attachments)
+                # Cleanup temp files after archival
                 self.attachment_handler.cleanup_attachments(attachments)
 
     def _process_query(self, email: EmailMessage) -> ProcessingResult:

@@ -102,12 +102,13 @@ class EmailClient:
         try:
             logger.info(f"Connecting to IMAP server {self.server}:{self.port}")
 
-            # Create mailbox connection
+            # Create mailbox connection with 60 second timeout
+            timeout = 60  # seconds - prevents hanging on slow/unresponsive servers
             if self.use_ssl:
-                self._mailbox = MailBox(self.server, self.port)
+                self._mailbox = MailBox(self.server, self.port, timeout=timeout)
             else:
                 # Unencrypted connection - use STARTTLS if on standard port 143
-                self._mailbox = MailBoxUnencrypted(self.server, self.port)
+                self._mailbox = MailBoxUnencrypted(self.server, self.port, timeout=timeout)
                 if self.port == 143:
                     # Upgrade to TLS using STARTTLS
                     logger.debug("Upgrading connection with STARTTLS")
