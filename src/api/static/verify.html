@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Code - RAGInbox</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/auth.css">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <div class="auth-card">
+            <!-- Header -->
+            <div class="auth-header">
+                <div class="auth-icon">✉️</div>
+                <h1 class="auth-title">Check Your Email</h1>
+                <p class="auth-subtitle">
+                    We sent a 6-digit code to<br>
+                    <strong id="user-email"></strong>
+                </p>
+            </div>
+
+            <!-- Verification Form -->
+            <form id="verify-form" class="auth-form">
+                <div class="form-group">
+                    <label for="otp-code" class="form-label">Enter Code</label>
+                    <input
+                        type="text"
+                        id="otp-code"
+                        class="form-input otp-input"
+                        placeholder="000000"
+                        required
+                        maxlength="6"
+                        pattern="[0-9]{6}"
+                        autocomplete="one-time-code"
+                        autofocus
+                    >
+                    <p class="form-hint">The code expires in 5 minutes</p>
+                </div>
+
+                <button type="submit" class="auth-button" id="submit-btn">
+                    <span class="button-text">Verify Code</span>
+                    <span class="button-spinner" style="display: none;">
+                        <svg class="spinner" viewBox="0 0 24 24">
+                            <circle class="spinner-circle" cx="12" cy="12" r="10"></circle>
+                        </svg>
+                    </span>
+                </button>
+
+                <!-- Error Message -->
+                <div class="auth-message error" id="error-message" style="display: none;"></div>
+
+                <!-- Success Message -->
+                <div class="auth-message success" id="success-message" style="display: none;"></div>
+            </form>
+
+            <!-- Back Link -->
+            <div class="auth-footer">
+                <p class="auth-footer-text">
+                    Didn't receive the code?
+                    <a href="/static/login.html" class="auth-link">Request a new one</a>
+                </p>
+                <p class="auth-footer-text">
+                    <a href="/static/login.html" class="auth-link">← Back to login</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/verify.js"></script>
+</body>
+</html>

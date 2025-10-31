@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - RAGInbox</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/auth.css">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <div class="auth-card">
+            <!-- Header -->
+            <div class="auth-header">
+                <div class="auth-icon">🔒</div>
+                <h1 class="auth-title" id="instance-name">RAGInbox</h1>
+                <p class="auth-subtitle" id="instance-description">AI-powered Knowledge Base Assistant</p>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" class="auth-form">
+                <div class="form-group">
+                    <label for="email" class="form-label">Email Address</label>
+                    <input
+                        type="email"
+                        id="email"
+                        class="form-input"
+                        placeholder="your.email@example.com"
+                        required
+                        autocomplete="email"
+                        autofocus
+                    >
+                    <p class="form-hint">Enter your authorized email address</p>
+                </div>
+
+                <button type="submit" class="auth-button" id="submit-btn">
+                    <span class="button-text">Send Login Code</span>
+                    <span class="button-spinner" style="display: none;">
+                        <svg class="spinner" viewBox="0 0 24 24">
+                            <circle class="spinner-circle" cx="12" cy="12" r="10"></circle>
+                        </svg>
+                    </span>
+                </button>
+
+                <!-- Error Message -->
+                <div class="auth-message error" id="error-message" style="display: none;"></div>
+
+                <!-- Info Message -->
+                <div class="auth-message info" id="info-message" style="display: none;"></div>
+            </form>
+
+            <!-- KB Stats -->
+            <div class="auth-footer">
+                <div class="kb-stats-small">
+                    <span class="stat-item-small">
+                        <span class="stat-label">Documents:</span>
+                        <span class="stat-value" id="kb-documents">-</span>
+                    </span>
+                    <span class="stat-item-small">
+                        <span class="stat-label">Chunks:</span>
+                        <span class="stat-value" id="kb-chunks">-</span>
+                    </span>
+                </div>
+                <p class="auth-footer-text">
+                    Passwordless authentication via one-time code
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/login.js"></script>
+</body>
+</html>

@@ -206,6 +206,9 @@ class Settings(BaseSettings):
     cors_origins: List[str] = Field(
         default=["http://localhost:8000"], description="Allowed CORS origins"
     )
+    web_session_timeout: int = Field(
+        default=86400, description="Web session timeout in seconds (default 24 hours)"
+    )
 
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")

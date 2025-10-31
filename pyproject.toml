@@ -58,6 +58,7 @@ dependencies = [
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
     "python-dotenv>=1.0.0",
+    "email-validator>=2.0.0",  # For pydantic EmailStr validation
 
     # LLM API
     "openai>=1.50.0",

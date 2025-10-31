@@ -6,16 +6,27 @@ class ChatApp {
         this.queryInput = document.getElementById('query-input');
         this.sendBtn = document.getElementById('send-btn');
         this.clearBtn = document.getElementById('clear-btn');
+        this.logoutBtn = document.getElementById('logout-btn');
+        this.userEmailSpan = document.getElementById('user-email');
         this.loadingOverlay = document.getElementById('loading-overlay');
         this.toast = document.getElementById('toast');
 
         this.isLoading = false;
         this.sessionId = null;
+        this.userEmail = null;
 
         this.init();
     }
 
     async init() {
+        // Check authentication first
+        const authenticated = await this.checkAuth();
+        if (!authenticated) {
+            // Redirect to login
+            window.location.href = '/static/login.html';
+            return;
+        }
+
         // Load KB stats
         await this.loadStats();
 
@@ -27,6 +38,30 @@ class ChatApp {
 
         // Focus input
         this.queryInput.focus();
+    }
+
+    async checkAuth() {
+        try {
+            const response = await fetch('/api/auth/status', {
+                credentials: 'include',
+            });
+            const data = await response.json();
+
+            if (!data.authenticated) {
+                return false;
+            }
+
+            // Store and display user email
+            this.userEmail = data.email;
+            if (this.userEmailSpan && this.userEmail) {
+                this.userEmailSpan.textContent = this.userEmail;
+                this.userEmailSpan.title = `Logged in as ${this.userEmail}`;
+            }
+            return true;
+        } catch (error) {
+            console.error('Error checking auth:', error);
+            return false;
+        }
     }
 
     setupEventListeners() {
@@ -49,6 +84,9 @@ class ChatApp {
 
         // Clear chat button
         this.clearBtn.addEventListener('click', () => this.clearSession());
+
+        // Logout button
+        this.logoutBtn.addEventListener('click', () => this.logout());
     }
 
     async loadStats() {
@@ -323,6 +361,31 @@ class ChatApp {
             }
         } catch (error) {
             console.error('Error clearing session:', error);
+            this.showToast('Network error', 'error');
+        }
+    }
+
+    async logout() {
+        if (!confirm('Are you sure you want to logout?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/auth/logout', {
+                method: 'POST',
+                credentials: 'include',
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Redirect to login page
+                window.location.href = '/static/login.html';
+            } else {
+                this.showToast('Failed to logout', 'error');
+            }
+        } catch (error) {
+            console.error('Error logging out:', error);
             this.showToast('Network error', 'error');
         }
     }

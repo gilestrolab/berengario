@@ -5,19 +5,22 @@ Provides a REST API and web UI for real-time RAG queries with conversation threa
 """
 
 import logging
+import secrets
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 
-from fastapi import FastAPI, Request, Response, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Request, Response, HTTPException, BackgroundTasks, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 from src.config import settings
 from src.rag.query_handler import QueryHandler
+from src.email.email_sender import EmailSender
+from src.email.whitelist_validator import WhitelistValidator
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +62,162 @@ class StatsResponse(BaseModel):
     documents: List[str]
 
 
+# Authentication Models
+class OTPRequest(BaseModel):
+    """Request model for OTP generation."""
+
+    email: EmailStr
+
+
+class OTPVerifyRequest(BaseModel):
+    """Request model for OTP verification."""
+
+    email: EmailStr
+    otp_code: str
+
+
+class AuthResponse(BaseModel):
+    """Response model for authentication operations."""
+
+    success: bool
+    message: str
+    email: Optional[str] = None
+
+
+class AuthStatusResponse(BaseModel):
+    """Response model for authentication status."""
+
+    authenticated: bool
+    email: Optional[str] = None
+    session_id: Optional[str] = None
+
+
+# OTP Management
+@dataclass
+class OTPEntry:
+    """
+    OTP entry with expiration and attempt tracking.
+
+    Attributes:
+        code: 6-digit OTP code
+        email: Email address
+        created_at: Creation timestamp
+        expires_at: Expiration timestamp
+        attempts: Number of verification attempts
+        max_attempts: Maximum allowed attempts
+    """
+
+    code: str
+    email: str
+    created_at: datetime = field(default_factory=datetime.now)
+    expires_at: datetime = field(default_factory=lambda: datetime.now() + timedelta(minutes=5))
+    attempts: int = 0
+    max_attempts: int = 5
+
+    def is_expired(self) -> bool:
+        """Check if OTP has expired."""
+        return datetime.now() > self.expires_at
+
+    def is_locked(self) -> bool:
+        """Check if maximum attempts reached."""
+        return self.attempts >= self.max_attempts
+
+    def increment_attempts(self) -> None:
+        """Increment verification attempts."""
+        self.attempts += 1
+
+
+class OTPManager:
+    """
+    Manages OTP generation, storage, and verification.
+
+    Attributes:
+        otps: Dictionary of email -> OTPEntry
+    """
+
+    def __init__(self):
+        """Initialize OTP manager."""
+        self.otps: Dict[str, OTPEntry] = {}
+        logger.info("OTPManager initialized")
+
+    def generate_otp(self, email: str) -> str:
+        """
+        Generate a new 6-digit OTP for email.
+
+        Args:
+            email: Email address
+
+        Returns:
+            6-digit OTP code
+        """
+        # Generate random 6-digit code
+        code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+
+        # Store OTP entry
+        self.otps[email.lower()] = OTPEntry(code=code, email=email.lower())
+
+        logger.info(f"Generated OTP for {email}")
+        return code
+
+    def verify_otp(self, email: str, code: str) -> tuple[bool, str]:
+        """
+        Verify OTP code for email.
+
+        Args:
+            email: Email address
+            code: OTP code to verify
+
+        Returns:
+            Tuple of (success, message)
+        """
+        email = email.lower()
+
+        # Check if OTP exists
+        if email not in self.otps:
+            return False, "No OTP found for this email. Please request a new one."
+
+        otp_entry = self.otps[email]
+
+        # Check if expired
+        if otp_entry.is_expired():
+            del self.otps[email]
+            return False, "OTP has expired. Please request a new one."
+
+        # Check if locked due to too many attempts
+        if otp_entry.is_locked():
+            del self.otps[email]
+            return False, "Too many failed attempts. Please request a new OTP."
+
+        # Increment attempts
+        otp_entry.increment_attempts()
+
+        # Verify code
+        if otp_entry.code == code:
+            # Success - remove OTP
+            del self.otps[email]
+            return True, "OTP verified successfully"
+        else:
+            remaining = otp_entry.max_attempts - otp_entry.attempts
+            if remaining > 0:
+                return False, f"Invalid OTP. {remaining} attempts remaining."
+            else:
+                del self.otps[email]
+                return False, "Invalid OTP. Maximum attempts reached. Please request a new one."
+
+    def cleanup_expired(self):
+        """Remove expired OTP entries."""
+        expired = [email for email, otp in self.otps.items() if otp.is_expired()]
+        for email in expired:
+            del self.otps[email]
+        if expired:
+            logger.info(f"Cleaned up {len(expired)} expired OTPs")
+
+
 # Session Management
 @dataclass
 class Session:
     """
-    User session with conversation history.
+    User session with conversation history and authentication.
 
     Attributes:
         session_id: Unique session identifier
@@ -71,6 +225,8 @@ class Session:
         attachments: List of attachments for this session
         created_at: Session creation timestamp
         last_activity: Last activity timestamp
+        authenticated: Whether session is authenticated
+        email: Authenticated email address (if authenticated)
     """
 
     session_id: str
@@ -78,6 +234,24 @@ class Session:
     attachments: List[Dict] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
     last_activity: datetime = field(default_factory=datetime.now)
+    authenticated: bool = False
+    email: Optional[str] = None
+
+    def authenticate(self, email: str):
+        """
+        Authenticate session with email.
+
+        Args:
+            email: Authenticated email address
+        """
+        self.authenticated = True
+        self.email = email.lower()
+        self.last_activity = datetime.now()
+        logger.info(f"Session {self.session_id} authenticated for {email}")
+
+    def is_authenticated(self) -> bool:
+        """Check if session is authenticated."""
+        return self.authenticated and self.email is not None
 
     def add_message(self, role: str, content: str, sources: Optional[List] = None, attachments: Optional[List] = None):
         """
@@ -219,8 +393,17 @@ app = FastAPI(
     version="1.0.0",
 )
 
-session_manager = SessionManager(session_timeout=3600)  # 1 hour timeout
+session_manager = SessionManager(session_timeout=settings.web_session_timeout)
 query_handler = QueryHandler()
+otp_manager = OTPManager()
+email_sender = EmailSender()
+
+# Initialize whitelist validator for authentication
+query_whitelist = WhitelistValidator(
+    whitelist_file=settings.email_query_whitelist_file,
+    whitelist=settings.email_query_whitelist,
+    enabled=settings.email_query_whitelist_enabled,
+)
 
 # Mount static files
 static_dir = Path(__file__).parent / "static"
@@ -269,7 +452,283 @@ async def cleanup_old_attachments():
         logger.error(f"Error during attachment cleanup: {e}")
 
 
+def send_otp_email(email: str, otp_code: str) -> bool:
+    """
+    Send OTP code via email.
+
+    Args:
+        email: Recipient email address
+        otp_code: 6-digit OTP code
+
+    Returns:
+        True if sent successfully, False otherwise
+    """
+    subject = f"{settings.instance_name} - Login Code"
+
+    # Plain text version
+    body_text = f"""Hello,
+
+Your login code for {settings.instance_name} is: {otp_code}
+
+This code will expire in 5 minutes.
+
+If you did not request this code, please ignore this email.
+
+Best regards,
+{settings.instance_name}
+{settings.organization}
+"""
+
+    # HTML version
+    body_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }}
+        .container {{
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 30px;
+        }}
+        .otp-code {{
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 8px;
+            color: #2563eb;
+            text-align: center;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 2px dashed #2563eb;
+        }}
+        .footer {{
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 14px;
+            color: #64748b;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Login Code for {settings.instance_name}</h2>
+        <p>Hello,</p>
+        <p>Your login code is:</p>
+        <div class="otp-code">{otp_code}</div>
+        <p><strong>This code will expire in 5 minutes.</strong></p>
+        <p>If you did not request this code, please ignore this email.</p>
+        <div class="footer">
+            <p>Best regards,<br>
+            <strong>{settings.instance_name}</strong><br>
+            {settings.organization}</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+    try:
+        success = email_sender.send_reply(
+            to_address=email,
+            subject=subject,
+            body_text=body_text,
+            body_html=body_html,
+        )
+        if success:
+            logger.info(f"Sent OTP email to {email}")
+        else:
+            logger.error(f"Failed to send OTP email to {email}")
+        return success
+    except Exception as e:
+        logger.error(f"Error sending OTP email: {e}")
+        return False
+
+
+# Authentication dependency
+async def require_auth(request: Request) -> Session:
+    """
+    Dependency to require authentication for endpoints.
+
+    Args:
+        request: FastAPI request object
+
+    Returns:
+        Authenticated session
+
+    Raises:
+        HTTPException: If not authenticated
+    """
+    session_id = get_session_id(request)
+    if not session_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated. Please login first.",
+        )
+
+    session = session_manager.get_session(session_id)
+    if not session or not session.is_authenticated():
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated. Please login first.",
+        )
+
+    # Update last activity
+    session.last_activity = datetime.now()
+
+    return session
+
+
 # API Endpoints
+
+# Authentication Endpoints
+@app.post("/api/auth/request-otp", response_model=AuthResponse)
+async def request_otp(request: OTPRequest, background_tasks: BackgroundTasks):
+    """
+    Request OTP for email authentication.
+
+    Args:
+        request: OTP request with email
+        background_tasks: Background task manager
+
+    Returns:
+        AuthResponse with success/failure message
+    """
+    email = request.email.lower()
+
+    # Check if email is in query whitelist
+    if not query_whitelist.is_allowed(email):
+        logger.warning(f"OTP request denied for non-whitelisted email: {email}")
+        return AuthResponse(
+            success=False,
+            message="Access denied. Your email address is not authorized to use this system. "
+                   "Please contact your administrator if you believe this is an error.",
+        )
+
+    # Generate OTP
+    otp_code = otp_manager.generate_otp(email)
+
+    # Send OTP email in background
+    background_tasks.add_task(send_otp_email, email, otp_code)
+    background_tasks.add_task(otp_manager.cleanup_expired)
+
+    logger.info(f"OTP requested for {email}")
+
+    return AuthResponse(
+        success=True,
+        message=f"A login code has been sent to {email}. Please check your email and enter the code to continue.",
+        email=email,
+    )
+
+
+@app.post("/api/auth/verify-otp", response_model=AuthResponse)
+async def verify_otp(
+    verify_request: OTPVerifyRequest,
+    request: Request,
+    response: Response,
+):
+    """
+    Verify OTP and authenticate session.
+
+    Args:
+        verify_request: OTP verification request
+        request: FastAPI request object
+        response: FastAPI response object
+
+    Returns:
+        AuthResponse with success/failure message
+    """
+    email = verify_request.email.lower()
+    otp_code = verify_request.otp_code
+
+    # Verify OTP
+    success, message = otp_manager.verify_otp(email, otp_code)
+
+    if success:
+        # Get or create session
+        session_id = get_session_id(request)
+        session = session_manager.get_or_create_session(session_id)
+
+        # Authenticate session
+        session.authenticate(email)
+
+        # Set session cookie
+        set_session_cookie(response, session.session_id)
+
+        logger.info(f"Successfully authenticated {email}")
+
+        return AuthResponse(
+            success=True,
+            message="Successfully authenticated! Redirecting to chat...",
+            email=email,
+        )
+    else:
+        logger.warning(f"Failed OTP verification for {email}: {message}")
+        return AuthResponse(
+            success=False,
+            message=message,
+        )
+
+
+@app.post("/api/auth/logout")
+async def logout(request: Request, response: Response):
+    """
+    Logout and clear session.
+
+    Args:
+        request: FastAPI request object
+        response: FastAPI response object
+
+    Returns:
+        Success message
+    """
+    session_id = get_session_id(request)
+    if session_id:
+        session_manager.delete_session(session_id)
+        response.delete_cookie("session_id")
+        logger.info(f"Logged out session {session_id}")
+
+    return {"success": True, "message": "Logged out successfully"}
+
+
+@app.get("/api/auth/status", response_model=AuthStatusResponse)
+async def auth_status(request: Request):
+    """
+    Check authentication status.
+
+    Args:
+        request: FastAPI request object
+
+    Returns:
+        AuthStatusResponse with authentication status
+    """
+    session_id = get_session_id(request)
+    if not session_id:
+        return AuthStatusResponse(authenticated=False)
+
+    session = session_manager.get_session(session_id)
+    if not session or not session.is_authenticated():
+        return AuthStatusResponse(authenticated=False)
+
+    return AuthStatusResponse(
+        authenticated=True,
+        email=session.email,
+        session_id=session.session_id,
+    )
+
+
+# Protected Endpoints (require authentication)
 @app.get("/")
 async def root():
     """Serve main web interface."""
@@ -285,22 +744,24 @@ async def query(
     request: Request,
     response: Response,
     background_tasks: BackgroundTasks,
+    session: Session = Depends(require_auth),
 ):
     """
     Process a RAG query and return response.
+
+    Requires authentication.
 
     Args:
         query_request: Query request with text and optional context
         request: FastAPI request object
         response: FastAPI response object
         background_tasks: Background task manager
+        session: Authenticated session (injected by dependency)
 
     Returns:
         QueryResponse with answer, sources, and attachments
     """
-    # Get or create session
-    session_id = get_session_id(request)
-    session = session_manager.get_or_create_session(session_id)
+    # Session is already authenticated via dependency
     set_session_cookie(response, session.session_id)
 
     # Add user message to history
@@ -382,29 +843,20 @@ async def query(
 
 
 @app.get("/api/history", response_model=HistoryResponse)
-async def get_history(request: Request, response: Response):
+async def get_history(
+    session: Session = Depends(require_auth),
+):
     """
-    Get conversation history for session.
+    Get conversation history for authenticated session.
+
+    Requires authentication.
 
     Args:
-        request: FastAPI request object
-        response: FastAPI response object
+        session: Authenticated session (injected by dependency)
 
     Returns:
         HistoryResponse with conversation messages
     """
-    session_id = get_session_id(request)
-    if not session_id:
-        # Create new session
-        session = session_manager.get_or_create_session()
-        set_session_cookie(response, session.session_id)
-    else:
-        session = session_manager.get_session(session_id)
-        if not session:
-            # Session expired, create new one
-            session = session_manager.get_or_create_session()
-            set_session_cookie(response, session.session_id)
-
     return HistoryResponse(
         session_id=session.session_id,
         messages=session.messages,
@@ -414,41 +866,59 @@ async def get_history(request: Request, response: Response):
 
 
 @app.delete("/api/session")
-async def clear_session(request: Request, response: Response):
+async def clear_session(
+    response: Response,
+    session: Session = Depends(require_auth),
+):
     """
     Clear session history and delete attachments.
 
+    Requires authentication.
+
     Args:
-        request: FastAPI request object
         response: FastAPI response object
+        session: Authenticated session (injected by dependency)
 
     Returns:
         Success message
     """
-    session_id = get_session_id(request)
-    if session_id and session_manager.delete_session(session_id):
+    if session_manager.delete_session(session.session_id):
         # Clear cookie
         response.delete_cookie("session_id")
         return {"success": True, "message": "Session cleared"}
 
-    return {"success": False, "message": "No active session"}
+    return {"success": False, "message": "Failed to clear session"}
 
 
 @app.get("/api/attachments/{session_id}/{filename}")
-async def download_attachment(session_id: str, filename: str):
+async def download_attachment(
+    session_id: str,
+    filename: str,
+    session: Session = Depends(require_auth),
+):
     """
     Download attachment file.
+
+    Requires authentication. Users can only download attachments from their own session.
 
     Args:
         session_id: Session ID
         filename: Attachment filename
+        session: Authenticated session (injected by dependency)
 
     Returns:
         File download response
 
     Raises:
-        HTTPException: If file not found
+        HTTPException: If file not found or unauthorized
     """
+    # Verify user is requesting their own session's attachments
+    if session.session_id != session_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied. You can only download your own attachments."
+        )
+
     filepath = settings.email_temp_dir / f"web_{session_id}" / filename
 
     if not filepath.exists():
@@ -480,10 +950,16 @@ async def get_stats():
     """
     try:
         stats = query_handler.get_stats()
+        # Extract just filenames from document dicts
+        documents = stats.get("documents", [])
+        document_names = [
+            doc.get("filename", "Unknown") if isinstance(doc, dict) else str(doc)
+            for doc in documents
+        ]
         return StatsResponse(
             total_chunks=stats.get("total_chunks", 0),
             unique_documents=stats.get("unique_documents", 0),
-            documents=stats.get("documents", []),
+            documents=document_names,
         )
     except Exception as e:
         logger.error(f"Error getting stats: {e}")
