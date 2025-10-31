@@ -441,6 +441,91 @@
         .backup-actions .btn-delete-backup:hover {
             background: var(--danger-dark, #c82333);
         }
+
+        /* Settings section styles */
+        .settings-section {
+            padding: 1rem 0;
+        }
+
+        .settings-card {
+            background: white;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+            padding: 1.5rem;
+        }
+
+        .settings-card h3 {
+            margin: 0 0 0.5rem 0;
+            color: var(--text-primary, #333);
+        }
+
+        .settings-card h4 {
+            margin: 0;
+            color: var(--text-primary, #333);
+        }
+
+        .model-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .model-card {
+            background: var(--bg-secondary, #f8f9fa);
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+            padding: 1rem;
+        }
+
+        .model-card h4 {
+            margin: 0 0 0.75rem 0;
+            font-size: 1rem;
+            color: var(--text-primary, #333);
+        }
+
+        .model-detail {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border, #ddd);
+            font-size: 0.875rem;
+        }
+
+        .model-detail:last-child {
+            border-bottom: none;
+        }
+
+        .model-detail-label {
+            font-weight: 500;
+            color: var(--text-secondary, #666);
+        }
+
+        .model-detail-value {
+            color: var(--text-primary, #333);
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+
+        .btn-save-prompt {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary, #007bff);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .btn-save-prompt:hover {
+            background: var(--primary-dark, #0056b3);
+        }
+
+        .btn-save-prompt:disabled {
+            background: var(--text-secondary, #666);
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -454,6 +539,7 @@
             <button class="tab active" data-tab="whitelists">Whitelists</button>
             <button class="tab" data-tab="documents">Documents</button>
             <button class="tab" data-tab="backups">Backups</button>
+            <button class="tab" data-tab="settings">Settings</button>
         </div>
 
         <!-- Whitelists Tab -->
@@ -522,6 +608,63 @@
                 <h3 style="margin-top: 2rem;">Available Backups</h3>
                 <div class="backups-list" id="backups-list">
                     <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-content">
+            <div class="settings-section">
+                <!-- Model Information -->
+                <div class="settings-card">
+                    <h3>Model Configuration</h3>
+                    <p style="margin-bottom: 1rem; color: var(--text-secondary, #666); font-size: 0.875rem;">
+                        Information about the LLM and embedding models configured for this instance.
+                    </p>
+                    <div id="model-info" class="model-info">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+
+                <!-- System Prompt -->
+                <div class="settings-card" style="margin-top: 2rem;">
+                    <h3>System Prompt</h3>
+                    <p style="margin-bottom: 1rem; color: var(--text-secondary, #666); font-size: 0.875rem;">
+                        Customize the AI's behavior by adding custom instructions to the system prompt.
+                        The custom prompt is appended to the base prompt shown below.
+                    </p>
+
+                    <!-- Full Prompt Preview (Read-only) -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <h4 style="margin-bottom: 0.5rem; font-size: 0.95rem;">Full System Prompt (Preview)</h4>
+                        <textarea id="full-prompt" readonly
+                            style="width: 100%; min-height: 300px; padding: 0.75rem;
+                                   font-family: 'Courier New', monospace; font-size: 0.875rem;
+                                   border: 1px solid var(--border, #ddd); border-radius: 4px;
+                                   background: var(--bg-secondary, #f8f9fa); color: var(--text-primary, #333);
+                                   resize: vertical;">
+                        </textarea>
+                    </div>
+
+                    <!-- Custom Prompt Editor -->
+                    <div style="margin-bottom: 1rem;">
+                        <h4 style="margin-bottom: 0.5rem; font-size: 0.95rem;">Custom Instructions (Editable)</h4>
+                        <textarea id="custom-prompt"
+                            placeholder="Add custom instructions here. For example:&#10;&#10;Additional guidelines:&#10;- Always use British English spelling&#10;- Reference specific policy numbers when available&#10;- Include links to documentation when possible"
+                            style="width: 100%; min-height: 200px; padding: 0.75rem;
+                                   font-family: 'Courier New', monospace; font-size: 0.875rem;
+                                   border: 1px solid var(--border, #ddd); border-radius: 4px;
+                                   background: white; color: var(--text-primary, #333);
+                                   resize: vertical;">
+                        </textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+                        <button class="btn-save-prompt" onclick="adminPanel.savePrompt()">
+                            Save Custom Prompt
+                        </button>
+                        <span id="prompt-save-status" style="color: var(--text-secondary, #666); font-size: 0.875rem;"></span>
+                    </div>
                 </div>
             </div>
         </div>

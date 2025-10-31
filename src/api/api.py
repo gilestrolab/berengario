@@ -19,6 +19,7 @@ from pydantic import BaseModel, EmailStr
 
 from src.config import settings
 from src.rag.query_handler import QueryHandler
+from src.rag.rag_engine import get_system_prompt
 from src.email.email_sender import EmailSender
 from src.email.whitelist_validator import WhitelistValidator
 from src.document_processing.kb_manager import KnowledgeBaseManager
@@ -1715,6 +1716,165 @@ async def delete_backup(
     except Exception as e:
         logger.error(f"Error deleting backup {filename}: {e}")
         raise HTTPException(status_code=500, detail=f"Error deleting backup: {str(e)}")
+
+
+# Settings endpoints
+@app.get("/api/admin/settings/prompt")
+async def get_prompt_settings(session: Session = Depends(require_admin)):
+    """
+    Get system prompt settings and preview.
+
+    Requires admin privileges.
+
+    Args:
+        session: Admin session (injected by dependency)
+
+    Returns:
+        System prompt information including base and custom prompts
+    """
+    try:
+        # Get the full system prompt (preview)
+        full_prompt = get_system_prompt(
+            instance_name=settings.instance_name,
+            instance_description=settings.instance_description,
+            organization=settings.organization,
+            include_tools=True
+        )
+
+        # Get custom prompt content if it exists
+        custom_prompt = ""
+        custom_prompt_file = settings.rag_custom_prompt_file
+        if custom_prompt_file and Path(custom_prompt_file).exists():
+            try:
+                with open(custom_prompt_file, 'r', encoding='utf-8') as f:
+                    custom_prompt = f.read()
+            except Exception as e:
+                logger.error(f"Error reading custom prompt file: {e}")
+
+        # Log the action
+        audit_logger.log_action(
+            session.email,
+            "settings_view_prompt",
+            "system_prompt",
+            "success"
+        )
+
+        return {
+            "success": True,
+            "full_prompt": full_prompt,
+            "custom_prompt": custom_prompt,
+            "custom_prompt_file": str(custom_prompt_file) if custom_prompt_file else None,
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting prompt settings: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting prompt settings: {str(e)}")
+
+
+@app.post("/api/admin/settings/prompt")
+async def update_prompt_settings(
+    request: dict,
+    session: Session = Depends(require_admin),
+):
+    """
+    Update custom system prompt.
+
+    Requires admin privileges.
+
+    Args:
+        request: Dictionary with 'custom_prompt' field
+        session: Admin session (injected by dependency)
+
+    Returns:
+        Success message
+
+    Raises:
+        HTTPException: If update fails
+    """
+    try:
+        custom_prompt = request.get("custom_prompt", "")
+
+        # Ensure the custom prompt file path is set
+        if not settings.rag_custom_prompt_file:
+            # Set a default path if not configured
+            settings.rag_custom_prompt_file = Path("data/config/custom_prompt.txt")
+
+        custom_prompt_file = Path(settings.rag_custom_prompt_file)
+
+        # Ensure directory exists
+        custom_prompt_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write the custom prompt
+        with open(custom_prompt_file, 'w', encoding='utf-8') as f:
+            f.write(custom_prompt)
+
+        # Log the action
+        audit_logger.log_action(
+            session.email,
+            "settings_update_prompt",
+            "system_prompt",
+            "success",
+            f"length:{len(custom_prompt)}"
+        )
+
+        logger.info(f"Admin {session.email} updated custom system prompt ({len(custom_prompt)} chars)")
+
+        return {
+            "success": True,
+            "message": "Custom system prompt updated successfully",
+            "custom_prompt_file": str(custom_prompt_file),
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating prompt settings: {e}")
+        raise HTTPException(status_code=500, detail=f"Error updating prompt settings: {str(e)}")
+
+
+@app.get("/api/admin/settings/models")
+async def get_model_settings(session: Session = Depends(require_admin)):
+    """
+    Get information about configured LLM and embedding models.
+
+    Requires admin privileges.
+
+    Args:
+        session: Admin session (injected by dependency)
+
+    Returns:
+        Model configuration information
+    """
+    try:
+        # Log the action
+        audit_logger.log_action(
+            session.email,
+            "settings_view_models",
+            "model_info",
+            "success"
+        )
+
+        return {
+            "success": True,
+            "embedding": {
+                "model": settings.openai_embedding_model,
+                "api_base": settings.openai_api_base,
+                "provider": "Naga.ac" if "naga.ac" in settings.openai_api_base.lower() else "OpenAI",
+            },
+            "llm": {
+                "model": settings.openrouter_model,
+                "api_base": settings.openrouter_api_base,
+                "provider": "Naga.ac" if "naga.ac" in settings.openrouter_api_base.lower() else "OpenRouter",
+            },
+            "rag": {
+                "chunk_size": settings.chunk_size,
+                "chunk_overlap": settings.chunk_overlap,
+                "top_k_retrieval": settings.top_k_retrieval,
+                "similarity_threshold": settings.similarity_threshold,
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting model settings: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting model settings: {str(e)}")
 
 
 @app.get("/api/config")

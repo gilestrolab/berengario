@@ -29,6 +29,7 @@ class AdminPanel {
         await this.loadAllWhitelists();
         await this.loadDocuments();
         await this.loadBackups();
+        await this.loadSettings();
     }
 
     async checkAuth() {
@@ -555,6 +556,186 @@ class AdminPanel {
         setTimeout(() => {
             toast.style.display = 'none';
         }, 3000);
+    }
+
+    async loadSettings() {
+        // Load both model info and prompt settings
+        await Promise.all([
+            this.loadModelInfo(),
+            this.loadPromptSettings()
+        ]);
+    }
+
+    async loadModelInfo() {
+        try {
+            const response = await fetch('/api/admin/settings/models');
+
+            if (!response.ok) {
+                throw new Error('Failed to load model settings');
+            }
+
+            const data = await response.json();
+            this.renderModelInfo(data);
+        } catch (error) {
+            console.error('Error loading model settings:', error);
+            this.renderModelInfoError(error.message);
+        }
+    }
+
+    renderModelInfo(data) {
+        const container = document.getElementById('model-info');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="model-card">
+                <h4>Embedding Model</h4>
+                <div class="model-detail">
+                    <span class="model-detail-label">Model:</span>
+                    <span class="model-detail-value">${this.escapeHtml(data.embedding.model)}</span>
+                </div>
+                <div class="model-detail">
+                    <span class="model-detail-label">Provider:</span>
+                    <span class="model-detail-value">${this.escapeHtml(data.embedding.provider)}</span>
+                </div>
+                <div class="model-detail">
+                    <span class="model-detail-label">API Base:</span>
+                    <span class="model-detail-value">${this.escapeHtml(data.embedding.api_base)}</span>
+                </div>
+            </div>
+
+            <div class="model-card">
+                <h4>LLM Model</h4>
+                <div class="model-detail">
+                    <span class="model-detail-label">Model:</span>
+                    <span class="model-detail-value">${this.escapeHtml(data.llm.model)}</span>
+                </div>
+                <div class="model-detail">
+                    <span class="model-detail-label">Provider:</span>
+                    <span class="model-detail-value">${this.escapeHtml(data.llm.provider)}</span>
+                </div>
+                <div class="model-detail">
+                    <span class="model-detail-label">API Base:</span>
+                    <span class="model-detail-value">${this.escapeHtml(data.llm.api_base)}</span>
+                </div>
+            </div>
+
+            <div class="model-card">
+                <h4>RAG Configuration</h4>
+                <div class="model-detail">
+                    <span class="model-detail-label">Chunk Size:</span>
+                    <span class="model-detail-value">${data.rag.chunk_size}</span>
+                </div>
+                <div class="model-detail">
+                    <span class="model-detail-label">Chunk Overlap:</span>
+                    <span class="model-detail-value">${data.rag.chunk_overlap}</span>
+                </div>
+                <div class="model-detail">
+                    <span class="model-detail-label">Top K Retrieval:</span>
+                    <span class="model-detail-value">${data.rag.top_k_retrieval}</span>
+                </div>
+                <div class="model-detail">
+                    <span class="model-detail-label">Similarity Threshold:</span>
+                    <span class="model-detail-value">${data.rag.similarity_threshold}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    renderModelInfoError(message) {
+        const container = document.getElementById('model-info');
+        if (!container) return;
+
+        container.innerHTML = `<div class="error-message">Error: ${this.escapeHtml(message)}</div>`;
+    }
+
+    async loadPromptSettings() {
+        try {
+            const response = await fetch('/api/admin/settings/prompt');
+
+            if (!response.ok) {
+                throw new Error('Failed to load prompt settings');
+            }
+
+            const data = await response.json();
+            this.renderPromptSettings(data);
+        } catch (error) {
+            console.error('Error loading prompt settings:', error);
+            this.showToast('Failed to load prompt settings', 'error');
+        }
+    }
+
+    renderPromptSettings(data) {
+        const fullPromptTextarea = document.getElementById('full-prompt');
+        const customPromptTextarea = document.getElementById('custom-prompt');
+
+        if (fullPromptTextarea) {
+            fullPromptTextarea.value = data.full_prompt || '';
+        }
+
+        if (customPromptTextarea) {
+            customPromptTextarea.value = data.custom_prompt || '';
+        }
+    }
+
+    async savePrompt() {
+        const customPromptTextarea = document.getElementById('custom-prompt');
+        const saveButton = document.querySelector('.btn-save-prompt');
+        const statusSpan = document.getElementById('prompt-save-status');
+
+        if (!customPromptTextarea) return;
+
+        const customPrompt = customPromptTextarea.value;
+
+        try {
+            // Disable button during save
+            if (saveButton) {
+                saveButton.disabled = true;
+                saveButton.textContent = 'Saving...';
+            }
+            if (statusSpan) {
+                statusSpan.textContent = '';
+            }
+
+            const response = await fetch('/api/admin/settings/prompt', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ custom_prompt: customPrompt }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to save custom prompt');
+            }
+
+            this.showToast(data.message, 'success');
+            if (statusSpan) {
+                statusSpan.textContent = '✓ Saved successfully';
+                statusSpan.style.color = 'var(--success, #28a745)';
+                setTimeout(() => {
+                    statusSpan.textContent = '';
+                }, 3000);
+            }
+
+            // Reload the full prompt to show the updated version
+            await this.loadPromptSettings();
+
+        } catch (error) {
+            console.error('Error saving custom prompt:', error);
+            this.showToast(error.message, 'error');
+            if (statusSpan) {
+                statusSpan.textContent = '✗ Save failed';
+                statusSpan.style.color = 'var(--danger, #dc3545)';
+            }
+        } finally {
+            // Re-enable button
+            if (saveButton) {
+                saveButton.disabled = false;
+                saveButton.textContent = 'Save Custom Prompt';
+            }
+        }
     }
 
     escapeHtml(text) {
