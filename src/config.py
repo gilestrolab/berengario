@@ -130,6 +130,20 @@ class Settings(BaseSettings):
         description="Enable query whitelist validation",
     )
 
+    # Admin Whitelist (for web interface admin access)
+    email_admin_whitelist: str = Field(
+        default="",
+        description="Comma-separated list of email addresses/domains with admin access",
+    )
+    email_admin_whitelist_file: Optional[Path] = Field(
+        default=Path("data/config/allowed_admins.txt"),
+        description="Path to file with email addresses/domains with admin access (one per line)",
+    )
+    email_admin_whitelist_enabled: bool = Field(
+        default=True,
+        description="Enable admin whitelist validation",
+    )
+
     # Legacy whitelist support (deprecated - maps to teach whitelist)
     email_whitelist: str = Field(
         default="",
