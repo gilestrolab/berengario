@@ -293,19 +293,25 @@
         }
 
         .modal-close {
-            background: none;
-            border: none;
-            font-size: 2rem;
+            background: var(--bg-secondary, #f8f9fa);
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+            font-size: 1.5rem;
+            font-weight: bold;
             cursor: pointer;
             color: var(--text-secondary, #666);
-            padding: 0;
-            width: 32px;
+            padding: 0.25rem 0.5rem;
+            min-width: 32px;
             height: 32px;
             line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .modal-close:hover {
             color: var(--text-primary, #333);
+            background: var(--border, #ddd);
         }
 
         .modal-body {

@@ -226,6 +226,17 @@ class AdminPanel {
         }
     }
 
+    getDisplayName(doc) {
+        // Generate a better display name for emails
+        if (doc.source_type === 'email' && doc.sender && doc.subject) {
+            const senderName = doc.sender.split('@')[0];
+            const date = doc.date ? new Date(doc.date).toLocaleDateString() : 'unknown date';
+            const subject = doc.subject.substring(0, 50);
+            return `Email from ${senderName} on ${date} - ${subject}`;
+        }
+        return doc.filename;
+    }
+
     renderDocuments() {
         const container = document.getElementById('documents-list');
         if (!container) return;
@@ -240,6 +251,9 @@ class AdminPanel {
             const canDownload = ['manual', 'file'].includes(doc.source_type);
             const canView = doc.source_type === 'email';
 
+            // Get display name (improved for emails)
+            const displayName = this.getDisplayName(doc);
+
             const downloadButton = canDownload ? `
                 <button class="btn-download" onclick="adminPanel.downloadDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
                     Download
@@ -247,7 +261,7 @@ class AdminPanel {
             ` : '';
 
             const viewButton = canView ? `
-                <button class="btn-view" onclick="adminPanel.viewDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
+                <button class="btn-view" onclick="adminPanel.viewDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(displayName)}')">
                     View
                 </button>
             ` : '';
@@ -255,7 +269,7 @@ class AdminPanel {
             return `
                 <div class="document-item">
                     <div class="document-info">
-                        <div class="filename">${this.escapeHtml(doc.filename)}</div>
+                        <div class="filename">${this.escapeHtml(displayName)}</div>
                         <div class="metadata">
                             Type: ${this.escapeHtml(doc.file_type || 'unknown')} |
                             Source: ${this.escapeHtml(doc.source_type || 'unknown')} |
@@ -265,7 +279,7 @@ class AdminPanel {
                     <div class="document-actions">
                         ${viewButton}
                         ${downloadButton}
-                        <button class="btn-delete" onclick="adminPanel.deleteDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
+                        <button class="btn-delete" onclick="adminPanel.deleteDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(displayName)}')">
                             Delete
                         </button>
                     </div>
@@ -295,14 +309,24 @@ class AdminPanel {
             document.getElementById('modal-content').textContent = data.content;
 
             // Show modal
-            document.getElementById('view-modal').classList.add('active');
+            const modal = document.getElementById('view-modal');
+            modal.classList.add('active');
 
             // Close modal on background click
-            document.getElementById('view-modal').onclick = (e) => {
+            modal.onclick = (e) => {
                 if (e.target.id === 'view-modal') {
                     this.closeViewModal();
                 }
             };
+
+            // Close modal on ESC key
+            const escHandler = (e) => {
+                if (e.key === 'Escape') {
+                    this.closeViewModal();
+                    document.removeEventListener('keydown', escHandler);
+                }
+            };
+            document.addEventListener('keydown', escHandler);
 
         } catch (error) {
             console.error('Error viewing document:', error);

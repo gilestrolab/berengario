@@ -272,6 +272,10 @@ class KnowledgeBaseManager:
                         "file_hash": file_hash,
                         "source_type": metadata.get("source_type"),
                         "file_type": metadata.get("file_type"),
+                        # Include email metadata if available
+                        "sender": metadata.get("sender"),
+                        "subject": metadata.get("subject"),
+                        "date": metadata.get("date"),
                     }
 
             return list(unique_docs.values())
