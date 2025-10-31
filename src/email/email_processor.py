@@ -312,10 +312,20 @@ class EmailProcessor:
 
                         # Process email body as text document
                         from pathlib import Path
+
+                        # Create descriptive filename
+                        date_str = email.date.strftime("%Y-%m-%d") if email.date else "unknown-date"
+                        sender_name = email.sender.email.split('@')[0]  # Get name part of email
+                        subject_clean = email.subject[:50] if email.subject else "No Subject"
+                        # Remove invalid filename characters
+                        subject_clean = "".join(c for c in subject_clean if c.isalnum() or c in (' ', '-', '_')).strip()
+                        descriptive_filename = f"Email from {sender_name} on {date_str} - {subject_clean}.txt"
+
                         nodes = self.doc_processor.process_document(
                             file_path=Path(temp_file.name),
                             source_type="email",
                             extra_metadata={
+                                "filename": descriptive_filename,  # Override temp filename
                                 "sender": email.sender.email,
                                 "subject": email.subject,
                                 "date": str(email.date) if email.date else None,
