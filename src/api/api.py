@@ -1333,6 +1333,84 @@ async def delete_document(
         raise HTTPException(status_code=500, detail=f"Error deleting document: {str(e)}")
 
 
+@app.get("/api/admin/documents/{file_hash}/download")
+async def download_document(
+    file_hash: str,
+    session: Session = Depends(require_admin),
+):
+    """
+    Download a document file from the knowledge base.
+
+    Requires admin privileges.
+
+    Args:
+        file_hash: SHA-256 hash of document to download
+        session: Admin session (injected by dependency)
+
+    Returns:
+        File download response
+
+    Raises:
+        HTTPException: If document not found or file doesn't exist
+    """
+    try:
+        # Get document info
+        documents = document_manager.list_documents()
+        doc = next((d for d in documents if d.get('file_hash') == file_hash), None)
+
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"Document not found with hash: {file_hash}")
+
+        # Only allow download of file-sourced documents
+        if doc.get('source_type') != 'file':
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot download documents from source type: {doc.get('source_type')}"
+            )
+
+        filename = doc['filename']
+        file_path = document_manager.documents_path / filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+
+        # Log the download action
+        audit_logger.log_action(
+            session.email,
+            "document_download",
+            filename,
+            "success",
+            f"hash:{file_hash}"
+        )
+
+        logger.info(f"Admin {session.email} downloaded document: {filename}")
+
+        # Determine content type based on file extension
+        content_type = "application/octet-stream"
+        if filename.endswith('.pdf'):
+            content_type = "application/pdf"
+        elif filename.endswith('.docx'):
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        elif filename.endswith('.doc'):
+            content_type = "application/msword"
+        elif filename.endswith('.txt'):
+            content_type = "text/plain"
+        elif filename.endswith('.csv'):
+            content_type = "text/csv"
+
+        return FileResponse(
+            file_path,
+            media_type=content_type,
+            filename=filename,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading document {file_hash}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error downloading document: {str(e)}")
+
+
 @app.get("/api/config")
 async def get_config():
     """

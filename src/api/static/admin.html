@@ -194,17 +194,34 @@
             color: var(--text-secondary, #666);
         }
 
+        .document-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
         .document-actions button {
             padding: 0.5rem 1rem;
-            background: var(--danger, #dc3545);
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             transition: background 0.3s;
+            font-size: 0.875rem;
         }
 
-        .document-actions button:hover {
+        .document-actions .btn-download {
+            background: var(--primary, #007bff);
+        }
+
+        .document-actions .btn-download:hover {
+            background: var(--primary-dark, #0056b3);
+        }
+
+        .document-actions .btn-delete {
+            background: var(--danger, #dc3545);
+        }
+
+        .document-actions .btn-delete:hover {
             background: var(--danger-dark, #c82333);
         }
 

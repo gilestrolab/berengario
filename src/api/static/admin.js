@@ -246,7 +246,10 @@ class AdminPanel {
                     </div>
                 </div>
                 <div class="document-actions">
-                    <button onclick="adminPanel.deleteDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
+                    <button class="btn-download" onclick="adminPanel.downloadDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
+                        Download
+                    </button>
+                    <button class="btn-delete" onclick="adminPanel.deleteDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
                         Delete
                     </button>
                 </div>
@@ -259,6 +262,24 @@ class AdminPanel {
         if (!container) return;
 
         container.innerHTML = `<div class="error-message">Error: ${this.escapeHtml(message)}</div>`;
+    }
+
+    downloadDocument(fileHash, filename) {
+        // Create a download link and trigger it
+        const downloadUrl = `/api/admin/documents/${fileHash}/download`;
+
+        // Create temporary link element
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = filename;
+        link.style.display = 'none';
+
+        // Add to DOM, click, and remove
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        this.showToast(`Downloading ${filename}...`, 'success');
     }
 
     async deleteDocument(fileHash, filename) {
