@@ -1549,11 +1549,11 @@ async def create_backup(
 </html>
                 """
 
-                await email_sender.send_email(
-                    to_addresses=[session.email],
+                email_sender.send_reply(
+                    to_address=session.email,
                     subject=subject,
-                    body=body,
-                    is_html=True,
+                    body_text="",  # Empty plain text
+                    body_html=body,
                 )
 
                 # Log the action
@@ -1571,11 +1571,11 @@ async def create_backup(
                 logger.error(f"Error in backup creation task: {e}")
                 # Try to send error notification
                 try:
-                    await email_sender.send_email(
-                        to_addresses=[session.email],
+                    email_sender.send_reply(
+                        to_address=session.email,
                         subject=f"[{settings.instance_name}] Backup Failed",
-                        body=f"Backup creation failed: {str(e)}",
-                        is_html=False,
+                        body_text=f"Backup creation failed: {str(e)}",
+                        body_html=None,
                     )
                 except:
                     pass
