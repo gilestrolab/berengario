@@ -460,7 +460,7 @@ admin_whitelist = WhitelistValidator(
 
 # Initialize admin managers
 kb_manager = KnowledgeBaseManager()
-document_processor = DocumentProcessor(kb_manager=kb_manager)
+document_processor = DocumentProcessor()
 whitelist_manager = WhitelistManager()
 document_manager = DocumentManager(
     kb_manager=kb_manager,

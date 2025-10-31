@@ -275,10 +275,20 @@ class DocumentManager:
             chunks_added = 0
             if process:
                 try:
-                    # Process document
-                    self.document_processor.process_file(str(file_path))
-                    chunks_added = '?'  # Would need to track this
-                    logger.info(f"Processed document into KB: {safe_filename}")
+                    # Process document into chunks
+                    nodes = self.document_processor.process_document(
+                        file_path,
+                        source_type="manual",
+                        extra_metadata={"uploaded_via": "admin_interface"}
+                    )
+
+                    # Add chunks to knowledge base
+                    if nodes:
+                        self.kb_manager.add_documents(nodes)
+                        chunks_added = len(nodes)
+                        logger.info(f"Processed document into KB: {safe_filename} ({chunks_added} chunks)")
+                    else:
+                        logger.warning(f"No chunks extracted from {safe_filename}")
                 except Exception as e:
                     logger.error(f"Error processing document: {e}")
                     # Keep file but note processing failed
