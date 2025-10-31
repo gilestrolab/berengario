@@ -832,6 +832,20 @@ async def root():
     return {"message": f"Welcome to {settings.instance_name} API", "docs": "/docs"}
 
 
+@app.get("/admin")
+async def admin_panel():
+    """
+    Serve admin panel interface.
+
+    Note: Authentication and admin privilege check is done client-side
+    via JavaScript after page load.
+    """
+    admin_file = static_dir / "admin.html"
+    if admin_file.exists():
+        return FileResponse(admin_file)
+    raise HTTPException(status_code=404, detail="Admin panel not found")
+
+
 @app.post("/api/query", response_model=QueryResponse)
 async def query(
     query_request: QueryRequest,

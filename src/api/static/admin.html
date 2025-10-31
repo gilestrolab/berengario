@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - RAGInbox</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .admin-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .admin-header {
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .admin-header h1 {
+            margin: 0;
+            font-size: 2rem;
+            color: var(--text-primary, #333);
+        }
+
+        .admin-header .back-link {
+            color: var(--primary, #007bff);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--primary, #007bff);
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+
+        .admin-header .back-link:hover {
+            background: var(--primary, #007bff);
+            color: white;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid var(--border, #ddd);
+        }
+
+        .tab {
+            padding: 1rem 2rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            color: var(--text-secondary, #666);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            color: var(--text-primary, #333);
+        }
+
+        .tab.active {
+            color: var(--primary, #007bff);
+            border-bottom-color: var(--primary, #007bff);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .whitelist-section {
+            margin-bottom: 2rem;
+        }
+
+        .whitelist-section h3 {
+            margin-bottom: 1rem;
+            color: var(--text-primary, #333);
+        }
+
+        .whitelist-controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .whitelist-controls input {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        .whitelist-controls button {
+            padding: 0.5rem 1rem;
+            background: var(--primary, #007bff);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .whitelist-controls button:hover {
+            background: var(--primary-dark, #0056b3);
+        }
+
+        .whitelist-list {
+            background: var(--bg-secondary, #f8f9fa);
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+            padding: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .whitelist-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            background: white;
+            border-radius: 4px;
+        }
+
+        .whitelist-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .whitelist-item button {
+            padding: 0.25rem 0.75rem;
+            background: var(--danger, #dc3545);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: background 0.3s;
+        }
+
+        .whitelist-item button:hover {
+            background: var(--danger-dark, #c82333);
+        }
+
+        .documents-list {
+            background: var(--bg-secondary, #f8f9fa);
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+            padding: 1rem;
+        }
+
+        .document-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: white;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+        }
+
+        .document-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .document-info {
+            flex: 1;
+        }
+
+        .document-info .filename {
+            font-weight: 500;
+            color: var(--text-primary, #333);
+            margin-bottom: 0.25rem;
+        }
+
+        .document-info .metadata {
+            font-size: 0.875rem;
+            color: var(--text-secondary, #666);
+        }
+
+        .document-actions button {
+            padding: 0.5rem 1rem;
+            background: var(--danger, #dc3545);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .document-actions button:hover {
+            background: var(--danger-dark, #c82333);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary, #666);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary, #666);
+        }
+
+        .error-message {
+            background: var(--danger-light, #f8d7da);
+            color: var(--danger-dark, #721c24);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="admin-header">
+            <h1 id="admin-title">Admin Panel</h1>
+            <a href="/" class="back-link">← Back to Chat</a>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="whitelists">Whitelists</button>
+            <button class="tab" data-tab="documents">Documents</button>
+        </div>
+
+        <!-- Whitelists Tab -->
+        <div id="whitelists-tab" class="tab-content active">
+            <div class="whitelist-section">
+                <h3>Query Whitelist</h3>
+                <p style="margin-bottom: 1rem; color: var(--text-secondary, #666); font-size: 0.875rem;">
+                    Users who can query the knowledge base
+                </p>
+                <div class="whitelist-controls">
+                    <input type="email" id="queriers-input" placeholder="email@example.com or @domain.com">
+                    <button onclick="adminPanel.addWhitelistEntry('queriers')">Add</button>
+                </div>
+                <div class="whitelist-list" id="queriers-list">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+
+            <div class="whitelist-section">
+                <h3>Teacher Whitelist</h3>
+                <p style="margin-bottom: 1rem; color: var(--text-secondary, #666); font-size: 0.875rem;">
+                    Users who can add documents to the knowledge base
+                </p>
+                <div class="whitelist-controls">
+                    <input type="email" id="teachers-input" placeholder="email@example.com or @domain.com">
+                    <button onclick="adminPanel.addWhitelistEntry('teachers')">Add</button>
+                </div>
+                <div class="whitelist-list" id="teachers-list">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+
+            <div class="whitelist-section">
+                <h3>Admin Whitelist</h3>
+                <p style="margin-bottom: 1rem; color: var(--text-secondary, #666); font-size: 0.875rem;">
+                    Users with full admin access
+                </p>
+                <div class="whitelist-controls">
+                    <input type="email" id="admins-input" placeholder="email@example.com or @domain.com">
+                    <button onclick="adminPanel.addWhitelistEntry('admins')">Add</button>
+                </div>
+                <div class="whitelist-list" id="admins-list">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Documents Tab -->
+        <div id="documents-tab" class="tab-content">
+            <div class="documents-list" id="documents-list">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+
+    <script src="/static/admin.js"></script>
+</body>
+</html>

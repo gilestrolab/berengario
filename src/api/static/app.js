@@ -85,6 +85,15 @@ class ChatApp {
                 this.userEmailSpan.textContent = this.userEmail;
                 this.userEmailSpan.title = `Logged in as ${this.userEmail}`;
             }
+
+            // Show admin button if user is admin
+            if (data.is_admin) {
+                const adminBtn = document.getElementById('admin-btn');
+                if (adminBtn) {
+                    adminBtn.style.display = 'block';
+                }
+            }
+
             return true;
         } catch (error) {
             console.error('Error checking auth:', error);
@@ -115,6 +124,14 @@ class ChatApp {
 
         // Logout button
         this.logoutBtn.addEventListener('click', () => this.logout());
+
+        // Admin button
+        const adminBtn = document.getElementById('admin-btn');
+        if (adminBtn) {
+            adminBtn.addEventListener('click', () => {
+                window.location.href = '/admin';
+            });
+        }
     }
 
     async loadStats() {
