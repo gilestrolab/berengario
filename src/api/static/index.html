@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAGInbox - Chat Interface</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <h1 class="title" id="instance-name">RAGInbox</h1>
+                    <p class="subtitle" id="instance-description">AI-powered Knowledge Base Assistant</p>
+                </div>
+                <div class="header-right">
+                    <div class="kb-stats">
+                        <span class="stat-item">
+                            <span class="stat-label">Documents:</span>
+                            <span class="stat-value" id="kb-documents">-</span>
+                        </span>
+                        <span class="stat-item">
+                            <span class="stat-label">Chunks:</span>
+                            <span class="stat-value" id="kb-chunks">-</span>
+                        </span>
+                    </div>
+                    <button class="btn-icon" id="clear-btn" title="Clear conversation">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Messages Area -->
+        <main class="messages-container" id="messages-container">
+            <div class="messages" id="messages">
+                <div class="welcome-message">
+                    <div class="welcome-icon">💬</div>
+                    <h2>Welcome to RAGInbox</h2>
+                    <p>Ask me anything about the knowledge base documents.</p>
+                    <p class="welcome-hint">Your conversation history will be saved during this session.</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Input Area -->
+        <footer class="input-container">
+            <div class="input-wrapper">
+                <textarea
+                    id="query-input"
+                    class="query-input"
+                    placeholder="Ask a question about the knowledge base..."
+                    rows="1"
+                ></textarea>
+                <button id="send-btn" class="send-btn" title="Send message (Enter)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="input-hint">
+                Press <kbd>Enter</kbd> to send, <kbd>Shift</kbd>+<kbd>Enter</kbd> for new line
+            </div>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Thinking...</p>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
