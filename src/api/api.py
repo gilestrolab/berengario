@@ -1361,11 +1361,13 @@ async def download_document(
         if not doc:
             raise HTTPException(status_code=404, detail=f"Document not found with hash: {file_hash}")
 
-        # Only allow download of file-sourced documents
-        if doc.get('source_type') != 'file':
+        # Only allow download of file-sourced documents (manual uploads or file ingestion)
+        # Email-sourced documents don't have physical files to download
+        allowed_source_types = ['manual', 'file']
+        if doc.get('source_type') not in allowed_source_types:
             raise HTTPException(
                 status_code=400,
-                detail=f"Cannot download documents from source type: {doc.get('source_type')}"
+                detail=f"Cannot download documents from source type: {doc.get('source_type')}. Only manual/file uploads can be downloaded."
             )
 
         filename = doc['filename']
