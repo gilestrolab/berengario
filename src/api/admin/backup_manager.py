@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
+from src.config import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,7 +47,9 @@ class BackupManager:
             Backup filename with timestamp.
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return f"raginbox_backup_{timestamp}.zip"
+        # Convert instance name to safe filename (lowercase, replace spaces with underscores)
+        instance_name = settings.instance_name.lower().replace(" ", "_").replace("-", "_")
+        return f"{instance_name}_backup_{timestamp}.zip"
 
     async def create_backup(self, exclude_backups: bool = True) -> Path:
         """
