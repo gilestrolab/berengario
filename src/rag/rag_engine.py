@@ -265,6 +265,8 @@ class RAGEngine:
             # Extract source information
             sources = []
             if hasattr(response, "source_nodes"):
+                # Build all sources first
+                all_sources = []
                 for node in response.source_nodes:
                     source_info = {
                         "filename": node.metadata.get("filename", "Unknown"),
@@ -278,7 +280,28 @@ class RAGEngine:
                         "subject": node.metadata.get("subject"),
                         "date": node.metadata.get("date"),
                     }
-                    sources.append(source_info)
+                    all_sources.append(source_info)
+
+                # Deduplicate sources by filename/subject, keeping highest score
+                # Use filename for files, subject for emails
+                logger.info(f"Before deduplication: {len(all_sources)} source nodes")
+                seen = {}
+                for source in all_sources:
+                    # Create unique key based on source type
+                    if source.get("subject") and source.get("sender"):
+                        # Email source - use subject+sender as key
+                        key = (source["subject"], source["sender"])
+                    else:
+                        # File source - use filename as key
+                        key = source["filename"]
+
+                    # Keep only the highest scoring source for each unique document
+                    if key not in seen or source["score"] > seen[key]["score"]:
+                        seen[key] = source
+
+                # Convert back to list, sorted by score (highest first)
+                sources = sorted(seen.values(), key=lambda x: x["score"], reverse=True)
+                logger.info(f"After deduplication: {len(sources)} unique sources from {len(seen)} unique keys")
 
             result = {
                 "response": str(response),
