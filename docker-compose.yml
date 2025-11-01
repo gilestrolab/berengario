@@ -1,8 +1,8 @@
 services:
-  # MariaDB Database for testing
+  # MariaDB Database
   mariadb:
     image: mariadb:11.2
-    container_name: raginbox-mariadb-test
+    container_name: raginbox-db
     restart: unless-stopped
 
     environment:
@@ -12,7 +12,7 @@ services:
       MYSQL_PASSWORD: test_password
 
     volumes:
-      - mariadb-test-data:/var/lib/mysql
+      - raginbox-db-data:/var/lib/mysql
 
     ports:
       - "3307:3306"  # Use 3307 to avoid conflicts with local MySQL
@@ -139,5 +139,5 @@ networks:
     driver: bridge
 
 volumes:
-  mariadb-test-data:
+  raginbox-db-data:
     driver: local

@@ -292,3 +292,98 @@ def clear_knowledge_base(
 
     except Exception as e:
         handle_error(e, "clearing knowledge base")
+
+@app.command("regenerate-descriptions")
+def regenerate_descriptions(
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
+):
+    """
+    Regenerate AI descriptions for all documents in the knowledge base.
+
+    Uses LLM to create fresh 2-sentence summaries for each document.
+    """
+    try:
+        from src.document_processing.description_generator import DescriptionGenerator
+
+        print_header("Regenerate Document Descriptions")
+
+        # Get all unique documents
+        documents = kb_manager.get_unique_documents()
+
+        if not documents:
+            print_info("No documents found in knowledge base")
+            return
+
+        # Confirm operation
+        if not force:
+            console.print()
+            print_warning(f"This will regenerate descriptions for {len(documents)} documents using LLM.")
+            print_warning("This may take several minutes and will incur LLM API costs.")
+            console.print()
+            if not confirm_destructive("regenerate descriptions for", f"{len(documents)} documents"):
+                return
+
+        # Initialize description generator
+        desc_gen = DescriptionGenerator()
+
+        # Regenerate descriptions
+        success_count = 0
+        error_count = 0
+
+        console.print()
+        with create_progress() as progress:
+            task = progress.add_task(
+                f"Regenerating descriptions for {len(documents)} documents...",
+                total=len(documents)
+            )
+
+            for doc in documents:
+                filename = doc.get("filename", "Unknown")
+                file_hash = doc.get("file_hash")
+
+                try:
+                    # Get chunks for this document
+                    chunks = kb_manager.get_document_chunks(file_hash)
+
+                    if not chunks:
+                        logger.warning(f"No chunks found for {filename}")
+                        error_count += 1
+                        progress.update(task, advance=1)
+                        continue
+
+                    # Generate new description
+                    description = desc_gen.generate_description(chunks)
+
+                    # Get file info from metadata
+                    metadata = chunks[0].metadata if chunks else {}
+                    file_path = metadata.get("file_path", filename)
+                    file_size = metadata.get("file_size")
+                    file_type = doc.get("file_type")
+
+                    # Save description
+                    desc_gen.save_description(
+                        file_path=file_path,
+                        filename=filename,
+                        description=description,
+                        chunk_count=len(chunks),
+                        file_size=file_size,
+                        file_type=file_type,
+                    )
+
+                    success_count += 1
+                    logger.info(f"Regenerated description for {filename}")
+
+                except Exception as e:
+                    logger.error(f"Error regenerating description for {filename}: {e}")
+                    error_count += 1
+
+                progress.update(task, advance=1)
+
+        # Summary
+        console.print()
+        print_success(f"Description regeneration complete!")
+        print_key_value("Successful", str(success_count))
+        print_key_value("Errors", str(error_count))
+
+    except Exception as e:
+        handle_error(e, "regenerating descriptions")

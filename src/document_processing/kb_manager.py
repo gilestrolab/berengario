@@ -176,6 +176,49 @@ class KnowledgeBaseManager:
             logger.error(f"Failed to get document content: {e}")
             raise
 
+    def get_document_chunks(self, file_hash: str) -> List[TextNode]:
+        """
+        Get all chunks for a document as TextNode objects.
+
+        Args:
+            file_hash: SHA-256 hash of the document.
+
+        Returns:
+            List of TextNode objects containing the document chunks.
+
+        Raises:
+            Exception: If retrieval fails.
+        """
+        try:
+            # Get all chunks with this hash
+            results = self.collection.get(
+                where={"file_hash": file_hash},
+                include=["documents", "metadatas", "ids"]
+            )
+
+            if not results["documents"]:
+                logger.warning(f"No chunks found for hash {file_hash}")
+                return []
+
+            # Convert to TextNode objects
+            chunks = []
+            for i, (doc_id, text, metadata) in enumerate(
+                zip(results["ids"], results["documents"], results["metadatas"])
+            ):
+                node = TextNode(
+                    id_=doc_id,
+                    text=text,
+                    metadata=metadata
+                )
+                chunks.append(node)
+
+            logger.info(f"Retrieved {len(chunks)} chunks for hash {file_hash}")
+            return chunks
+
+        except Exception as e:
+            logger.error(f"Failed to get document chunks: {e}")
+            raise
+
     def delete_document_by_hash(self, file_hash: str) -> int:
         """
         Delete all nodes associated with a document hash.
