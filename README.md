@@ -133,23 +133,58 @@ The web interface provides:
 - **Dynamic Branding**: Instance name and description from .env
 - **Admin Panel**: Whitelist and document management (for admin users)
 
-#### CLI Interface
+#### CLI Administration Tool
+
+RAGInbox includes a unified CLI for administration and management (Docker-only):
 
 ```bash
-# Process documents from data/documents folder
-python src/demo_phase1.py --mode process
+# Create an alias for convenience
+alias raginbox="docker exec raginbox-web python -m src.cli.main"
 
-# Query the knowledge base
-python src/demo_phase1.py --mode query --query "What are the key policies?"
+# Knowledge Base operations
+raginbox kb list              # List all documents in the KB
+raginbox kb stats             # Show KB statistics
+raginbox kb reingest          # Reingest all documents from data/documents/
+raginbox kb delete <hash>     # Delete a specific document
+raginbox kb clear             # Clear entire KB (with confirmation)
 
-# Watch for new documents (runs continuously)
-python src/demo_phase1.py --mode watch
+# Database operations
+raginbox db init              # Initialize database tables
+raginbox db test              # Test database connection
+raginbox db info              # Show database configuration
+raginbox db stats             # Show processing statistics
 
-# Run email service (monitors inbox for KB updates)
+# Backup operations
+raginbox backup create        # Create a new backup
+raginbox backup list          # List available backups
+raginbox backup delete <file> # Delete a specific backup
+raginbox backup cleanup       # Clean up old backups
+
+# System information
+raginbox version              # Show version and instance info
+raginbox info                 # Show detailed configuration
+```
+
+**Features:**
+- Colorized output with progress bars
+- Interactive confirmations for destructive operations
+- Pretty-printed tables for list commands
+- Comprehensive help text (`raginbox <command> --help`)
+- Replaces scripts folder with unified interface
+
+See [`docs/CLI.md`](docs/CLI.md) for complete CLI documentation.
+
+#### Running Services
+
+```bash
+# Run email service (monitors inbox for KB updates and queries)
 python run_email_service.py
 
 # Run web service (chat interface with authentication)
 python run_web_service.py
+
+# Or use Docker Compose to run everything
+docker-compose up -d
 ```
 
 See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
