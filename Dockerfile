@@ -45,6 +45,13 @@ COPY --chown=raginbox:raginbox . .
 RUN mkdir -p data/documents data/chroma_db data/logs data/config data/temp_attachments && \
     chown -R raginbox:raginbox data/
 
+# Install the package to ensure CLI entry points are available
+# This must be done after copying the code so pyproject.toml is available
+RUN pip install --no-cache-dir -e ".[mariadb]"
+
+# Copy CLI wrapper script to PATH
+COPY --chmod=755 scripts/raginbox-cli /usr/local/bin/raginbox-cli
+
 # Switch to non-root user
 USER raginbox
 

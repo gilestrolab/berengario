@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+"""
+RAGInbox CLI entry point.
+
+This script provides a command-line interface for RAGInbox administration.
+Usage: raginbox-cli [COMMAND] [OPTIONS]
+"""
+
+if __name__ == "__main__":
+    import sys
+
+    # Handle 'help' as an alias for '--help'
+    if len(sys.argv) > 1 and sys.argv[1] in ["help", "-h"]:
+        sys.argv[1] = "--help"
+
+    from src.cli.main import cli
+    cli()

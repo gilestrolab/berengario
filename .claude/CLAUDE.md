@@ -78,30 +78,37 @@ docker-compose up -d
 RAGInbox includes a unified CLI for administration:
 
 ```bash
+# Basic usage
+docker exec raginbox-web raginbox-cli [COMMAND] [OPTIONS]
+
+# Get help
+docker exec raginbox-web raginbox-cli help
+docker exec raginbox-web raginbox-cli --help
+
 # Knowledge base operations
-docker exec raginbox-web python -m src.cli.main kb list       # List documents
-docker exec raginbox-web python -m src.cli.main kb stats      # Show statistics
-docker exec raginbox-web python -m src.cli.main kb reingest   # Reingest all documents
+docker exec raginbox-web raginbox-cli kb list       # List documents
+docker exec raginbox-web raginbox-cli kb stats      # Show statistics
+docker exec raginbox-web raginbox-cli kb reingest   # Reingest all documents
 
 # Database operations
-docker exec raginbox-web python -m src.cli.main db init       # Initialize database
-docker exec raginbox-web python -m src.cli.main db test       # Test connection
-docker exec raginbox-web python -m src.cli.main db info       # Show DB info
-docker exec raginbox-web python -m src.cli.main db stats      # Show statistics
+docker exec raginbox-web raginbox-cli db init       # Initialize database
+docker exec raginbox-web raginbox-cli db test       # Test connection
+docker exec raginbox-web raginbox-cli db info       # Show DB info
+docker exec raginbox-web raginbox-cli db stats      # Show statistics
 
 # Backup operations
-docker exec raginbox-web python -m src.cli.main backup create  # Create backup
-docker exec raginbox-web python -m src.cli.main backup list    # List backups
-docker exec raginbox-web python -m src.cli.main backup cleanup # Clean old backups
+docker exec raginbox-web raginbox-cli backup create  # Create backup
+docker exec raginbox-web raginbox-cli backup list    # List backups
+docker exec raginbox-web raginbox-cli backup cleanup # Clean old backups
 
 # System information
-docker exec raginbox-web python -m src.cli.main version        # Show version
-docker exec raginbox-web python -m src.cli.main info           # Show configuration
+docker exec raginbox-web raginbox-cli version        # Show version
+docker exec raginbox-web raginbox-cli info           # Show configuration
 ```
 
 **Tip:** Create an alias for easier access:
 ```bash
-alias raginbox="docker exec raginbox-web python -m src.cli.main"
+alias raginbox="docker exec raginbox-web raginbox-cli"
 # Then use: raginbox kb list, raginbox db stats, etc.
 ```
 

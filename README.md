@@ -138,39 +138,49 @@ The web interface provides:
 RAGInbox includes a unified CLI for administration and management (Docker-only):
 
 ```bash
-# Create an alias for convenience
-alias raginbox="docker exec raginbox-web python -m src.cli.main"
+# Basic usage
+docker exec raginbox-web raginbox-cli [COMMAND] [OPTIONS]
+
+# Get help
+docker exec raginbox-web raginbox-cli help
+docker exec raginbox-web raginbox-cli --help
 
 # Knowledge Base operations
-raginbox kb list              # List all documents in the KB
-raginbox kb stats             # Show KB statistics
-raginbox kb reingest          # Reingest all documents from data/documents/
-raginbox kb delete <hash>     # Delete a specific document
-raginbox kb clear             # Clear entire KB (with confirmation)
+docker exec raginbox-web raginbox-cli kb list              # List all documents in the KB
+docker exec raginbox-web raginbox-cli kb stats             # Show KB statistics
+docker exec raginbox-web raginbox-cli kb reingest          # Reingest all documents
+docker exec raginbox-web raginbox-cli kb delete <hash>     # Delete a specific document
+docker exec raginbox-web raginbox-cli kb clear             # Clear entire KB (confirmation required)
 
 # Database operations
-raginbox db init              # Initialize database tables
-raginbox db test              # Test database connection
-raginbox db info              # Show database configuration
-raginbox db stats             # Show processing statistics
+docker exec raginbox-web raginbox-cli db init              # Initialize database tables
+docker exec raginbox-web raginbox-cli db test              # Test database connection
+docker exec raginbox-web raginbox-cli db info              # Show database configuration
+docker exec raginbox-web raginbox-cli db stats             # Show processing statistics
 
 # Backup operations
-raginbox backup create        # Create a new backup
-raginbox backup list          # List available backups
-raginbox backup delete <file> # Delete a specific backup
-raginbox backup cleanup       # Clean up old backups
+docker exec raginbox-web raginbox-cli backup create        # Create a new backup
+docker exec raginbox-web raginbox-cli backup list          # List available backups
+docker exec raginbox-web raginbox-cli backup delete <file> # Delete a specific backup
+docker exec raginbox-web raginbox-cli backup cleanup       # Clean up old backups
 
 # System information
-raginbox version              # Show version and instance info
-raginbox info                 # Show detailed configuration
+docker exec raginbox-web raginbox-cli version              # Show version and instance info
+docker exec raginbox-web raginbox-cli info                 # Show detailed configuration
 ```
 
 **Features:**
 - Colorized output with progress bars
 - Interactive confirmations for destructive operations
 - Pretty-printed tables for list commands
-- Comprehensive help text (`raginbox <command> --help`)
+- Comprehensive help text (`raginbox-cli help` or `raginbox-cli <command> --help`)
 - Replaces scripts folder with unified interface
+
+**Tip:** For easier access, you can create a shell alias:
+```bash
+alias raginbox="docker exec raginbox-web raginbox-cli"
+# Then use: raginbox kb list, raginbox db stats, etc.
+```
 
 See [`docs/CLI.md`](docs/CLI.md) for complete CLI documentation.
 
