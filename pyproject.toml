@@ -67,6 +67,10 @@ dependencies = [
     "watchdog>=6.0.0",
     "aiofiles>=24.0.0",
 
+    # CLI
+    "typer>=0.15.0",
+    "rich>=13.0.0",
+
     # Logging
     "structlog>=24.4.0",
 ]
@@ -92,7 +96,8 @@ mariadb = [
 ]
 
 [project.scripts]
-raginbox = "src.demo_phase1:main"
+raginbox-cli = "src.cli.main:cli"
+raginbox-demo = "src.demo_phase1:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

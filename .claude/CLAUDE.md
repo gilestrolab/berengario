@@ -66,21 +66,46 @@ Users can be in one whitelist, both whitelists, or neither. Configure in:
 ### Running the System
 
 ```bash
-# Activate virtual environment (ALWAYS use this prefix for Python commands)
-source .venv/bin/activate
-
-# Process documents from data/documents folder
-python src/demo_phase1.py --mode process
-
-# Query the knowledge base
-python src/demo_phase1.py --mode query --query "What are the key policies?"
-
-# Watch for new documents (runs continuously)
-python src/demo_phase1.py --mode watch
-
 # Run email service (monitors inbox for KB updates and queries)
 python run_email_service.py
+
+# Or use Docker Compose
+docker-compose up -d
 ```
+
+### CLI Commands (Docker-only)
+
+RAGInbox includes a unified CLI for administration:
+
+```bash
+# Knowledge base operations
+docker exec raginbox-web python -m src.cli.main kb list       # List documents
+docker exec raginbox-web python -m src.cli.main kb stats      # Show statistics
+docker exec raginbox-web python -m src.cli.main kb reingest   # Reingest all documents
+
+# Database operations
+docker exec raginbox-web python -m src.cli.main db init       # Initialize database
+docker exec raginbox-web python -m src.cli.main db test       # Test connection
+docker exec raginbox-web python -m src.cli.main db info       # Show DB info
+docker exec raginbox-web python -m src.cli.main db stats      # Show statistics
+
+# Backup operations
+docker exec raginbox-web python -m src.cli.main backup create  # Create backup
+docker exec raginbox-web python -m src.cli.main backup list    # List backups
+docker exec raginbox-web python -m src.cli.main backup cleanup # Clean old backups
+
+# System information
+docker exec raginbox-web python -m src.cli.main version        # Show version
+docker exec raginbox-web python -m src.cli.main info           # Show configuration
+```
+
+**Tip:** Create an alias for easier access:
+```bash
+alias raginbox="docker exec raginbox-web python -m src.cli.main"
+# Then use: raginbox kb list, raginbox db stats, etc.
+```
+
+See `docs/CLI.md` for complete CLI documentation.
 
 ### Testing
 
