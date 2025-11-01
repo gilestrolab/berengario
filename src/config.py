@@ -236,6 +236,12 @@ class Settings(BaseSettings):
 
     # Development
     debug: bool = Field(default=False, description="Enable debug mode")
+    disable_otp_for_dev: bool = Field(
+        default=False,
+        description="SECURITY WARNING: Disable OTP authentication for development. "
+        "DO NOT enable in production! When enabled, any login attempt will succeed "
+        "without requiring email verification.",
+    )
 
     @field_validator("documents_path", "chroma_db_path", mode="before")
     @classmethod

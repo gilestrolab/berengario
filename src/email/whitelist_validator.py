@@ -38,6 +38,7 @@ class WhitelistValidator:
         whitelist: str = None,
         whitelist_file: Path = None,
         enabled: bool = None,
+        parent_validators: list = None,
     ):
         """
         Initialize whitelist validator.
@@ -46,10 +47,12 @@ class WhitelistValidator:
             whitelist: Comma-separated list of allowed addresses/domains
             whitelist_file: Path to file with allowed addresses/domains
             enabled: Whether whitelist validation is enabled
+            parent_validators: List of parent validators to check first (for hierarchy)
         """
         self.enabled = enabled if enabled is not None else settings.email_whitelist_enabled
         self.whitelist_entries: Set[str] = set()
         self.domain_entries: Set[str] = set()
+        self.parent_validators = parent_validators or []
 
         if not self.enabled:
             logger.warning("Email whitelist validation is DISABLED - all senders allowed!")
@@ -139,6 +142,8 @@ class WhitelistValidator:
         """
         Check if an email address is allowed.
 
+        Supports hierarchy: checks parent validators first (e.g., admin > teacher > querier)
+
         Args:
             email_address: Email address to validate
 
@@ -152,6 +157,12 @@ class WhitelistValidator:
         if not email_address:
             logger.warning("Empty email address provided for validation")
             return False
+
+        # Check parent validators first (hierarchy)
+        for parent in self.parent_validators:
+            if parent.is_allowed(email_address):
+                logger.debug(f"Email allowed (via parent validator): {email_address}")
+                return True
 
         email_lower = email_address.lower().strip()
 

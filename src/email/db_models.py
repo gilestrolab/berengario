@@ -8,8 +8,9 @@ processing statistics. Supports both SQLite and MariaDB/MySQL backends.
 from datetime import datetime, date
 from typing import Optional
 
-from sqlalchemy import Column, String, Integer, DateTime, Text, Date, Index
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import Column, String, Integer, DateTime, Text, Date, Index, ForeignKey, Enum
+from sqlalchemy.orm import declarative_base, relationship
+import enum
 
 # Base class for all models
 Base = declarative_base()
@@ -183,4 +184,291 @@ class ProcessingStats(Base):
             "chunks_created": self.chunks_created,
             "errors_count": self.errors_count,
             "last_updated": self.last_updated.isoformat() if self.last_updated else None,
+        }
+
+
+class ChannelType(enum.Enum):
+    """Enum for conversation channel types."""
+    EMAIL = "email"
+    WEBCHAT = "webchat"
+
+
+class MessageType(enum.Enum):
+    """Enum for message types in conversations."""
+    QUERY = "query"  # User message
+    REPLY = "reply"  # Assistant response
+
+
+class Conversation(Base):
+    """
+    Track conversation threads across email and webchat.
+
+    Each conversation represents a thread (email thread or webchat session)
+    with multiple messages exchanged between user and assistant.
+
+    Attributes:
+        id: Auto-increment primary key
+        thread_id: Unique thread identifier (email: Message-ID/References, webchat: session ID)
+        sender: User identifier (email address or webchat user ID)
+        channel: Source channel (email or webchat)
+        created_at: Timestamp when conversation started
+        last_message_at: Timestamp of most recent message
+        messages: Relationship to ConversationMessage records
+    """
+
+    __tablename__ = "conversations"
+
+    # Primary key
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Thread identification
+    thread_id = Column(String(500), nullable=False, unique=True, index=True)
+
+    # User identification
+    sender = Column(String(255), nullable=False, index=True)
+
+    # Channel (email or webchat)
+    channel = Column(Enum(ChannelType), nullable=False, default=ChannelType.EMAIL)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, index=True)
+    last_message_at = Column(DateTime, nullable=False)
+
+    # Relationship to messages
+    messages = relationship("ConversationMessage", back_populates="conversation", cascade="all, delete-orphan")
+
+    # Composite indexes for common queries
+    __table_args__ = (
+        Index("idx_sender_channel", "sender", "channel"),
+        Index("idx_last_message", "last_message_at"),
+    )
+
+    def __init__(
+        self,
+        thread_id: str,
+        sender: str,
+        channel: ChannelType = ChannelType.EMAIL,
+        created_at: Optional[datetime] = None,
+        last_message_at: Optional[datetime] = None,
+    ):
+        """Initialize Conversation with defaults."""
+        self.thread_id = thread_id
+        self.sender = sender
+        self.channel = channel
+        now = datetime.utcnow()
+        self.created_at = created_at or now
+        self.last_message_at = last_message_at or now
+
+    def __repr__(self) -> str:
+        """String representation of Conversation."""
+        return (
+            f"<Conversation(id={self.id}, thread_id='{self.thread_id}', "
+            f"sender='{self.sender}', channel='{self.channel.value}')>"
+        )
+
+    def to_dict(self) -> dict:
+        """
+        Convert model to dictionary.
+
+        Returns:
+            Dictionary representation of the model.
+        """
+        return {
+            "id": self.id,
+            "thread_id": self.thread_id,
+            "sender": self.sender,
+            "channel": self.channel.value if isinstance(self.channel, ChannelType) else self.channel,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "last_message_at": self.last_message_at.isoformat() if self.last_message_at else None,
+            "message_count": len(self.messages) if self.messages else 0,
+        }
+
+
+class ConversationMessage(Base):
+    """
+    Individual messages within a conversation thread.
+
+    Stores each query and reply in a conversation with metadata and
+    optional rating for future rating feature.
+
+    Attributes:
+        id: Auto-increment primary key
+        conversation_id: Foreign key to Conversation
+        message_type: Type of message (query or reply)
+        content: Message text content
+        sender: Who sent this message (email or user ID)
+        subject: Email subject (nullable, for email messages)
+        timestamp: When message was sent/received
+        message_order: Sequential order within conversation
+        rating: Optional 1-5 rating for replies (for future rating feature)
+        conversation: Relationship to Conversation record
+    """
+
+    __tablename__ = "conversation_messages"
+
+    # Primary key
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Foreign key to conversation
+    conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Message metadata
+    message_type = Column(Enum(MessageType), nullable=False)
+    content = Column(Text, nullable=False)
+    sender = Column(String(255), nullable=False)
+    subject = Column(String(500), nullable=True)  # For email messages
+    timestamp = Column(DateTime, nullable=False, index=True)
+    message_order = Column(Integer, nullable=False)  # Sequential order in conversation
+
+    # Rating (1-5, nullable, for future rating feature)
+    rating = Column(Integer, nullable=True)
+
+    # Relationship to conversation
+    conversation = relationship("Conversation", back_populates="messages")
+
+    # Composite indexes for common queries
+    __table_args__ = (
+        Index("idx_conversation_order", "conversation_id", "message_order"),
+        Index("idx_conversation_timestamp", "conversation_id", "timestamp"),
+        Index("idx_message_type", "message_type"),
+    )
+
+    def __init__(
+        self,
+        conversation_id: int,
+        message_type: MessageType,
+        content: str,
+        sender: str,
+        subject: Optional[str] = None,
+        timestamp: Optional[datetime] = None,
+        message_order: int = 0,
+        rating: Optional[int] = None,
+    ):
+        """Initialize ConversationMessage with defaults."""
+        self.conversation_id = conversation_id
+        self.message_type = message_type
+        self.content = content
+        self.sender = sender
+        self.subject = subject
+        self.timestamp = timestamp or datetime.utcnow()
+        self.message_order = message_order
+        self.rating = rating
+
+    def __repr__(self) -> str:
+        """String representation of ConversationMessage."""
+        return (
+            f"<ConversationMessage(id={self.id}, conversation_id={self.conversation_id}, "
+            f"type='{self.message_type.value}', order={self.message_order})>"
+        )
+
+    def to_dict(self) -> dict:
+        """
+        Convert model to dictionary.
+
+        Returns:
+            Dictionary representation of the model.
+        """
+        return {
+            "id": self.id,
+            "conversation_id": self.conversation_id,
+            "message_type": self.message_type.value if isinstance(self.message_type, MessageType) else self.message_type,
+            "content": self.content,
+            "sender": self.sender,
+            "subject": self.subject,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "message_order": self.message_order,
+            "rating": self.rating,
+        }
+
+
+class DocumentDescription(Base):
+    """
+    Store AI-generated descriptions for ingested documents.
+
+    This model stores 2-sentence summaries of documents for display
+    in the admin panel and other UI elements.
+
+    Attributes:
+        id: Auto-increment primary key
+        file_path: Relative path to the document file
+        filename: Name of the file
+        description: 2-sentence AI-generated description
+        file_size: Size of file in bytes
+        file_type: File extension/type (pdf, docx, txt, csv)
+        chunk_count: Number of chunks created from this document
+        created_at: When the description was generated
+        updated_at: When the description was last updated
+    """
+
+    __tablename__ = "document_descriptions"
+
+    # Primary key
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # File identification
+    file_path = Column(String(500), nullable=False, unique=True, index=True)
+    filename = Column(String(255), nullable=False)
+
+    # Description and metadata
+    description = Column(Text, nullable=False)
+    file_size = Column(Integer, nullable=True)
+    file_type = Column(String(10), nullable=True)
+    chunk_count = Column(Integer, nullable=False, default=0)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, index=True)
+    updated_at = Column(DateTime, nullable=False)
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_filename", "filename"),
+        Index("idx_file_type", "file_type"),
+    )
+
+    def __init__(
+        self,
+        file_path: str,
+        filename: str,
+        description: str,
+        file_size: Optional[int] = None,
+        file_type: Optional[str] = None,
+        chunk_count: int = 0,
+        created_at: Optional[datetime] = None,
+        updated_at: Optional[datetime] = None,
+    ):
+        """Initialize DocumentDescription with defaults."""
+        self.file_path = file_path
+        self.filename = filename
+        self.description = description
+        self.file_size = file_size
+        self.file_type = file_type
+        self.chunk_count = chunk_count
+        now = datetime.utcnow()
+        self.created_at = created_at or now
+        self.updated_at = updated_at or now
+
+    def __repr__(self) -> str:
+        """String representation of DocumentDescription."""
+        return (
+            f"<DocumentDescription(id={self.id}, filename='{self.filename}', "
+            f"chunks={self.chunk_count})>"
+        )
+
+    def to_dict(self) -> dict:
+        """
+        Convert model to dictionary.
+
+        Returns:
+            Dictionary representation of the model.
+        """
+        return {
+            "id": self.id,
+            "file_path": self.file_path,
+            "filename": self.filename,
+            "description": self.description,
+            "file_size": self.file_size,
+            "file_type": self.file_type,
+            "chunk_count": self.chunk_count,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

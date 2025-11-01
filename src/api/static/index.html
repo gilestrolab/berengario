@@ -7,9 +7,41 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h3>Conversations</h3>
+                <button class="btn-icon" id="new-conversation-btn" title="New conversation">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="search-container">
+                <input type="text" id="conversation-search" class="search-input" placeholder="Search conversations..." />
+            </div>
+
+            <div class="conversations-list" id="conversations-list">
+                <div class="loading-conversations">
+                    <div class="spinner"></div>
+                    <p>Loading conversations...</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Mobile sidebar toggle -->
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sidebar">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 12h18M3 6h18M3 18h18"/>
+            </svg>
+        </button>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Header -->
+            <header class="header">
             <div class="header-content">
                 <div class="header-left">
                     <h1 class="title" id="instance-name">RAGInbox</h1>
@@ -81,17 +113,14 @@
                 Press <kbd>Enter</kbd> to send, <kbd>Shift</kbd>+<kbd>Enter</kbd> for new line
             </div>
         </footer>
-    </div>
-
-    <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loading-overlay">
-        <div class="loading-spinner"></div>
-        <p>Thinking...</p>
-    </div>
+        </div> <!-- end main-content -->
+    </div> <!-- end app-container -->
 
     <!-- Toast Notification -->
     <div class="toast" id="toast"></div>
 
+    <!-- Markdown parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
     <script src="/static/app.js"></script>
 </body>
 </html>

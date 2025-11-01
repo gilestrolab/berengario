@@ -95,6 +95,8 @@ class EmailMessage(BaseModel):
     is_whitelisted: bool = Field(default=False, description="Sender is whitelisted")
     is_cced: bool = Field(default=False, description="Is CC'd message")
     attachment_count: int = Field(default=0, description="Number of attachments")
+    in_reply_to: Optional[str] = Field(default=None, description="In-Reply-To header for threading")
+    references: Optional[str] = Field(default=None, description="References header for threading")
 
     @field_validator("subject")
     @classmethod
@@ -375,6 +377,15 @@ class EmailParser:
 
             logger.info(f"Extracted Message-ID from email: {message_id}")
 
+            # Extract threading headers for conversation tracking
+            in_reply_to = message.headers.get("in-reply-to", [""])[0] or None
+            references = message.headers.get("references", [""])[0] or None
+
+            if in_reply_to:
+                logger.debug(f"In-Reply-To: {in_reply_to}")
+            if references:
+                logger.debug(f"References: {references}")
+
             # Parse sender
             sender = self.parse_email_address(message.from_)
             if not sender:
@@ -418,6 +429,8 @@ class EmailParser:
                 is_whitelisted=is_whitelisted,
                 is_cced=is_cced,
                 attachment_count=attachment_count,
+                in_reply_to=in_reply_to,
+                references=references,
             )
 
             logger.info(

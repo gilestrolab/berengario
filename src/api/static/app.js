@@ -8,13 +8,22 @@ class ChatApp {
         this.clearBtn = document.getElementById('clear-btn');
         this.logoutBtn = document.getElementById('logout-btn');
         this.userEmailSpan = document.getElementById('user-email');
-        this.loadingOverlay = document.getElementById('loading-overlay');
         this.toast = document.getElementById('toast');
+
+        // Conversation management
+        this.conversationsList = document.getElementById('conversations-list');
+        this.conversationSearch = document.getElementById('conversation-search');
+        this.newConversationBtn = document.getElementById('new-conversation-btn');
+        this.sidebarToggle = document.getElementById('sidebar-toggle');
+        this.sidebar = document.getElementById('sidebar');
 
         this.isLoading = false;
         this.sessionId = null;
         this.userEmail = null;
         this.config = null; // Store instance configuration
+        this.currentConversationId = null; // Currently active conversation
+        this.conversations = []; // List of conversations
+        this.searchTimeout = null; // For debouncing search
 
         this.init();
     }
@@ -34,7 +43,10 @@ class ChatApp {
         // Load KB stats
         await this.loadStats();
 
-        // Load conversation history
+        // Load all conversations
+        await this.loadConversations();
+
+        // Load current session history (for in-memory messages)
         await this.loadHistory();
 
         // Setup event listeners
@@ -139,6 +151,28 @@ class ChatApp {
                 window.location.href = '/admin';
             });
         }
+
+        // Conversation management
+        if (this.newConversationBtn) {
+            this.newConversationBtn.addEventListener('click', () => this.startNewConversation());
+        }
+
+        if (this.conversationSearch) {
+            this.conversationSearch.addEventListener('input', (e) => this.handleSearch(e.target.value));
+        }
+
+        if (this.sidebarToggle) {
+            this.sidebarToggle.addEventListener('click', () => this.toggleSidebar());
+        }
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768 && this.sidebar.classList.contains('open')) {
+                if (!this.sidebar.contains(e.target) && !this.sidebarToggle.contains(e.target)) {
+                    this.toggleSidebar();
+                }
+            }
+        });
     }
 
     async loadStats() {
@@ -208,12 +242,18 @@ class ChatApp {
         this.setLoading(true);
 
         try {
+            // Prepare request payload with conversation_id if continuing a conversation
+            const requestBody = { query };
+            if (this.currentConversationId) {
+                requestBody.conversation_id = this.currentConversationId;
+            }
+
             const response = await fetch('/api/query', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ query }),
+                body: JSON.stringify(requestBody),
                 credentials: 'include', // Include cookies for session
             });
 
@@ -229,6 +269,9 @@ class ChatApp {
                     data.timestamp
                 );
                 this.sessionId = data.session_id;
+
+                // Reload conversations to update the list (in case a new one was created)
+                await this.loadConversations();
             } else {
                 // Display error
                 this.displayMessage(
@@ -272,7 +315,20 @@ class ChatApp {
         // Message bubble
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
-        bubble.textContent = content;
+
+        // Render markdown for assistant messages, plain text for user messages
+        if (role === 'assistant' && typeof marked !== 'undefined') {
+            // Configure marked for safe rendering
+            marked.setOptions({
+                breaks: true,  // Convert \n to <br>
+                gfm: true,     // GitHub Flavored Markdown
+                headerIds: false,
+                mangle: false,
+            });
+            bubble.innerHTML = marked.parse(content);
+        } else {
+            bubble.textContent = content;
+        }
 
         // Timestamp
         if (timestamp) {
@@ -451,9 +507,54 @@ class ChatApp {
         this.queryInput.disabled = loading;
 
         if (loading) {
-            this.loadingOverlay.classList.add('active');
+            // Show typing indicator as a message
+            this.showTypingIndicator();
         } else {
-            this.loadingOverlay.classList.remove('active');
+            // Remove typing indicator
+            this.hideTypingIndicator();
+        }
+    }
+
+    showTypingIndicator() {
+        // Remove existing typing indicator if present
+        this.hideTypingIndicator();
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message assistant-message typing-indicator-message';
+        messageDiv.id = 'typing-indicator';
+
+        // Avatar
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        avatar.textContent = 'AI';
+
+        // Content wrapper
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+
+        // Typing indicator bubble
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble typing-indicator';
+        bubble.innerHTML = `
+            <div class="typing-dots">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+            </div>
+        `;
+
+        contentDiv.appendChild(bubble);
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(contentDiv);
+
+        this.messagesContainer.appendChild(messageDiv);
+        this.scrollToBottom();
+    }
+
+    hideTypingIndicator() {
+        const typingIndicator = document.getElementById('typing-indicator');
+        if (typingIndicator) {
+            typingIndicator.remove();
         }
     }
 
@@ -488,6 +589,279 @@ class ChatApp {
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit'
+        });
+    }
+
+    // ====================================
+    // Conversation Management Methods
+    // ====================================
+
+    async loadConversations() {
+        try {
+            const response = await fetch('/api/conversations', {
+                credentials: 'include',
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load conversations');
+            }
+
+            const data = await response.json();
+            this.conversations = data.conversations;
+            this.renderConversations(this.conversations);
+        } catch (error) {
+            console.error('Error loading conversations:', error);
+            this.conversationsList.innerHTML = `
+                <div class="empty-conversations">
+                    <p>Failed to load conversations</p>
+                </div>
+            `;
+        }
+    }
+
+    renderConversations(conversations) {
+        if (conversations.length === 0) {
+            this.conversationsList.innerHTML = `
+                <div class="empty-conversations">
+                    <p>No conversations yet</p>
+                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">Start a new conversation to get started!</p>
+                </div>
+            `;
+            return;
+        }
+
+        this.conversationsList.innerHTML = conversations.map(conv => {
+            const channelIcon = conv.channel === 'email' ? '📧' : '💬';
+            const isActive = this.currentConversationId === conv.id;
+            const preview = conv.preview || 'No messages yet';
+            const messageCount = conv.message_count || 0;
+
+            return `
+                <div class="conversation-item ${isActive ? 'active' : ''}" data-id="${conv.id}">
+                    <div class="conversation-header">
+                        <div style="display: flex; align-items: center; flex: 1;">
+                            <span class="conversation-channel">${channelIcon}</span>
+                            <div style="flex: 1; min-width: 0;">
+                                <div class="conversation-title">${conv.subject || 'Conversation'}</div>
+                            </div>
+                        </div>
+                        <span class="conversation-date">${this.formatRelativeTime(conv.last_message_at)}</span>
+                    </div>
+                    <div class="conversation-preview">${preview}</div>
+                    <div class="conversation-meta">
+                        <span class="conversation-count">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                            </svg>
+                            ${messageCount} message${messageCount !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                    <div class="conversation-actions">
+                        <button class="delete-conversation-btn" data-id="${conv.id}" title="Delete conversation">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Add click handlers for conversation items
+        this.conversationsList.querySelectorAll('.conversation-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (!e.target.closest('.delete-conversation-btn')) {
+                    const conversationId = parseInt(item.dataset.id);
+                    this.loadConversation(conversationId);
+                }
+            });
+        });
+
+        // Add click handlers for delete buttons
+        this.conversationsList.querySelectorAll('.delete-conversation-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const conversationId = parseInt(btn.dataset.id);
+                this.deleteConversation(conversationId);
+            });
+        });
+    }
+
+    async loadConversation(conversationId) {
+        try {
+            const response = await fetch(`/api/conversations/${conversationId}`, {
+                credentials: 'include',
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load conversation');
+            }
+
+            const data = await response.json();
+
+            // Set current conversation
+            this.currentConversationId = conversationId;
+
+            // Clear messages and display conversation history
+            this.messagesContainer.innerHTML = '';
+
+            // Add all messages
+            data.messages.forEach(msg => {
+                this.displayMessage(
+                    msg.role,
+                    msg.content,
+                    msg.sources,
+                    msg.attachments,
+                    msg.timestamp
+                );
+            });
+
+            // Update UI
+            this.updateActiveConversation();
+
+            // Close sidebar on mobile
+            if (window.innerWidth <= 768) {
+                this.toggleSidebar();
+            }
+
+            this.showToast('Conversation loaded', 'success');
+        } catch (error) {
+            console.error('Error loading conversation:', error);
+            this.showToast('Failed to load conversation', 'error');
+        }
+    }
+
+    async deleteConversation(conversationId) {
+        if (!confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/conversations/${conversationId}`, {
+                method: 'DELETE',
+                credentials: 'include',
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete conversation');
+            }
+
+            // If deleted conversation was active, start new one
+            if (this.currentConversationId === conversationId) {
+                this.startNewConversation();
+            }
+
+            // Reload conversations list
+            await this.loadConversations();
+
+            this.showToast('Conversation deleted', 'success');
+        } catch (error) {
+            console.error('Error deleting conversation:', error);
+            this.showToast('Failed to delete conversation', 'error');
+        }
+    }
+
+    async handleSearch(query) {
+        // Debounce search
+        clearTimeout(this.searchTimeout);
+
+        if (!query || query.trim().length < 2) {
+            // Show all conversations if search is cleared
+            this.renderConversations(this.conversations);
+            return;
+        }
+
+        this.searchTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`/api/conversations/search?q=${encodeURIComponent(query)}`, {
+                    credentials: 'include',
+                });
+
+                if (!response.ok) {
+                    throw new Error('Search failed');
+                }
+
+                const data = await response.json();
+                this.renderConversations(data.results);
+            } catch (error) {
+                console.error('Error searching conversations:', error);
+                this.showToast('Search failed', 'error');
+            }
+        }, 300);
+    }
+
+    startNewConversation() {
+        // Clear current conversation
+        this.currentConversationId = null;
+
+        // Clear messages
+        const welcomeMsg = this.messagesContainer.querySelector('.welcome-message');
+        if (!welcomeMsg) {
+            this.messagesContainer.innerHTML = `
+                <div class="welcome-message">
+                    <div class="welcome-icon">💬</div>
+                    <h2 id="welcome-title">Welcome to ${this.config?.instance_name || 'RAGInbox'}</h2>
+                    <p id="welcome-description">${this.config?.instance_description || 'Ask me anything about the knowledge base documents.'}</p>
+                    <p class="welcome-hint">Start a new conversation below.</p>
+                </div>
+            `;
+        }
+
+        // Update UI
+        this.updateActiveConversation();
+
+        // Clear search
+        if (this.conversationSearch) {
+            this.conversationSearch.value = '';
+        }
+
+        // Show all conversations
+        this.renderConversations(this.conversations);
+
+        // Close sidebar on mobile
+        if (window.innerWidth <= 768) {
+            this.toggleSidebar();
+        }
+
+        // Focus input
+        this.queryInput.focus();
+
+        this.showToast('New conversation started', 'success');
+    }
+
+    updateActiveConversation() {
+        // Update visual state of conversation items
+        this.conversationsList.querySelectorAll('.conversation-item').forEach(item => {
+            const itemId = parseInt(item.dataset.id);
+            if (itemId === this.currentConversationId) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+    }
+
+    toggleSidebar() {
+        this.sidebar.classList.toggle('open');
+        document.body.classList.toggle('sidebar-open');
+    }
+
+    formatRelativeTime(timestamp) {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+
+        return date.toLocaleDateString([], {
+            month: 'short',
+            day: 'numeric'
         });
     }
 }

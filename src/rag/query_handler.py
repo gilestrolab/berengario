@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Dict, Optional
 
 from src.rag.rag_engine import RAGEngine
+from src.rag.tools import set_tool_context, clear_tool_context
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,8 @@ class QueryHandler:
         self,
         query_text: str,
         user_email: Optional[str] = None,
+        is_admin: bool = False,
+        is_email_request: bool = False,
         context: Optional[Dict] = None,
     ) -> Dict[str, any]:
         """
@@ -42,6 +45,8 @@ class QueryHandler:
         Args:
             query_text: The query string.
             user_email: Email address of the user (for logging).
+            is_admin: Whether the user has admin privileges (for whitelist management tools).
+            is_email_request: Whether this is an email request (requires confirmation for whitelist changes).
             context: Additional context information.
 
         Returns:
@@ -66,29 +71,49 @@ class QueryHandler:
             if not query_text or not query_text.strip():
                 raise ValueError("Query text cannot be empty")
 
-            # Process query through RAG engine
-            result = self.rag_engine.query(query_text)
-
-            # Build response
-            response = {
-                "success": True,
-                "response": result["response"],
-                "sources": result["sources"],
-                "attachments": result.get("attachments", []),
-                "metadata": result["metadata"],
-                "timestamp": timestamp,
-            }
-
-            if user_email:
-                response["user_email"] = user_email
-
-            num_attachments = len(response["attachments"])
-            logger.info(
-                f"Query processed successfully for {user_email or 'unknown'} "
-                f"with {len(result['sources'])} sources and {num_attachments} attachments"
+            # Set tool context for admin-only tools
+            set_tool_context(
+                user_email=user_email or 'unknown',
+                is_admin=is_admin,
+                is_email_request=is_email_request,
             )
 
-            return response
+            try:
+                # Extract conversation history from context if available
+                conversation_history = None
+                if context and "conversation_history" in context:
+                    conversation_history = context["conversation_history"]
+
+                # Process query through RAG engine with conversation history
+                result = self.rag_engine.query(
+                    query_text,
+                    conversation_history=conversation_history,
+                )
+
+                # Build response
+                response = {
+                    "success": True,
+                    "response": result["response"],
+                    "sources": result["sources"],
+                    "attachments": result.get("attachments", []),
+                    "metadata": result["metadata"],
+                    "timestamp": timestamp,
+                }
+
+                if user_email:
+                    response["user_email"] = user_email
+
+                num_attachments = len(response["attachments"])
+                logger.info(
+                    f"Query processed successfully for {user_email or 'unknown'} "
+                    f"with {len(result['sources'])} sources and {num_attachments} attachments"
+                )
+
+                return response
+
+            finally:
+                # Always clear tool context after processing
+                clear_tool_context()
 
         except Exception as e:
             logger.error(f"Error processing query: {e}")

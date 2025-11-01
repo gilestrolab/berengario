@@ -526,6 +526,86 @@
             background: var(--text-secondary, #666);
             cursor: not-allowed;
         }
+
+        /* Document upload styles */
+        .documents-section {
+            padding: 0;
+        }
+
+        .upload-section {
+            background: white;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .upload-section h3 {
+            margin: 0 0 0.5rem 0;
+            color: var(--text-primary, #333);
+        }
+
+        .upload-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn-upload, .btn-upload-process {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary, #007bff);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .btn-upload:hover, .btn-upload-process:hover {
+            background: var(--primary-dark, #0056b3);
+        }
+
+        .btn-upload-process {
+            background: var(--success, #28a745);
+        }
+
+        .btn-upload-process:hover {
+            background: var(--success-dark, #218838);
+        }
+
+        .btn-upload:disabled, .btn-upload-process:disabled {
+            background: var(--text-secondary, #666);
+            cursor: not-allowed;
+        }
+
+        #upload-status {
+            font-size: 0.875rem;
+            color: var(--text-primary, #333);
+        }
+
+        #upload-status .upload-file-item {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border, #ddd);
+        }
+
+        #upload-status .upload-file-item:last-child {
+            border-bottom: none;
+        }
+
+        #upload-status .upload-file-success {
+            color: var(--success, #28a745);
+        }
+
+        #upload-status .upload-file-error {
+            color: var(--danger, #dc3545);
+        }
+
+        #upload-status .upload-file-processing {
+            color: var(--primary, #007bff);
+        }
     </style>
 </head>
 <body>
@@ -589,8 +669,33 @@
 
         <!-- Documents Tab -->
         <div id="documents-tab" class="tab-content">
-            <div class="documents-list" id="documents-list">
-                <div class="loading">Loading...</div>
+            <div class="documents-section">
+                <div class="upload-section">
+                    <h3>Upload Documents</h3>
+                    <p style="margin-bottom: 1rem; color: var(--text-secondary, #666); font-size: 0.875rem;">
+                        Upload PDF, DOCX, TXT, or CSV files to add them to the knowledge base.
+                    </p>
+                    <div class="upload-controls">
+                        <input type="file" id="document-upload" multiple accept=".pdf,.docx,.doc,.txt,.csv" style="display: none;">
+                        <button class="btn-upload" onclick="document.getElementById('document-upload').click()">
+                            Choose Files
+                        </button>
+                        <button class="btn-upload-process" onclick="adminPanel.uploadDocuments()" style="display: none;">
+                            Upload & Process
+                        </button>
+                        <span id="selected-files" style="margin-left: 1rem; color: var(--text-secondary, #666); font-size: 0.875rem;"></span>
+                    </div>
+                    <div id="upload-progress" style="display: none; margin-top: 1rem;">
+                        <div style="background: var(--bg-secondary, #f8f9fa); border: 1px solid var(--border, #ddd); border-radius: 4px; padding: 1rem;">
+                            <div id="upload-status"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 2rem;">Knowledge Base Documents</h3>
+                <div class="documents-list" id="documents-list">
+                    <div class="loading">Loading...</div>
+                </div>
             </div>
         </div>
 

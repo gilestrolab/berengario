@@ -166,30 +166,42 @@ class RAGEngine:
 
         logger.info(f"RAGEngine initialized with model {self.llm_model}")
 
-    def _check_for_function_calls(self, query_text: str) -> List[Dict[str, Any]]:
+    def _check_for_function_calls(self, query_text: str, conversation_history: Optional[str] = None) -> Dict[str, Any]:
         """
         Check if the query requires any function calls.
 
         Args:
             query_text: The user's query.
+            conversation_history: Optional conversation history for context.
 
         Returns:
-            List of attachments generated from function calls.
+            Dictionary containing:
+                - has_tool_calls: Whether tools were called
+                - tool_response: LLM-generated response based on tool results (if tools were called)
+                - attachments: List of attachments from tools
         """
         if not self.enable_function_calling or not self.tools:
-            return []
+            return {"has_tool_calls": False, "tool_response": None, "attachments": []}
 
         try:
+            # Build system prompt with conversation context if available
+            system_content = f"You are {settings.instance_name}. Analyze the user's request and determine if you need to use any tools."
+
+            if conversation_history:
+                system_content += f"\n\n{conversation_history}"
+
             # Make initial call to check for function calls
+            messages = [
+                {
+                    "role": "system",
+                    "content": system_content,
+                },
+                {"role": "user", "content": query_text},
+            ]
+
             response = self.openai_client.chat.completions.create(
                 model=self.llm_model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": f"You are {settings.instance_name}. Analyze the user's request and determine if you need to use any tools.",
-                    },
-                    {"role": "user", "content": query_text},
-                ],
+                messages=messages,
                 tools=[{"type": "function", "function": tool} for tool in self.tools],
                 tool_choice="auto",
                 extra_headers={"HTTP-Referer": "https://github.com/imperial-dols/dols-gpt"},
@@ -199,14 +211,37 @@ class RAGEngine:
 
             # Check if there are tool calls
             if not hasattr(message, "tool_calls") or not message.tool_calls:
-                return []
+                # No tools called, but check if this is an administrative query
+                # (whitelist management, clarification requests, etc.)
+                # If so, use the LLM's response directly without RAG retrieval
+                if message.content:
+                    query_lower = query_text.lower()
+                    response_lower = message.content.lower()
+
+                    # Check if query is about user/whitelist management
+                    admin_query_keywords = ["whitelist", "add to", "remove from", "list of users", "grant access", "revoke access"]
+                    is_admin_query = any(keyword in query_lower for keyword in admin_query_keywords)
+
+                    # Check if response suggests administrative action or clarification
+                    admin_response_keywords = ["confirmation required", "please specify", "which whitelist", "clarification", "ambiguous"]
+                    is_admin_response = any(keyword in response_lower for keyword in admin_response_keywords)
+
+                    if is_admin_query or is_admin_response:
+                        logger.info("Administrative query/response detected - using direct LLM response without sources")
+                        return {
+                            "has_tool_calls": True,  # Treat as tool-related (no sources)
+                            "tool_response": message.content,
+                            "attachments": [],
+                        }
+
+                return {"has_tool_calls": False, "tool_response": None, "attachments": []}
 
             # Execute function calls
             function_calls = []
             for tool_call in message.tool_calls:
                 function_name = tool_call.function.name
                 arguments = json.loads(tool_call.function.arguments)
-                function_calls.append({"name": function_name, "arguments": arguments})
+                function_calls.append({"name": function_name, "arguments": arguments, "id": tool_call.id})
                 logger.info(f"Function call requested: {function_name}")
 
             # Execute all function calls
@@ -218,16 +253,54 @@ class RAGEngine:
                 f"{execution_result['error_count']} failed"
             )
 
-            return execution_result.get("attachments", [])
+            # Pass tool results back to LLM to generate final response
+            messages.append({
+                "role": "assistant",
+                "content": message.content,
+                "tool_calls": message.tool_calls,
+            })
+
+            # Add tool responses and check if any tool sent an email
+            email_already_sent = False
+            for i, call in enumerate(function_calls):
+                result = execution_result['results'][i]
+                # Check if this tool already sent an email (e.g., confirmation email)
+                if result.get('success') and result.get('result', {}).get('email_sent'):
+                    email_already_sent = True
+                    logger.info(f"Tool {call['name']} already sent email - will skip automatic reply")
+
+                tool_response_content = json.dumps(result.get('result', result.get('error', 'Unknown error')))
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": call["id"],
+                    "content": tool_response_content,
+                })
+
+            # Get final response from LLM based on tool results
+            final_response = self.openai_client.chat.completions.create(
+                model=self.llm_model,
+                messages=messages,
+                extra_headers={"HTTP-Referer": "https://github.com/imperial-dols/dols-gpt"},
+            )
+
+            tool_response_text = final_response.choices[0].message.content
+
+            return {
+                "has_tool_calls": True,
+                "tool_response": tool_response_text,
+                "attachments": execution_result.get("attachments", []),
+                "skip_email_reply": email_already_sent,  # Flag to indicate email was already sent by tool
+            }
 
         except Exception as e:
             logger.error(f"Error checking for function calls: {e}", exc_info=True)
-            return []
+            return {"has_tool_calls": False, "tool_response": None, "attachments": []}
 
     def query(
         self,
         query_text: str,
         top_k: Optional[int] = None,
+        conversation_history: Optional[str] = None,
     ) -> Dict[str, any]:
         """
         Execute a query against the knowledge base.
@@ -235,6 +308,7 @@ class RAGEngine:
         Args:
             query_text: The query string.
             top_k: Number of top results to retrieve (overrides default).
+            conversation_history: Optional conversation history for multi-turn context.
 
         Returns:
             Dictionary containing:
@@ -253,58 +327,72 @@ class RAGEngine:
 
         try:
             # Check for function calls and generate attachments
-            attachments = self._check_for_function_calls(query_text)
+            function_result = self._check_for_function_calls(query_text, conversation_history)
+            attachments = function_result.get("attachments", [])
 
-            # Update top_k if provided
-            if top_k:
-                self.query_engine.retriever.similarity_top_k = top_k
+            # If tools were called, use the tool response instead of RAG query
+            if function_result.get("has_tool_calls"):
+                response_text = function_result.get("tool_response", "Tool executed successfully.")
+                sources = []
+                logger.info("Using tool response instead of RAG query")
+            else:
+                # Update top_k if provided
+                if top_k:
+                    self.query_engine.retriever.similarity_top_k = top_k
 
-            # Execute query
-            response = self.query_engine.query(query_text)
+                # Build query with conversation history if available
+                full_query = query_text
+                if conversation_history:
+                    full_query = f"{conversation_history}\n\nCurrent query: {query_text}"
+                    logger.debug("Added conversation history to RAG query")
 
-            # Extract source information
-            sources = []
-            if hasattr(response, "source_nodes"):
-                # Build all sources first
-                all_sources = []
-                for node in response.source_nodes:
-                    source_info = {
-                        "filename": node.metadata.get("filename", "Unknown"),
-                        "score": node.score,
-                        "text_preview": node.text[:200] + "..."
-                        if len(node.text) > 200
-                        else node.text,
-                        "source_type": node.metadata.get("source_type", "Unknown"),
-                        # Additional metadata for emails
-                        "sender": node.metadata.get("sender"),
-                        "subject": node.metadata.get("subject"),
-                        "date": node.metadata.get("date"),
-                    }
-                    all_sources.append(source_info)
+                # Execute query
+                response = self.query_engine.query(full_query)
+                response_text = str(response)
 
-                # Deduplicate sources by filename/subject, keeping highest score
-                # Use filename for files, subject for emails
-                logger.info(f"Before deduplication: {len(all_sources)} source nodes")
-                seen = {}
-                for source in all_sources:
-                    # Create unique key based on source type
-                    if source.get("subject") and source.get("sender"):
-                        # Email source - use subject+sender as key
-                        key = (source["subject"], source["sender"])
-                    else:
-                        # File source - use filename as key
-                        key = source["filename"]
+                # Extract source information
+                sources = []
+                if hasattr(response, "source_nodes"):
+                    # Build all sources first
+                    all_sources = []
+                    for node in response.source_nodes:
+                        source_info = {
+                            "filename": node.metadata.get("filename", "Unknown"),
+                            "score": node.score,
+                            "text_preview": node.text[:200] + "..."
+                            if len(node.text) > 200
+                            else node.text,
+                            "source_type": node.metadata.get("source_type", "Unknown"),
+                            # Additional metadata for emails
+                            "sender": node.metadata.get("sender"),
+                            "subject": node.metadata.get("subject"),
+                            "date": node.metadata.get("date"),
+                        }
+                        all_sources.append(source_info)
 
-                    # Keep only the highest scoring source for each unique document
-                    if key not in seen or source["score"] > seen[key]["score"]:
-                        seen[key] = source
+                    # Deduplicate sources by filename/subject, keeping highest score
+                    # Use filename for files, subject for emails
+                    logger.info(f"Before deduplication: {len(all_sources)} source nodes")
+                    seen = {}
+                    for source in all_sources:
+                        # Create unique key based on source type
+                        if source.get("subject") and source.get("sender"):
+                            # Email source - use subject+sender as key
+                            key = (source["subject"], source["sender"])
+                        else:
+                            # File source - use filename as key
+                            key = source["filename"]
 
-                # Convert back to list, sorted by score (highest first)
-                sources = sorted(seen.values(), key=lambda x: x["score"], reverse=True)
-                logger.info(f"After deduplication: {len(sources)} unique sources from {len(seen)} unique keys")
+                        # Keep only the highest scoring source for each unique document
+                        if key not in seen or source["score"] > seen[key]["score"]:
+                            seen[key] = source
+
+                    # Convert back to list, sorted by score (highest first)
+                    sources = sorted(seen.values(), key=lambda x: x["score"], reverse=True)
+                    logger.info(f"After deduplication: {len(sources)} unique sources from {len(seen)} unique keys")
 
             result = {
-                "response": str(response),
+                "response": response_text,
                 "sources": sources,
                 "attachments": attachments,
                 "metadata": {
@@ -312,6 +400,7 @@ class RAGEngine:
                     "num_sources": len(sources),
                     "num_attachments": len(attachments),
                     "query_length": len(query_text),
+                    "skip_email_reply": function_result.get("skip_email_reply", False),
                 },
             }
 

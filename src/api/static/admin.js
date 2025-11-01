@@ -102,6 +102,37 @@ class AdminPanel {
                 });
             }
         });
+
+        // File upload selection handler
+        const fileInput = document.getElementById('document-upload');
+        if (fileInput) {
+            fileInput.addEventListener('change', (e) => {
+                this.handleFileSelection(e);
+            });
+        }
+    }
+
+    handleFileSelection(event) {
+        const files = event.target.files;
+        const selectedFilesSpan = document.getElementById('selected-files');
+        const uploadButton = document.querySelector('.btn-upload-process');
+
+        if (files.length > 0) {
+            const fileNames = Array.from(files).map(f => f.name).join(', ');
+            if (selectedFilesSpan) {
+                selectedFilesSpan.textContent = `${files.length} file(s) selected: ${fileNames.substring(0, 100)}${fileNames.length > 100 ? '...' : ''}`;
+            }
+            if (uploadButton) {
+                uploadButton.style.display = 'inline-block';
+            }
+        } else {
+            if (selectedFilesSpan) {
+                selectedFilesSpan.textContent = '';
+            }
+            if (uploadButton) {
+                uploadButton.style.display = 'none';
+            }
+        }
     }
 
     switchTab(tabName) {
@@ -229,14 +260,34 @@ class AdminPanel {
 
     async loadDocuments() {
         try {
-            const response = await fetch('/api/admin/documents');
+            // Load both documents and descriptions in parallel
+            const [docsResponse, descsResponse] = await Promise.all([
+                fetch('/api/admin/documents'),
+                fetch('/api/admin/documents/descriptions')
+            ]);
 
-            if (!response.ok) {
+            if (!docsResponse.ok) {
                 throw new Error('Failed to load documents');
             }
 
-            const data = await response.json();
-            this.documents = data.documents;
+            const docsData = await docsResponse.json();
+            this.documents = docsData.documents;
+
+            // Load descriptions (don't fail if it errors)
+            this.descriptions = {};
+            if (descsResponse.ok) {
+                try {
+                    const descsData = await descsResponse.json();
+                    // Create a map of file_path -> description
+                    descsData.descriptions.forEach(desc => {
+                        // Also map by filename for easier matching
+                        this.descriptions[desc.filename] = desc;
+                    });
+                } catch (e) {
+                    console.warn('Failed to parse descriptions:', e);
+                }
+            }
+
             this.renderDocuments();
         } catch (error) {
             console.error('Error loading documents:', error);
@@ -272,6 +323,10 @@ class AdminPanel {
             // Get display name (improved for emails)
             const displayName = this.getDisplayName(doc);
 
+            // Get description if available
+            const description = this.descriptions && this.descriptions[doc.filename];
+            const hasDescription = description && description.description;
+
             const downloadButton = canDownload ? `
                 <button class="btn-download" onclick="adminPanel.downloadDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
                     Download
@@ -284,6 +339,18 @@ class AdminPanel {
                 </button>
             ` : '';
 
+            const descriptionHtml = hasDescription ? `
+                <div class="document-description">
+                    <button class="description-toggle" onclick="adminPanel.toggleDescription(this)">
+                        <span class="toggle-icon">▶</span>
+                        <span class="toggle-text">Show Description</span>
+                    </button>
+                    <div class="description-content" style="display: none;">
+                        ${this.escapeHtml(description.description)}
+                    </div>
+                </div>
+            ` : '';
+
             return `
                 <div class="document-item">
                     <div class="document-info">
@@ -292,7 +359,9 @@ class AdminPanel {
                             Type: ${this.escapeHtml(doc.file_type || 'unknown')} |
                             Source: ${this.escapeHtml(doc.source_type || 'unknown')} |
                             Hash: ${this.escapeHtml(doc.file_hash.substring(0, 16))}...
+                            ${description ? `| Chunks: ${description.chunk_count}` : ''}
                         </div>
+                        ${descriptionHtml}
                     </div>
                     <div class="document-actions">
                         ${viewButton}
@@ -677,6 +746,96 @@ class AdminPanel {
         }
     }
 
+    async uploadDocuments() {
+        const fileInput = document.getElementById('document-upload');
+        const uploadButton = document.querySelector('.btn-upload-process');
+        const chooseButton = document.querySelector('.btn-upload');
+        const progressDiv = document.getElementById('upload-progress');
+        const statusDiv = document.getElementById('upload-status');
+
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            this.showToast('Please select files to upload', 'error');
+            return;
+        }
+
+        const files = Array.from(fileInput.files);
+
+        try {
+            // Disable buttons
+            if (uploadButton) uploadButton.disabled = true;
+            if (chooseButton) chooseButton.disabled = true;
+
+            // Show progress
+            if (progressDiv) progressDiv.style.display = 'block';
+            if (statusDiv) statusDiv.innerHTML = '';
+
+            // Upload files one by one
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+
+                // Update status
+                if (statusDiv) {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'upload-file-item upload-file-processing';
+                    fileItem.id = `upload-file-${i}`;
+                    fileItem.textContent = `Uploading ${file.name}... (${i + 1}/${files.length})`;
+                    statusDiv.appendChild(fileItem);
+                }
+
+                try {
+                    // Create form data
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    // Upload file
+                    const response = await fetch('/api/admin/documents/upload', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    const data = await response.json();
+
+                    // Update status
+                    const fileItem = document.getElementById(`upload-file-${i}`);
+                    if (fileItem) {
+                        if (response.ok) {
+                            fileItem.className = 'upload-file-item upload-file-success';
+                            fileItem.textContent = `✓ ${file.name} - Successfully processed (${data.chunks_added || 0} chunks)`;
+                        } else {
+                            fileItem.className = 'upload-file-item upload-file-error';
+                            fileItem.textContent = `✗ ${file.name} - ${data.detail || 'Upload failed'}`;
+                        }
+                    }
+                } catch (error) {
+                    const fileItem = document.getElementById(`upload-file-${i}`);
+                    if (fileItem) {
+                        fileItem.className = 'upload-file-item upload-file-error';
+                        fileItem.textContent = `✗ ${file.name} - ${error.message}`;
+                    }
+                }
+            }
+
+            // Show completion message
+            this.showToast(`Uploaded ${files.length} file(s)`, 'success');
+
+            // Reload documents list
+            await this.loadDocuments();
+
+            // Clear file input and reset UI
+            fileInput.value = '';
+            document.getElementById('selected-files').textContent = '';
+            if (uploadButton) uploadButton.style.display = 'none';
+
+        } catch (error) {
+            console.error('Error uploading documents:', error);
+            this.showToast(error.message, 'error');
+        } finally {
+            // Re-enable buttons
+            if (uploadButton) uploadButton.disabled = false;
+            if (chooseButton) chooseButton.disabled = false;
+        }
+    }
+
     async savePrompt() {
         const customPromptTextarea = document.getElementById('custom-prompt');
         const saveButton = document.querySelector('.btn-save-prompt');
@@ -735,6 +894,24 @@ class AdminPanel {
                 saveButton.disabled = false;
                 saveButton.textContent = 'Save Custom Prompt';
             }
+        }
+    }
+
+    toggleDescription(button) {
+        const descriptionContent = button.parentElement.querySelector('.description-content');
+        const toggleIcon = button.querySelector('.toggle-icon');
+        const toggleText = button.querySelector('.toggle-text');
+
+        if (descriptionContent.style.display === 'none') {
+            // Show description
+            descriptionContent.style.display = 'block';
+            toggleIcon.textContent = '▼';
+            toggleText.textContent = 'Hide Description';
+        } else {
+            // Hide description
+            descriptionContent.style.display = 'none';
+            toggleIcon.textContent = '▶';
+            toggleText.textContent = 'Show Description';
         }
     }
 

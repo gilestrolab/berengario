@@ -13,7 +13,7 @@ This module orchestrates:
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, TYPE_CHECKING
 
 from imap_tools import MailMessage
 
@@ -26,7 +26,12 @@ from src.email.email_parser import EmailMessage, EmailParser
 from src.email.email_sender import EmailSender, format_response_email
 from src.email.message_tracker import MessageTracker
 from src.email.whitelist_validator import WhitelistValidator
-from src.rag.query_handler import QueryHandler
+from src.email.conversation_manager import conversation_manager, ChannelType, MessageType
+from src.rag.tools.pending_actions import get_pending_action_manager
+
+# Lazy imports to avoid circular dependency
+if TYPE_CHECKING:
+    from src.rag.query_handler import QueryHandler
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +88,10 @@ class EmailProcessor:
         kb_manager: Optional[KnowledgeBaseManager] = None,
         message_tracker: Optional[MessageTracker] = None,
         email_sender: Optional[EmailSender] = None,
-        query_handler: Optional[QueryHandler] = None,
+        query_handler: Optional["QueryHandler"] = None,
         teach_validator: Optional[WhitelistValidator] = None,
         query_validator: Optional[WhitelistValidator] = None,
+        admin_validator: Optional[WhitelistValidator] = None,
     ):
         """
         Initialize email processor with components.
@@ -101,6 +107,7 @@ class EmailProcessor:
             query_handler: Query handler (creates new if None)
             teach_validator: Whitelist validator for teaching (KB ingestion)
             query_validator: Whitelist validator for querying
+            admin_validator: Whitelist validator for admin access
         """
         self.email_client = email_client or EmailClient()
         self.parser = parser or EmailParser()
@@ -109,21 +116,43 @@ class EmailProcessor:
         self.kb_manager = kb_manager or KnowledgeBaseManager()
         self.message_tracker = message_tracker or MessageTracker()
         self.email_sender = email_sender or EmailSender()
-        self.query_handler = query_handler or QueryHandler()
 
-        # Initialize dual whitelists for teach vs query permissions
+        # Lazy import to avoid circular dependency
+        if query_handler is None:
+            from src.rag.query_handler import QueryHandler
+            query_handler = QueryHandler()
+        self.query_handler = query_handler
+
+        # Initialize hierarchical whitelists with parent relationships
+        # Hierarchy: Admin > Teacher > Querier
+        # - Admins can do everything (teach + query)
+        # - Teachers can teach and query
+        # - Queriers can only query
+
+        # First create admin validator (top of hierarchy, no parents)
+        self.admin_validator = admin_validator or WhitelistValidator(
+            whitelist=settings.email_admin_whitelist,
+            whitelist_file=settings.email_admin_whitelist_file,
+            enabled=settings.email_admin_whitelist_enabled,
+        )
+
+        # Create teach validator (admins can also teach)
         self.teach_validator = teach_validator or WhitelistValidator(
             whitelist=settings.email_teach_whitelist,
             whitelist_file=settings.email_teach_whitelist_file,
             enabled=settings.email_teach_whitelist_enabled,
+            parent_validators=[self.admin_validator],  # Admins can teach
         )
+
+        # Create query validator (admins and teachers can also query)
         self.query_validator = query_validator or WhitelistValidator(
             whitelist=settings.email_query_whitelist,
             whitelist_file=settings.email_query_whitelist_file,
             enabled=settings.email_query_whitelist_enabled,
+            parent_validators=[self.admin_validator, self.teach_validator],  # Admins and teachers can query
         )
 
-        logger.info("EmailProcessor initialized with dual whitelists (teach/query)")
+        logger.info("EmailProcessor initialized with hierarchical whitelists (admin > teacher > querier)")
 
     def process_message(
         self, mail_message: MailMessage, mark_seen: bool = True
@@ -506,6 +535,20 @@ class EmailProcessor:
         logger.info(f"Processing query from {email.sender.email}: {email.subject}")
 
         try:
+            # Extract thread ID for conversation tracking
+            thread_id = conversation_manager.extract_thread_id_from_email(
+                message_id=email.message_id,
+                in_reply_to=email.in_reply_to,
+                references=email.references,
+            )
+            logger.debug(f"Thread ID: {thread_id}")
+
+            # Get conversation history for context
+            conversation_context = conversation_manager.format_conversation_context(
+                thread_id=thread_id,
+                max_messages=10,  # Last 10 messages for context
+            )
+
             # Extract query text from email body
             query_text = email.get_body(prefer_text=True)
 
@@ -525,15 +568,43 @@ class EmailProcessor:
                     action="query",
                 )
 
-            # Process query through RAG engine
+            # Store user query in conversation database
+            conversation_manager.add_message(
+                thread_id=thread_id,
+                message_type=MessageType.QUERY,
+                content=query_text,
+                sender=email.sender.email,
+                subject=email.subject,
+                channel=ChannelType.EMAIL,
+                timestamp=email.date,
+            )
+            logger.debug(f"Stored user query in conversation {thread_id}")
+
+            # Check if sender is admin
+            is_admin = self.admin_validator.is_allowed(email.sender.email)
+            if is_admin:
+                logger.info(f"Admin user detected: {email.sender.email}")
+
+            # Check if this is a confirmation email (search anywhere in subject or body)
+            if is_admin:
+                # Search for confirmation token in subject + body
+                search_text = f"{email.subject or ''} {query_text}".upper()
+                if "CONFIRM" in search_text:
+                    logger.info(f"Detected confirmation request from admin {email.sender.email}")
+                    return self._handle_confirmation(email, message_id, query_text, email.subject or "")
+
+            # Process query through RAG engine with conversation context
             logger.debug(f"Querying RAG engine for message {message_id}")
             result = self.query_handler.process_query(
                 query_text=query_text,
                 user_email=email.sender.email,
+                is_admin=is_admin,
+                is_email_request=True,  # Email requests require confirmation for whitelist changes
                 context={
                     "message_id": message_id,
                     "subject": email.subject,
                     "date": str(email.date) if email.date else None,
+                    "conversation_history": conversation_context,  # Add conversation context
                 },
             )
 
@@ -560,6 +631,23 @@ class EmailProcessor:
                 instance_name=settings.instance_name,
                 original_subject=email.subject,
             )
+
+            # Check if tool already sent an email (e.g., confirmation email)
+            skip_reply = result.get("metadata", {}).get("skip_email_reply", False)
+            if skip_reply:
+                logger.info(f"Skipping automatic email reply - tool already sent email to {email.sender.email}")
+                # Mark as processed successfully
+                self.message_tracker.mark_processed(
+                    message_id=message_id,
+                    sender=email.sender.email,
+                    subject=email.subject,
+                    status="success",
+                )
+                return ProcessingResult(
+                    message_id=message_id,
+                    success=True,
+                    action="query",
+                )
 
             # Get attachments from result (if any)
             attachments = result.get("attachments", [])
@@ -593,6 +681,17 @@ class EmailProcessor:
                     error="Failed to send reply email",
                     action="query",
                 )
+
+            # Store assistant reply in conversation database
+            conversation_manager.add_message(
+                thread_id=thread_id,
+                message_type=MessageType.REPLY,
+                content=result["response"],
+                sender=settings.email_target_address,
+                subject=subject,
+                channel=ChannelType.EMAIL,
+            )
+            logger.debug(f"Stored assistant reply in conversation {thread_id}")
 
             # Track successful processing
             self.message_tracker.mark_processed(
@@ -834,6 +933,277 @@ If you believe you should have access, please contact the administrator at {sett
         """
         return self.message_tracker.get_stats(days=days)
 
+    def _handle_confirmation(
+        self, email: EmailMessage, message_id: str, query_text: str, subject: str = ""
+    ) -> ProcessingResult:
+        """
+        Handle whitelist modification confirmation emails.
 
-# Global email processor instance
-email_processor = EmailProcessor()
+        Args:
+            email: Parsed email message
+            message_id: Unique message identifier
+            query_text: Email body text
+            subject: Email subject line
+
+        Returns:
+            ProcessingResult with confirmation processing outcome
+        """
+        # Lazy import to avoid circular dependency
+        from src.rag.tools.whitelist_tools import _add_to_whitelist_file, _remove_from_whitelist_file
+
+        try:
+            # Extract confirmation token from anywhere in subject or body
+            # Search for pattern: "CONFIRM <token>" or just the token format
+            import re
+
+            # Combine subject and body for token search
+            combined_text = f"{subject} {query_text}"
+
+            # Look for "CONFIRM <token>" pattern (case-insensitive)
+            match = re.search(r'CONFIRM\s+([A-Za-z0-9_-]{20,})', combined_text, re.IGNORECASE)
+            if match:
+                action_id = match.group(1)
+            else:
+                # Look for any token-like string (base64url format, 20+ chars)
+                match = re.search(r'\b([A-Za-z0-9_-]{20,})\b', combined_text)
+                if match:
+                    action_id = match.group(1)
+                else:
+                    error_msg = "Could not find confirmation token in email. Please reply to the confirmation email or include the full token."
+                    logger.warning(f"No confirmation token found in email from {email.sender.email}")
+
+                    # Send error reply
+                    subject_reply = f"Re: {email.subject}" if email.subject else "Confirmation Error"
+                    self.email_sender.send_reply(
+                        to_address=email.sender.email,
+                        subject=subject_reply,
+                        body_text=(
+                            f"Error: Could not find confirmation token in your email.\n\n"
+                            f"Please reply to the original confirmation email, or include the full confirmation token.\n\n"
+                            f"Example: Just reply to the confirmation email, or type: CONFIRM <your-token-here>"
+                        ),
+                        body_html=None,
+                    )
+
+                    self.message_tracker.mark_processed(
+                        message_id=message_id,
+                        sender=email.sender.email,
+                        subject=email.subject,
+                        status="error",
+                        error_message=error_msg,
+                    )
+
+                    return ProcessingResult(
+                        message_id=message_id,
+                        success=False,
+                        error=error_msg,
+                        action="confirmation",
+                    )
+
+            logger.info(f"Processing confirmation for action {action_id} from {email.sender.email}")
+
+            # Get pending action
+            pending_mgr = get_pending_action_manager()
+            action = pending_mgr.get_pending_action(action_id)
+
+            if not action:
+                error_msg = f"Invalid or expired confirmation token: {action_id}"
+                logger.warning(error_msg)
+
+                # Send error reply
+                subject = f"Re: {email.subject}" if email.subject else "Confirmation Error"
+                self.email_sender.send_reply(
+                    to_address=email.sender.email,
+                    subject=subject,
+                    body_text=(
+                        f"Error: The confirmation token is invalid or has expired.\n\n"
+                        f"Token: {action_id}\n\n"
+                        f"Confirmation tokens expire after 24 hours. Please make a new request."
+                    ),
+                    body_html=None,
+                )
+
+                self.message_tracker.mark_processed(
+                    message_id=message_id,
+                    sender=email.sender.email,
+                    subject=email.subject,
+                    status="error",
+                    error_message=error_msg,
+                )
+
+                return ProcessingResult(
+                    message_id=message_id,
+                    success=False,
+                    error=error_msg,
+                    action="confirmation",
+                )
+
+            # Verify the requester matches
+            if action.requested_by.lower() != email.sender.email.lower():
+                error_msg = (
+                    f"Confirmation mismatch: action requested by {action.requested_by}, "
+                    f"but confirmed by {email.sender.email}"
+                )
+                logger.warning(error_msg)
+
+                subject = f"Re: {email.subject}" if email.subject else "Confirmation Error"
+                self.email_sender.send_reply(
+                    to_address=email.sender.email,
+                    subject=subject,
+                    body_text=(
+                        f"Error: You can only confirm actions that you requested.\n\n"
+                        f"This action was requested by: {action.requested_by}"
+                    ),
+                    body_html=None,
+                )
+
+                self.message_tracker.mark_processed(
+                    message_id=message_id,
+                    sender=email.sender.email,
+                    subject=email.subject,
+                    status="error",
+                    error_message=error_msg,
+                )
+
+                return ProcessingResult(
+                    message_id=message_id,
+                    success=False,
+                    error=error_msg,
+                    action="confirmation",
+                )
+
+            # Execute the pending action
+            logger.info(
+                f"Executing confirmed action {action.action_id}: {action.action_type} "
+                f"for {action.email_to_modify}"
+            )
+
+            try:
+                # Execute based on action type
+                if action.action_type == 'add_teach':
+                    whitelist_file = Path(settings.email_teach_whitelist_file)
+                    whitelist_file.parent.mkdir(parents=True, exist_ok=True)
+                    _add_to_whitelist_file(whitelist_file, action.email_to_modify)
+                    result_msg = f"Successfully added '{action.email_to_modify}' to the teach whitelist."
+
+                elif action.action_type == 'remove_teach':
+                    whitelist_file = Path(settings.email_teach_whitelist_file)
+                    _remove_from_whitelist_file(whitelist_file, action.email_to_modify)
+                    result_msg = f"Successfully removed '{action.email_to_modify}' from the teach whitelist."
+
+                elif action.action_type == 'add_query':
+                    whitelist_file = Path(settings.email_query_whitelist_file)
+                    whitelist_file.parent.mkdir(parents=True, exist_ok=True)
+                    _add_to_whitelist_file(whitelist_file, action.email_to_modify)
+                    result_msg = f"Successfully added '{action.email_to_modify}' to the query whitelist."
+
+                elif action.action_type == 'remove_query':
+                    whitelist_file = Path(settings.email_query_whitelist_file)
+                    _remove_from_whitelist_file(whitelist_file, action.email_to_modify)
+                    result_msg = f"Successfully removed '{action.email_to_modify}' from the query whitelist."
+
+                else:
+                    raise ValueError(f"Unknown action type: {action.action_type}")
+
+                # Remove pending action
+                pending_mgr.remove_action(action_id)
+
+                logger.info(f"Confirmed action executed successfully: {result_msg}")
+
+                # Send success confirmation
+                subject = f"Re: {email.subject}" if email.subject else "Action Confirmed"
+                self.email_sender.send_reply(
+                    to_address=email.sender.email,
+                    subject=subject,
+                    body_text=(
+                        f"✓ {result_msg}\n\n"
+                        f"Action ID: {action.action_id}\n"
+                        f"Action Type: {action.action_type}\n"
+                        f"Email Modified: {action.email_to_modify}"
+                    ),
+                    body_html=None,
+                )
+
+                self.message_tracker.mark_processed(
+                    message_id=message_id,
+                    sender=email.sender.email,
+                    subject=email.subject,
+                    status="success",
+                )
+
+                return ProcessingResult(
+                    message_id=message_id,
+                    success=True,
+                    action="confirmation",
+                    chunks_created=0,
+                )
+
+            except Exception as e:
+                error_msg = f"Error executing confirmed action: {str(e)}"
+                logger.error(error_msg, exc_info=True)
+
+                # Send error reply
+                subject = f"Re: {email.subject}" if email.subject else "Action Failed"
+                self.email_sender.send_reply(
+                    to_address=email.sender.email,
+                    subject=subject,
+                    body_text=(
+                        f"Error executing confirmed action:\n\n{str(e)}\n\n"
+                        f"Action ID: {action.action_id}\n"
+                        f"Please contact support if this issue persists."
+                    ),
+                    body_html=None,
+                )
+
+                self.message_tracker.mark_processed(
+                    message_id=message_id,
+                    sender=email.sender.email,
+                    subject=email.subject,
+                    status="error",
+                    error_message=error_msg,
+                )
+
+                return ProcessingResult(
+                    message_id=message_id,
+                    success=False,
+                    error=error_msg,
+                    action="confirmation",
+                )
+
+        except Exception as e:
+            error_msg = f"Error processing confirmation: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+
+            self.message_tracker.mark_processed(
+                message_id=message_id,
+                sender=email.sender.email,
+                subject=email.subject,
+                status="error",
+                error_message=error_msg,
+            )
+
+            return ProcessingResult(
+                message_id=message_id,
+                success=False,
+                error=error_msg,
+                action="confirmation",
+            )
+
+
+# Global email processor instance (lazy initialization to avoid circular imports)
+_email_processor_instance = None
+
+
+def get_email_processor() -> EmailProcessor:
+    """
+    Get the global email processor instance.
+
+    Uses lazy initialization to avoid circular import issues.
+
+    Returns:
+        Global EmailProcessor instance.
+    """
+    global _email_processor_instance
+    if _email_processor_instance is None:
+        _email_processor_instance = EmailProcessor()
+    return _email_processor_instance

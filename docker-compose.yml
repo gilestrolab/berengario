@@ -1,37 +1,65 @@
-version: '3.8'
-
 services:
-  # RAGInbox Email Service
-  raginbox:
+  # MariaDB Database for testing
+  mariadb:
+    image: mariadb:11.2
+    container_name: raginbox-mariadb-test
+    restart: unless-stopped
+
+    environment:
+      MYSQL_ROOT_PASSWORD: test_root_password
+      MYSQL_DATABASE: raginbox
+      MYSQL_USER: raginbox
+      MYSQL_PASSWORD: test_password
+
+    volumes:
+      - mariadb-test-data:/var/lib/mysql
+
+    ports:
+      - "3307:3306"  # Use 3307 to avoid conflicts with local MySQL
+
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - raginbox-network
+
+  # RAGInbox Email Service (depends on MariaDB)
+  raginbox-email:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: raginbox
+    container_name: raginbox-email
     restart: unless-stopped
+    command: python run_email_service.py
 
-    # Environment variables (use .env file)
     env_file:
       - .env
 
-    # Volume mounts for persistent data
+    # Override DB settings for MariaDB
+    environment:
+      DB_TYPE: mariadb
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_NAME: raginbox
+      DB_USER: raginbox
+      DB_PASSWORD: test_password
+
     volumes:
+      - ./src:/app/src  # Mount src for live code changes during development
       - ./data/documents:/app/data/documents
       - ./data/chroma_db:/app/data/chroma_db
       - ./data/logs:/app/data/logs
       - ./data/config:/app/data/config
       - ./data/temp_attachments:/app/data/temp_attachments
-      # SQLite database (if using DB_TYPE=sqlite)
-      - ./data:/app/data
 
-    # API port (if using web interface)
-    ports:
-      - "${API_PORT:-8000}:8000"
+    depends_on:
+      mariadb:
+        condition: service_healthy
 
-    # Depends on database (uncomment if using MariaDB)
-    # depends_on:
-    #   - mariadb
-
-    # Health check
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
       interval: 30s
@@ -39,7 +67,6 @@ services:
       retries: 3
       start_period: 40s
 
-    # Resource limits (adjust based on your needs)
     deploy:
       resources:
         limits:
@@ -52,39 +79,65 @@ services:
     networks:
       - raginbox-network
 
-  # MariaDB Database (optional - uncomment if using DB_TYPE=mariadb)
-  # mariadb:
-  #   image: mariadb:11.2
-  #   container_name: raginbox-db
-  #   restart: unless-stopped
-  #
-  #   environment:
-  #     MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-changeme}
-  #     MYSQL_DATABASE: ${DB_NAME:-raginbox}
-  #     MYSQL_USER: ${DB_USER:-raginbox}
-  #     MYSQL_PASSWORD: ${DB_PASSWORD:-changeme}
-  #
-  #   volumes:
-  #     - mariadb-data:/var/lib/mysql
-  #
-  #   ports:
-  #     - "3306:3306"
-  #
-  #   healthcheck:
-  #     test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 3
-  #     start_period: 30s
-  #
-  #   networks:
-  #     - raginbox-network
+  # RAGInbox Web Interface (depends on MariaDB)
+  raginbox-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: raginbox-web
+    restart: unless-stopped
+    command: python run_web_service.py
+
+    env_file:
+      - .env
+
+    # Override DB settings for MariaDB
+    environment:
+      DB_TYPE: mariadb
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_NAME: raginbox
+      DB_USER: raginbox
+      DB_PASSWORD: test_password
+
+    volumes:
+      - ./src:/app/src  # Mount src for live code changes during development
+      - ./data/documents:/app/data/documents
+      - ./data/chroma_db:/app/data/chroma_db
+      - ./data/logs:/app/data/logs
+      - ./data/config:/app/data/config
+      - ./data/temp_attachments:/app/data/temp_attachments
+
+    ports:
+      - "8000:8000"  # Web interface port
+
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+    networks:
+      - raginbox-network
 
 networks:
   raginbox-network:
     driver: bridge
 
-# Volumes for persistent data
 volumes:
-  mariadb-data:
+  mariadb-test-data:
     driver: local

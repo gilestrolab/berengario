@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 
-from fastapi import FastAPI, Request, Response, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, Request, Response, HTTPException, BackgroundTasks, Depends, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, EmailStr
@@ -22,6 +22,7 @@ from src.rag.query_handler import QueryHandler
 from src.rag.rag_engine import get_system_prompt
 from src.email.email_sender import EmailSender
 from src.email.whitelist_validator import WhitelistValidator
+from src.email.conversation_manager import conversation_manager, ChannelType, MessageType
 from src.document_processing.kb_manager import KnowledgeBaseManager
 from src.document_processing.document_processor import DocumentProcessor
 from src.api.admin.whitelist_manager import WhitelistManager
@@ -37,6 +38,7 @@ class QueryRequest(BaseModel):
     """Request model for query endpoint."""
 
     query: str
+    conversation_id: Optional[int] = None  # To continue existing conversation
     context: Optional[Dict] = None
 
 
@@ -67,6 +69,45 @@ class StatsResponse(BaseModel):
     total_chunks: int
     unique_documents: int
     documents: List[str]
+
+
+# Conversation Models
+class ConversationListItem(BaseModel):
+    """Single conversation item in list."""
+
+    id: int
+    thread_id: str
+    channel: str
+    sender: str
+    created_at: str
+    last_message_at: str
+    message_count: int
+    preview: Optional[str] = None
+    subject: Optional[str] = None
+
+
+class ConversationsResponse(BaseModel):
+    """Response model for conversations list."""
+
+    conversations: List[ConversationListItem]
+    total_count: int
+
+
+class ConversationMessagesResponse(BaseModel):
+    """Response model for conversation messages."""
+
+    conversation_id: int
+    thread_id: str
+    channel: str
+    messages: List[Dict]
+
+
+class ConversationSearchResponse(BaseModel):
+    """Response model for conversation search."""
+
+    results: List[ConversationListItem]
+    query: str
+    total_results: int
 
 
 # Authentication Models
@@ -708,6 +749,19 @@ async def request_otp(request: OTPRequest, background_tasks: BackgroundTasks):
                    "Please contact your administrator if you believe this is an error.",
         )
 
+    # Development mode: Skip OTP email sending
+    if settings.disable_otp_for_dev:
+        logger.warning(
+            f"⚠️ SECURITY WARNING: OTP disabled for development! "
+            f"Allowing login for {email} without email verification. "
+            f"DO NOT USE IN PRODUCTION!"
+        )
+        return AuthResponse(
+            success=True,
+            message=f"Development mode: OTP disabled. Enter any code to login as {email}.",
+            email=email,
+        )
+
     # Generate OTP
     otp_code = otp_manager.generate_otp(email)
 
@@ -744,8 +798,17 @@ async def verify_otp(
     email = verify_request.email.lower()
     otp_code = verify_request.otp_code
 
-    # Verify OTP
-    success, message = otp_manager.verify_otp(email, otp_code)
+    # Development mode: Skip OTP verification
+    if settings.disable_otp_for_dev:
+        logger.warning(
+            f"⚠️ SECURITY WARNING: OTP verification bypassed for development! "
+            f"Authenticating {email} without verification. DO NOT USE IN PRODUCTION!"
+        )
+        success = True
+        message = "Development mode: OTP verification bypassed"
+    else:
+        # Verify OTP
+        success, message = otp_manager.verify_otp(email, otp_code)
 
     if success:
         # Get or create session
@@ -875,19 +938,85 @@ async def query(
     # Session is already authenticated via dependency
     set_session_cookie(response, session.session_id)
 
-    # Add user message to history
+    user_identifier = session.email if hasattr(session, 'email') and session.email else f"web_user_{session.session_id[:8]}"
+
+    # Determine thread_id: use existing conversation or create new
+    thread_id = None
+    channel = ChannelType.WEBCHAT
+
+    if query_request.conversation_id:
+        # Continue existing conversation
+        from src.email.db_models import Conversation
+
+        with conversation_manager.db_manager.get_session() as db_session:
+            existing_conv = (
+                db_session.query(Conversation)
+                .filter(Conversation.id == query_request.conversation_id)
+                .first()
+            )
+
+            if not existing_conv:
+                raise HTTPException(status_code=404, detail="Conversation not found")
+
+            # Verify user owns this conversation
+            if existing_conv.sender != user_identifier:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Access denied. You can only continue your own conversations."
+                )
+
+            thread_id = existing_conv.thread_id
+            channel = existing_conv.channel
+
+            logger.info(f"Continuing conversation {query_request.conversation_id} (thread: {thread_id})")
+    else:
+        # Create new conversation with session-based thread_id
+        thread_id = f"webchat_{session.session_id}"
+
+    # Store user query in conversation database
+    conversation_manager.add_message(
+        thread_id=thread_id,
+        message_type=MessageType.QUERY,
+        content=query_request.query,
+        sender=user_identifier,
+        channel=channel,
+    )
+
+    # Add user message to in-memory session history
     session.add_message("user", query_request.query)
 
+    # Build conversation history from session messages for context
+    conversation_history = conversation_manager.format_conversation_context(
+        thread_id=thread_id,
+        max_messages=10,  # Last 10 messages for context
+    )
+
     try:
-        # Process query through RAG engine
+        # Process query through RAG engine with conversation history
+        # Pass admin status from session for tool access control
+        context = query_request.context or {}
+        context["conversation_history"] = conversation_history
+
         result = query_handler.process_query(
             query_text=query_request.query,
-            user_email=f"web_user_{session.session_id[:8]}",
-            context=query_request.context,
+            user_email=user_identifier,
+            is_admin=session.is_admin if hasattr(session, 'is_admin') else False,
+            context=context,
         )
 
         if not result["success"]:
-            session.add_message("assistant", f"Error: {result.get('error', 'Unknown error')}")
+            error_response = f"Error: {result.get('error', 'Unknown error')}"
+            session.add_message("assistant", error_response)
+
+            # Store error response in conversation database
+            conversation_manager.add_message(
+                thread_id=thread_id,
+                message_type=MessageType.REPLY,
+                content=error_response,
+                sender=settings.instance_name,
+                channel=channel,
+            )
+
             return QueryResponse(
                 success=False,
                 error=result.get("error", "Unknown error"),
@@ -919,12 +1048,21 @@ async def query(
                 }
                 attachment_urls.append(attachment_url)
 
-        # Add assistant response to history
+        # Add assistant response to in-memory session history
         session.add_message(
             "assistant",
             result["response"],
             sources=result["sources"],
             attachments=attachment_urls,
+        )
+
+        # Store assistant response in conversation database
+        conversation_manager.add_message(
+            thread_id=thread_id,
+            message_type=MessageType.REPLY,
+            content=result["response"],
+            sender=settings.instance_name,
+            channel=channel,
         )
 
         # Schedule cleanup
@@ -943,7 +1081,17 @@ async def query(
     except Exception as e:
         logger.error(f"Error processing query: {e}", exc_info=True)
         error_msg = str(e)
-        session.add_message("assistant", f"Error: {error_msg}")
+        error_response = f"Error: {error_msg}"
+        session.add_message("assistant", error_response)
+
+        # Store exception error in conversation database
+        conversation_manager.add_message(
+            thread_id=thread_id,
+            message_type=MessageType.REPLY,
+            content=error_response,
+            sender=settings.instance_name,
+            channel=channel,
+        )
 
         return QueryResponse(
             success=False,
@@ -999,6 +1147,318 @@ async def clear_session(
         return {"success": True, "message": "Session cleared"}
 
     return {"success": False, "message": "Failed to clear session"}
+
+
+@app.get("/api/conversations", response_model=ConversationsResponse)
+async def list_conversations(
+    session: Session = Depends(require_auth),
+):
+    """
+    Get list of all conversations for authenticated user.
+
+    Returns conversations from database (both email and webchat) sorted by
+    most recent activity.
+
+    Requires authentication.
+
+    Args:
+        session: Authenticated session (injected by dependency)
+
+    Returns:
+        ConversationsResponse with list of conversations
+    """
+    from src.email.db_models import Conversation, ConversationMessage
+    from sqlalchemy import desc, func
+
+    user_email = session.email if hasattr(session, 'email') and session.email else None
+    if not user_email:
+        return ConversationsResponse(conversations=[], total_count=0)
+
+    with conversation_manager.db_manager.get_session() as db_session:
+        # Query conversations for this user, ordered by most recent
+        conversations_query = (
+            db_session.query(Conversation)
+            .filter(Conversation.sender == user_email)
+            .order_by(desc(Conversation.last_message_at))
+        )
+
+        conversations = conversations_query.all()
+        conversation_items = []
+
+        for conv in conversations:
+            # Get message count
+            message_count = (
+                db_session.query(func.count(ConversationMessage.id))
+                .filter(ConversationMessage.conversation_id == conv.id)
+                .scalar()
+            ) or 0
+
+            # Get first message for preview
+            first_message = (
+                db_session.query(ConversationMessage)
+                .filter(ConversationMessage.conversation_id == conv.id)
+                .order_by(ConversationMessage.message_order)
+                .first()
+            )
+
+            preview = None
+            subject = None
+            if first_message:
+                # Truncate preview to 100 chars
+                preview = (first_message.content[:100] + "...") if len(first_message.content) > 100 else first_message.content
+                subject = first_message.subject
+
+            conversation_items.append(
+                ConversationListItem(
+                    id=conv.id,
+                    thread_id=conv.thread_id,
+                    channel=conv.channel.value if hasattr(conv.channel, 'value') else str(conv.channel),
+                    sender=conv.sender,
+                    created_at=conv.created_at.isoformat(),
+                    last_message_at=conv.last_message_at.isoformat(),
+                    message_count=message_count,
+                    preview=preview,
+                    subject=subject,
+                )
+            )
+
+        return ConversationsResponse(
+            conversations=conversation_items,
+            total_count=len(conversation_items),
+        )
+
+
+@app.get("/api/conversations/{conversation_id}", response_model=ConversationMessagesResponse)
+async def get_conversation_messages(
+    conversation_id: int,
+    session: Session = Depends(require_auth),
+):
+    """
+    Get all messages for a specific conversation.
+
+    Requires authentication. Users can only access their own conversations.
+
+    Args:
+        conversation_id: Conversation ID
+        session: Authenticated session (injected by dependency)
+
+    Returns:
+        ConversationMessagesResponse with all messages
+
+    Raises:
+        HTTPException: If conversation not found or unauthorized
+    """
+    from src.email.db_models import Conversation, ConversationMessage
+
+    user_email = session.email if hasattr(session, 'email') and session.email else None
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    with conversation_manager.db_manager.get_session() as db_session:
+        # Get conversation and verify ownership
+        conversation = (
+            db_session.query(Conversation)
+            .filter(Conversation.id == conversation_id)
+            .first()
+        )
+
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        if conversation.sender != user_email:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied. You can only view your own conversations."
+            )
+
+        # Get all messages ordered by message_order
+        messages = (
+            db_session.query(ConversationMessage)
+            .filter(ConversationMessage.conversation_id == conversation_id)
+            .order_by(ConversationMessage.message_order)
+            .all()
+        )
+
+        # Convert to dictionaries
+        message_list = [
+            {
+                "id": msg.id,
+                "role": "user" if msg.message_type.value == "query" else "assistant",
+                "content": msg.content,
+                "sender": msg.sender,
+                "subject": msg.subject,
+                "timestamp": msg.timestamp.isoformat(),
+                "message_order": msg.message_order,
+                "rating": msg.rating,
+            }
+            for msg in messages
+        ]
+
+        return ConversationMessagesResponse(
+            conversation_id=conversation.id,
+            thread_id=conversation.thread_id,
+            channel=conversation.channel.value if hasattr(conversation.channel, 'value') else str(conversation.channel),
+            messages=message_list,
+        )
+
+
+@app.delete("/api/conversations/{conversation_id}")
+async def delete_conversation(
+    conversation_id: int,
+    session: Session = Depends(require_auth),
+):
+    """
+    Delete a conversation and all its messages.
+
+    Requires authentication. Users can only delete their own conversations.
+
+    Args:
+        conversation_id: Conversation ID to delete
+        session: Authenticated session (injected by dependency)
+
+    Returns:
+        Success message
+
+    Raises:
+        HTTPException: If conversation not found or unauthorized
+    """
+    from src.email.db_models import Conversation
+
+    user_email = session.email if hasattr(session, 'email') and session.email else None
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    with conversation_manager.db_manager.get_session() as db_session:
+        # Get conversation and verify ownership
+        conversation = (
+            db_session.query(Conversation)
+            .filter(Conversation.id == conversation_id)
+            .first()
+        )
+
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        if conversation.sender != user_email:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied. You can only delete your own conversations."
+            )
+
+        # Delete conversation (messages cascade delete automatically)
+        thread_id = conversation.thread_id
+        db_session.delete(conversation)
+        db_session.commit()
+
+        logger.info(f"User {user_email} deleted conversation {conversation_id} (thread: {thread_id})")
+
+        return {"success": True, "message": "Conversation deleted"}
+
+
+@app.get("/api/conversations/search", response_model=ConversationSearchResponse)
+async def search_conversations(
+    q: str,
+    session: Session = Depends(require_auth),
+):
+    """
+    Search conversations by content, subject, or sender.
+
+    Requires authentication. Only searches user's own conversations.
+
+    Args:
+        q: Search query string
+        session: Authenticated session (injected by dependency)
+
+    Returns:
+        ConversationSearchResponse with matching conversations
+    """
+    from src.email.db_models import Conversation, ConversationMessage
+    from sqlalchemy import desc, func, or_
+
+    user_email = session.email if hasattr(session, 'email') and session.email else None
+    if not user_email:
+        return ConversationSearchResponse(results=[], query=q, total_results=0)
+
+    if not q or len(q.strip()) < 2:
+        return ConversationSearchResponse(results=[], query=q, total_results=0)
+
+    search_term = f"%{q}%"
+
+    with conversation_manager.db_manager.get_session() as db_session:
+        # Find conversations where message content or subject matches search
+        matching_conv_ids = (
+            db_session.query(ConversationMessage.conversation_id)
+            .distinct()
+            .filter(
+                or_(
+                    ConversationMessage.content.ilike(search_term),
+                    ConversationMessage.subject.ilike(search_term),
+                )
+            )
+            .subquery()
+        )
+
+        # Get conversations that match
+        conversations_query = (
+            db_session.query(Conversation)
+            .filter(
+                Conversation.sender == user_email,
+                Conversation.id.in_(matching_conv_ids),
+            )
+            .order_by(desc(Conversation.last_message_at))
+        )
+
+        conversations = conversations_query.all()
+        results = []
+
+        for conv in conversations:
+            # Get message count
+            message_count = (
+                db_session.query(func.count(ConversationMessage.id))
+                .filter(ConversationMessage.conversation_id == conv.id)
+                .scalar()
+            ) or 0
+
+            # Get first matching message for context
+            matching_message = (
+                db_session.query(ConversationMessage)
+                .filter(
+                    ConversationMessage.conversation_id == conv.id,
+                    or_(
+                        ConversationMessage.content.ilike(search_term),
+                        ConversationMessage.subject.ilike(search_term),
+                    ),
+                )
+                .first()
+            )
+
+            preview = None
+            subject = None
+            if matching_message:
+                # Show snippet around match
+                content = matching_message.content
+                preview = (content[:100] + "...") if len(content) > 100 else content
+                subject = matching_message.subject
+
+            results.append(
+                ConversationListItem(
+                    id=conv.id,
+                    thread_id=conv.thread_id,
+                    channel=conv.channel.value if hasattr(conv.channel, 'value') else str(conv.channel),
+                    sender=conv.sender,
+                    created_at=conv.created_at.isoformat(),
+                    last_message_at=conv.last_message_at.isoformat(),
+                    message_count=message_count,
+                    preview=preview,
+                    subject=subject,
+                )
+            )
+
+        return ConversationSearchResponse(
+            results=results,
+            query=q,
+            total_results=len(results),
+        )
 
 
 @app.get("/api/attachments/{session_id}/{filename}")
@@ -1276,6 +1736,37 @@ async def list_documents(
         raise HTTPException(status_code=500, detail=f"Error listing documents: {str(e)}")
 
 
+@app.get("/api/admin/documents/descriptions")
+async def get_document_descriptions(
+    session: Session = Depends(require_admin),
+):
+    """
+    Get AI-generated descriptions for all documents.
+
+    Requires admin privileges.
+
+    Args:
+        session: Admin session (injected by dependency)
+
+    Returns:
+        List of document descriptions
+    """
+    try:
+        from src.document_processing.description_generator import description_generator
+
+        descriptions = description_generator.get_all_descriptions()
+        logger.info(
+            f"Admin {session.email} retrieved {len(descriptions)} document descriptions"
+        )
+        return {
+            "descriptions": descriptions,
+            "total_count": len(descriptions),
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving document descriptions: {e}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving descriptions: {str(e)}")
+
+
 @app.delete("/api/admin/documents/{file_hash}", response_model=AdminActionResponse)
 async def delete_document(
     file_hash: str,
@@ -1475,6 +1966,149 @@ async def download_document(
     except Exception as e:
         logger.error(f"Error downloading document {file_hash}: {e}")
         raise HTTPException(status_code=500, detail=f"Error downloading document: {str(e)}")
+
+
+@app.post("/api/admin/documents/upload")
+async def upload_document(
+    file: UploadFile = File(...),
+    session: Session = Depends(require_admin),
+):
+    """
+    Upload and process a document into the knowledge base.
+
+    Requires admin privileges.
+
+    Args:
+        file: The file to upload
+        session: Admin session (injected by dependency)
+
+    Returns:
+        JSON with upload status and processing details
+
+    Raises:
+        HTTPException: If upload fails or file type is unsupported
+    """
+    try:
+        # Validate file type
+        allowed_extensions = {'.pdf', '.docx', '.doc', '.txt', '.csv'}
+        file_ext = Path(file.filename).suffix.lower()
+
+        if file_ext not in allowed_extensions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {file_ext}. Allowed: {', '.join(allowed_extensions)}"
+            )
+
+        # Create temp directory if it doesn't exist
+        temp_dir = Path(settings.email_temp_dir)
+        temp_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save uploaded file to temp location
+        temp_file_path = temp_dir / f"upload_{uuid.uuid4().hex}_{file.filename}"
+
+        try:
+            # Read and save file
+            content = await file.read()
+            with open(temp_file_path, 'wb') as f:
+                f.write(content)
+
+            logger.info(f"Saved uploaded file to: {temp_file_path}")
+
+            # Save permanent copy to data/documents/ first
+            documents_dir = Path("data/documents")
+            documents_dir.mkdir(parents=True, exist_ok=True)
+
+            # Check if file already exists
+            permanent_path = documents_dir / file.filename
+            final_filename = file.filename
+            if permanent_path.exists():
+                # Add timestamp to avoid overwriting
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                name_parts = file.filename.rsplit('.', 1)
+                final_filename = f"{name_parts[0]}_{timestamp}.{name_parts[1]}"
+                permanent_path = documents_dir / final_filename
+
+            # Copy to permanent location
+            import shutil
+            shutil.copy2(temp_file_path, permanent_path)
+            logger.info(f"Saved permanent copy to: {permanent_path}")
+
+            # Process document with correct metadata
+            # Note: Use permanent path and filename in metadata
+            nodes = document_processor.process_document(
+                temp_file_path,
+                source_type="manual",
+                extra_metadata={
+                    "uploaded_via": "admin_interface",
+                    "uploaded_by": session.email,
+                    "filename": final_filename,  # Original filename (or with timestamp if duplicate)
+                    "file_path": str(permanent_path),  # Point to permanent location
+                }
+            )
+
+            # Add to knowledge base
+            chunks_added = 0
+            if nodes:
+                kb_manager.add_nodes(nodes)
+                chunks_added = len(nodes)
+                logger.info(f"Processed uploaded document: {final_filename} ({chunks_added} chunks)")
+
+                # Generate and save document description
+                try:
+                    from src.document_processing.description_generator import description_generator
+
+                    # Use relative path from project root
+                    relative_path = str(permanent_path)
+                    if relative_path.startswith('/app/'):
+                        relative_path = relative_path[5:]  # Remove '/app/' prefix in Docker
+
+                    description_generator.generate_and_save(
+                        file_path=relative_path,
+                        filename=final_filename,
+                        chunks=nodes,
+                        file_size=len(content),
+                        file_type=file_ext.lstrip('.'),
+                    )
+                    logger.info(f"Generated description for: {final_filename}")
+                except Exception as e:
+                    # Don't fail the upload if description generation fails
+                    logger.error(f"Error generating description for {final_filename}: {e}", exc_info=True)
+
+            # Log to audit trail
+            audit_logger.log_action(
+                session.email,
+                "document_upload",
+                file.filename,
+                "success",
+                f"chunks:{chunks_added}"
+            )
+
+            return {
+                "success": True,
+                "message": f"Document uploaded and processed successfully",
+                "filename": file.filename,
+                "chunks_added": chunks_added,
+            }
+
+        finally:
+            # Clean up temp file
+            if temp_file_path.exists():
+                temp_file_path.unlink()
+                logger.debug(f"Cleaned up temp file: {temp_file_path}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Log failure
+        audit_logger.log_action(
+            session.email,
+            "document_upload",
+            file.filename if file else "unknown",
+            "error",
+            str(e)
+        )
+        logger.error(f"Error uploading document {file.filename}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error uploading document: {str(e)}")
 
 
 # Backup endpoints
@@ -1906,6 +2540,16 @@ async def startup_event():
     logger.info(f"Instance: {settings.instance_name}")
     logger.info(f"Organization: {settings.organization}")
     logger.info(f"Model: {settings.openrouter_model}")
+
+    # Security warning if OTP is disabled
+    if settings.disable_otp_for_dev:
+        logger.error("=" * 80)
+        logger.error("⚠️  SECURITY WARNING: OTP AUTHENTICATION IS DISABLED!")
+        logger.error("⚠️  This is a DEVELOPMENT-ONLY mode with NO email verification.")
+        logger.error("⚠️  Anyone with whitelist access can login without verification.")
+        logger.error("⚠️  DO NOT USE THIS SETTING IN PRODUCTION!")
+        logger.error("⚠️  Set DISABLE_OTP_FOR_DEV=false to enable proper authentication.")
+        logger.error("=" * 80)
 
 
 @app.on_event("shutdown")

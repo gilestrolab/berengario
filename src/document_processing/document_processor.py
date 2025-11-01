@@ -42,9 +42,15 @@ class DocumentProcessor:
         """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
+
+        # Convert characters to tokens (roughly 1 token = 4 characters)
+        # SentenceSplitter uses tokens, not characters
+        chunk_size_tokens = chunk_size // 4
+        chunk_overlap_tokens = chunk_overlap // 4
+
         self.splitter = SentenceSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
+            chunk_size=chunk_size_tokens,
+            chunk_overlap=chunk_overlap_tokens,
         )
 
     def compute_file_hash(self, file_path: Path) -> str:

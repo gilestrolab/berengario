@@ -84,21 +84,10 @@ python run_email_service.py
 
 ### Testing
 
-```bash
-# Run all tests (ALWAYS activate venv first)
-source .venv/bin/activate && pytest tests/ -v
-
-# Run specific test suites
-source .venv/bin/activate && pytest tests/test_email_parser.py -v
-source .venv/bin/activate && pytest tests/test_email_sender.py -v
-source .venv/bin/activate && pytest tests/test_phase3_integration.py -v
-source .venv/bin/activate && pytest tests/test_document_processor.py -v
-
-# Run with coverage
-source .venv/bin/activate && pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
-
-# Current status: 246 of 252 tests passing (Phase 3 complete)
-```
+- **Always test code in the Docker container**, not with local `.venv`
+- The `src/` directory is volume-mapped to the container, so code changes are immediately available
+- Use `docker exec` to run tests and commands inside the container
+- Container name: `raginbox-web`
 
 ### Code Quality
 

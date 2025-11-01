@@ -287,6 +287,25 @@ class DocumentManager:
                         self.kb_manager.add_documents(nodes)
                         chunks_added = len(nodes)
                         logger.info(f"Processed document into KB: {safe_filename} ({chunks_added} chunks)")
+
+                        # Generate and save document description
+                        try:
+                            from src.document_processing.description_generator import description_generator
+
+                            # Calculate relative path from project root
+                            relative_path = str(file_path.relative_to(self.base_path))
+
+                            description_generator.generate_and_save(
+                                file_path=relative_path,
+                                filename=safe_filename,
+                                chunks=nodes,
+                                file_size=len(content),
+                                file_type=file_ext.lstrip('.'),
+                            )
+                            logger.info(f"Generated description for: {safe_filename}")
+                        except Exception as e:
+                            # Don't fail the upload if description generation fails
+                            logger.error(f"Error generating description: {e}", exc_info=True)
                     else:
                         logger.warning(f"No chunks extracted from {safe_filename}")
                 except Exception as e:
