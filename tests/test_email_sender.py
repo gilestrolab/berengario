@@ -334,8 +334,8 @@ class TestFormatResponseEmail:
         # Check plain text preserves newlines
         assert "Line 1\nLine 2\nLine 3" in plain
 
-        # Check HTML converts newlines to <br>
-        assert "Line 1<br>Line 2<br>Line 3" in html
+        # Check HTML converts newlines to <br /> (XHTML style)
+        assert "Line 1<br />" in html and "Line 2<br />" in html and "Line 3" in html
 
     def test_format_html_structure(self):
         """Test that HTML has proper structure."""

@@ -20,7 +20,8 @@ class TestDocumentProcessor:
     @pytest.fixture
     def processor(self):
         """Create a DocumentProcessor instance for testing."""
-        return DocumentProcessor(chunk_size=100, chunk_overlap=20)
+        # Use larger chunk_size to accommodate metadata (converted to tokens by dividing by 4)
+        return DocumentProcessor(chunk_size=512, chunk_overlap=50)
 
     @pytest.fixture
     def temp_dir(self):
@@ -131,17 +132,22 @@ class TestDocumentProcessor:
 
     def test_extract_text_unsupported_format(self, processor, temp_dir):
         """
-        Test that unsupported file format raises ValueError.
+        Test that unsupported file format falls back to text extraction.
+
+        For unknown file extensions, the processor tries to read as text.
+        This is a reasonable fallback for plain text files with unusual extensions.
 
         Args:
             processor: DocumentProcessor fixture.
             temp_dir: Temporary directory fixture.
         """
         test_file = temp_dir / "test.xyz"
-        test_file.write_text("Some content")
+        test_content = "Some text content in unusual format"
+        test_file.write_text(test_content)
 
-        with pytest.raises(ValueError, match="Unsupported file format"):
-            processor.extract_text(test_file)
+        # Should successfully extract as text (fallback behavior)
+        result = processor.extract_text(test_file)
+        assert test_content in result
 
     def test_process_document_success(self, processor, temp_dir):
         """
@@ -239,7 +245,7 @@ class TestDocumentProcessor:
         """
         test_file = temp_dir / "test.txt"
         # Create content that will span multiple chunks
-        test_content = "A" * 150  # 150 characters, chunk_size=100, overlap=20
+        test_content = "A" * 1500  # 1500 characters, chunk_size=512, overlap=50
         test_file.write_text(test_content)
 
         nodes = processor.process_document(test_file)

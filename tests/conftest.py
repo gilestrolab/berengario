@@ -8,7 +8,9 @@ import os
 from unittest.mock import patch
 
 import pytest
+from llama_index.core.base.llms.types import ChatMessage, ChatResponse, LLMMetadata
 from llama_index.core.embeddings import BaseEmbedding
+from llama_index.core.llms import LLM
 
 
 class MockEmbedding(BaseEmbedding):
@@ -31,6 +33,65 @@ class MockEmbedding(BaseEmbedding):
         return [0.1] * 384
 
 
+class MockLLM(LLM):
+    """Mock LLM for testing."""
+
+    api_key: str = "test-api-key"
+
+    @property
+    def metadata(self):
+        """Return mock metadata."""
+        return LLMMetadata(
+            model_name="mock-llm",
+            context_window=4096,
+            num_output=512,
+        )
+
+    def chat(self, messages, **kwargs):
+        """Return mock chat response."""
+        return ChatResponse(
+            message=ChatMessage(role="assistant", content="Mock response"),
+            raw={"content": "Mock response"},
+        )
+
+    def complete(self, prompt: str, **kwargs):
+        """Return mock completion."""
+        return "Mock completion"
+
+    def stream_chat(self, messages, **kwargs):
+        """Return mock chat stream."""
+        yield ChatResponse(
+            message=ChatMessage(role="assistant", content="Mock response"),
+            raw={"content": "Mock response"},
+        )
+
+    def stream_complete(self, prompt: str, **kwargs):
+        """Return mock completion stream."""
+        yield "Mock completion"
+
+    async def achat(self, messages, **kwargs):
+        """Return mock async chat response."""
+        return ChatResponse(
+            message=ChatMessage(role="assistant", content="Mock response"),
+            raw={"content": "Mock response"},
+        )
+
+    async def acomplete(self, prompt: str, **kwargs):
+        """Return mock async completion."""
+        return "Mock completion"
+
+    async def astream_chat(self, messages, **kwargs):
+        """Return mock async chat stream."""
+        yield ChatResponse(
+            message=ChatMessage(role="assistant", content="Mock response"),
+            raw={"content": "Mock response"},
+        )
+
+    async def astream_complete(self, prompt: str, **kwargs):
+        """Return mock async completion stream."""
+        yield "Mock completion"
+
+
 @pytest.fixture(autouse=True)
 def mock_openai_api():
     """
@@ -44,7 +105,7 @@ def mock_openai_api():
             "llama_index.embeddings.openai.OpenAIEmbedding",
             return_value=MockEmbedding(),
         ),
-        patch("llama_index.llms.openai.OpenAI"),
+        patch("llama_index.llms.openai.OpenAI", return_value=MockLLM()),
     ):
         yield
 

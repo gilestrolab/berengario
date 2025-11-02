@@ -8,7 +8,7 @@ The pre-commit hook runs three checks on all staged Python files:
 
 1. **Black Formatter** - Ensures consistent code formatting
 2. **Ruff Linter** - Catches common Python errors and style issues
-3. **Pytest** (optional) - Runs test suite if dependencies are installed
+3. **Pytest** (via Docker) - Runs full test suite in Docker container
 
 ## Installation
 
@@ -66,7 +66,7 @@ Fix the failing tests before committing.
 
 ## Dependencies
 
-### Required (Always Run)
+### Required for Local Development
 - `black` - Code formatter
 - `ruff` - Python linter
 
@@ -75,14 +75,22 @@ Install with:
 pip install black ruff
 ```
 
-### Optional (Run if Available)
-- `pytest` and project dependencies
+### Required for Testing
+- **Docker and docker-compose** - Tests run in the Docker container
+- The `raginbox-web` container must be running
 
-If pytest dependencies are not installed, the hook will skip tests with a warning:
+Start the container:
+```bash
+docker-compose up -d
 ```
-⚠️  Skipping pytest (dependencies not installed)
-   Tests will run in CI. To run locally:
-   docker exec raginbox-web pytest tests/
+
+If the container is not running, the hook will fail with:
+```
+⚠️  Docker container 'raginbox-web' is not running!
+   Start the container with: docker-compose up -d
+   Or run tests manually with: docker exec raginbox-web python -m pytest tests/
+
+❌ Cannot commit without running tests.
 ```
 
 ## Testing in Docker

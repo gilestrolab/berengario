@@ -50,6 +50,7 @@ services:
 
     volumes:
       - ./src:/app/src  # Mount src for live code changes during development
+      - ./tests:/app/tests  # Mount tests for development testing
       - ./data/documents:/app/data/documents
       - ./data/chroma_db:/app/data/chroma_db
       - ./data/logs:/app/data/logs
@@ -102,6 +103,7 @@ services:
 
     volumes:
       - ./src:/app/src  # Mount src for live code changes during development
+      - ./tests:/app/tests  # Mount tests for development testing
       - ./data/documents:/app/data/documents
       - ./data/chroma_db:/app/data/chroma_db
       - ./data/logs:/app/data/logs
