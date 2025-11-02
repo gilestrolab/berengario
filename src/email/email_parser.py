@@ -22,7 +22,6 @@ from imap_tools import MailMessage
 from pydantic import BaseModel, Field, field_validator
 
 from src.config import settings
-from src.email.whitelist_validator import whitelist_validator
 
 logger = logging.getLogger(__name__)
 
@@ -169,10 +168,10 @@ class EmailParser:
 
         Args:
             target_address: Target email for KB contributions (defaults to settings)
-            validator: Whitelist validator (defaults to global instance)
+            validator: Whitelist validator (optional, only used for logging is_whitelisted field)
         """
         self.target_address = (target_address or settings.email_target_address).lower()
-        self.validator = validator or whitelist_validator
+        self.validator = validator
 
         # Configure forwarded email detection
         self.forward_to_kb_enabled = settings.forward_to_kb_enabled
@@ -457,10 +456,10 @@ class EmailParser:
             if not sender:
                 raise ValueError("Invalid sender address")
 
-            # Check whitelist
-            is_whitelisted = self.validator.is_allowed(sender.email)
-            if not is_whitelisted:
-                logger.info(f"Message from {sender.email} REJECTED (not whitelisted)")
+            # Check whitelist (for logging only - actual validation done by EmailProcessor)
+            is_whitelisted = self.validator.is_allowed(sender.email) if self.validator else False
+            if not is_whitelisted and self.validator:
+                logger.debug(f"Message from {sender.email} not in parser's whitelist (check EmailProcessor validators)")
 
             # Parse recipients
             to_addresses = self.parse_email_list(message.to or "")
@@ -562,7 +561,3 @@ class EmailParser:
 
         # Direct messages (To: field) are queries - user expects a reply
         return False
-
-
-# Global parser instance
-email_parser = EmailParser()

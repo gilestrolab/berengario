@@ -148,20 +148,6 @@ class Settings(BaseSettings):
         description="Enable admin whitelist validation",
     )
 
-    # Legacy whitelist support (deprecated - maps to teach whitelist)
-    email_whitelist: str = Field(
-        default="",
-        description="DEPRECATED: Use email_teach_whitelist or email_query_whitelist instead",
-    )
-    email_whitelist_file: Optional[Path] = Field(
-        default=None,
-        description="DEPRECATED: Use email_teach_whitelist_file or email_query_whitelist_file instead",
-    )
-    email_whitelist_enabled: bool = Field(
-        default=True,
-        description="DEPRECATED: Use email_teach_whitelist_enabled or email_query_whitelist_enabled instead",
-    )
-
     # Database Configuration (Message Tracking)
     db_type: str = Field(
         default="sqlite",

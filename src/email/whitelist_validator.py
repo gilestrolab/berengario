@@ -37,7 +37,7 @@ class WhitelistValidator:
         self,
         whitelist: str = None,
         whitelist_file: Path = None,
-        enabled: bool = None,
+        enabled: bool = True,
         parent_validators: list = None,
     ):
         """
@@ -46,10 +46,10 @@ class WhitelistValidator:
         Args:
             whitelist: Comma-separated list of allowed addresses/domains
             whitelist_file: Path to file with allowed addresses/domains
-            enabled: Whether whitelist validation is enabled
+            enabled: Whether whitelist validation is enabled (default: True)
             parent_validators: List of parent validators to check first (for hierarchy)
         """
-        self.enabled = enabled if enabled is not None else settings.email_whitelist_enabled
+        self.enabled = enabled
         self.whitelist_entries: Set[str] = set()
         self.domain_entries: Set[str] = set()
         self.parent_validators = parent_validators or []
@@ -59,14 +59,12 @@ class WhitelistValidator:
             return
 
         # Load from inline whitelist
-        inline = whitelist or settings.email_whitelist
-        if inline:
-            self._load_from_string(inline)
+        if whitelist:
+            self._load_from_string(whitelist)
 
         # Load from file
-        file_path = whitelist_file or settings.email_whitelist_file
-        if file_path:
-            self._load_from_file(file_path)
+        if whitelist_file:
+            self._load_from_file(whitelist_file)
 
         # Log configuration
         if self.whitelist_entries or self.domain_entries:
@@ -252,7 +250,3 @@ class WhitelistValidator:
 
         logger.warning(f"Entry not found in whitelist: {entry}")
         return False
-
-
-# Global validator instance
-whitelist_validator = WhitelistValidator()
