@@ -6,9 +6,9 @@ Handles document listing, uploading, deletion, and archival operations.
 
 import logging
 import shutil
-from pathlib import Path
-from typing import List, Dict, Optional, Tuple
 from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -329,7 +329,7 @@ class DocumentManager:
             if file_path.exists():
                 try:
                     file_path.unlink()
-                except:
+                except Exception:
                     pass
             logger.error(f"Error uploading document: {e}")
             raise

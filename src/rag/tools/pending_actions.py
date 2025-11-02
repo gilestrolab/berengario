@@ -7,10 +7,10 @@ Stores pending whitelist changes that need admin confirmation before execution.
 import json
 import logging
 import secrets
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 

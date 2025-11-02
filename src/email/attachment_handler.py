@@ -10,11 +10,10 @@ This module provides attachment handling with:
 """
 
 import logging
-import mimetypes
 import shutil
+from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Tuple
-from datetime import datetime, timedelta
+from typing import List, Optional
 
 from imap_tools import MailMessage
 
@@ -359,7 +358,6 @@ class AttachmentHandler:
         Returns:
             Number of files successfully archived.
         """
-        import shutil
 
         documents_path = documents_path or settings.documents_path
         archived = 0

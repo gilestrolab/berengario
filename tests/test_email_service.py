@@ -6,8 +6,7 @@ Tests the EmailService class including polling, backoff, and shutdown handling.
 
 import logging
 import signal
-import time
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 

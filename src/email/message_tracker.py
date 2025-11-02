@@ -7,10 +7,10 @@ provides monitoring capabilities.
 """
 
 import logging
-from datetime import datetime, timedelta, date
-from typing import Optional, List, Dict
+from datetime import date, datetime, timedelta
+from typing import Dict, List, Optional
 
-from sqlalchemy import func, and_
+from sqlalchemy import func
 
 from src.email.db_manager import db_manager
 from src.email.db_models import ProcessedMessage, ProcessingStats

@@ -4,8 +4,7 @@ Unit tests for database models.
 Tests the SQLAlchemy ORM models for email message tracking.
 """
 
-import pytest
-from datetime import datetime, date
+from datetime import date, datetime
 
 from src.email.db_models import ProcessedMessage, ProcessingStats
 

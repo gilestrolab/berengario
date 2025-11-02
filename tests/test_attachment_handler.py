@@ -4,17 +4,16 @@ Unit tests for attachment handler.
 Tests attachment extraction, validation, and file management.
 """
 
-import pytest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock
+
+import pytest
 
 from src.email.attachment_handler import (
+    SUPPORTED_EXTENSIONS,
     AttachmentHandler,
     AttachmentInfo,
-    FileSizeError,
-    FileTypeError,
-    SUPPORTED_EXTENSIONS,
 )
 
 
@@ -47,7 +46,7 @@ class TestAttachmentHandler:
 
     def test_init_creates_temp_dir(self, temp_dir):
         """Test initialization creates temp directory."""
-        handler = AttachmentHandler(temp_dir=temp_dir / "new_dir")
+        _ = AttachmentHandler(temp_dir=temp_dir / "new_dir")
 
         assert (temp_dir / "new_dir").exists()
 

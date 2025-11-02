@@ -5,7 +5,7 @@ Provides common fixtures and setup for all tests.
 """
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from llama_index.core.embeddings import BaseEmbedding

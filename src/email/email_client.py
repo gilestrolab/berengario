@@ -9,9 +9,8 @@ connections with automatic reconnection on failures.
 import logging
 import time
 from typing import List, Optional, Tuple
-from email.message import Message
 
-from imap_tools import MailBox, MailMessage, MailBoxUnencrypted
+from imap_tools import MailBox, MailBoxUnencrypted, MailMessage
 from imap_tools.errors import MailboxLoginError, MailboxLogoutError
 
 from src.config import settings

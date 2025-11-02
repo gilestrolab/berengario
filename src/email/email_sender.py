@@ -6,12 +6,12 @@ Handles SMTP connection, email composition, and sending with proper error handli
 
 import logging
 import smtplib
+from email import encoders
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
-from typing import List, Optional, Dict
-from pathlib import Path
+from typing import Dict, List, Optional
+
 import markdown
 
 from src.config import settings
@@ -407,7 +407,6 @@ def _format_html_email(
         # Check if this is an email source with metadata
         sender = source.get("sender")
         subject = source.get("subject")
-        date = source.get("date")
         score = source.get("score", 0)
 
         if sender and subject:

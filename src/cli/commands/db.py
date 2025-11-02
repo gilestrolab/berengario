@@ -11,14 +11,13 @@ import typer
 
 from src.cli.utils import (
     console,
-    print_success,
-    print_error,
-    print_info,
-    print_header,
     create_table,
-    print_key_value,
     handle_error,
-    format_count,
+    print_error,
+    print_header,
+    print_info,
+    print_key_value,
+    print_success,
 )
 from src.config import settings
 from src.email.db_manager import db_manager

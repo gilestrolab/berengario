@@ -5,22 +5,22 @@ This module defines the ORM models for tracking processed emails and
 processing statistics. Supports both SQLite and MariaDB/MySQL backends.
 """
 
-from datetime import datetime, date
+import enum
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import (
     Column,
-    String,
-    Integer,
-    DateTime,
-    Text,
     Date,
-    Index,
-    ForeignKey,
+    DateTime,
     Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
 )
 from sqlalchemy.orm import declarative_base, relationship
-import enum
 
 # Base class for all models
 Base = declarative_base()

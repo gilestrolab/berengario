@@ -4,16 +4,14 @@ Unit tests for IMAP email client.
 Tests email client connection, message fetching, and error handling.
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 from imap_tools import MailMessage
-from imap_tools.errors import MailboxLoginError
 
 from src.email.email_client import (
     EmailClient,
     EmailConnectionError,
-    EmailAuthenticationError,
 )
 
 
@@ -32,9 +30,9 @@ def mock_settings():
 @pytest.fixture
 def mock_mailbox():
     """Mock MailBox for testing."""
-    with patch("src.email.email_client.MailBox") as MockMailBox:
+    with patch("src.email.email_client.MailBox") as mock_mail_box:
         mock_instance = MagicMock()
-        MockMailBox.return_value = mock_instance
+        mock_mail_box.return_value = mock_instance
         yield mock_instance
 
 
@@ -105,8 +103,8 @@ class TestEmailClient:
 
     def test_connect_connection_failure(self, mock_settings):
         """Test connection failure."""
-        with patch("src.email.email_client.MailBox") as MockMailBox:
-            MockMailBox.side_effect = ConnectionError("Cannot reach server")
+        with patch("src.email.email_client.MailBox") as mock_mail_box:
+            mock_mail_box.side_effect = ConnectionError("Cannot reach server")
 
             client = EmailClient()
 
@@ -341,7 +339,7 @@ class TestEmailClient:
     def test_context_manager_with_error(self, mock_settings, mock_mailbox):
         """Test context manager disconnects even on error."""
         with pytest.raises(ValueError):
-            with EmailClient() as client:
+            with EmailClient():
                 raise ValueError("Test error")
 
         # Should still disconnect

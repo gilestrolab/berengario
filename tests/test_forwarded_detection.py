@@ -5,7 +5,8 @@ Tests the configurable forwarded email detection feature.
 """
 
 import pytest
-from src.email.email_parser import EmailParser, EmailAddress, EmailMessage
+
+from src.email.email_parser import EmailAddress, EmailMessage, EmailParser
 
 
 @pytest.fixture

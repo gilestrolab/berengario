@@ -16,7 +16,6 @@ Usage:
 
 import argparse
 import logging
-from pathlib import Path
 
 from src.config import settings
 from src.document_processing.document_processor import DocumentProcessor
@@ -91,12 +90,12 @@ def process_documents(
     total_chunks = kb_manager.get_document_count()
     unique_docs = kb_manager.get_unique_documents()
 
-    logger.info(f"\nKnowledge Base Stats:")
+    logger.info("\nKnowledge Base Stats:")
     logger.info(f"  Total chunks: {total_chunks}")
     logger.info(f"  Unique documents: {len(unique_docs)}")
 
     if unique_docs:
-        logger.info(f"\nDocuments in KB:")
+        logger.info("\nDocuments in KB:")
         for doc in unique_docs:
             logger.info(
                 f"  - {doc['filename']} ({doc['source_type']}, {doc['file_type']})"

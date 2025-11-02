@@ -5,30 +5,27 @@ Manages documents in the RAGInbox knowledge base (ChromaDB).
 """
 
 import logging
-from pathlib import Path
-from typing import Optional
 
 import typer
-from rich.table import Table
 
 from src.cli.utils import (
-    console,
-    print_success,
-    print_error,
-    print_warning,
-    print_info,
-    print_header,
-    create_table,
-    create_progress,
     confirm_destructive,
+    console,
+    create_progress,
+    create_table,
     format_bytes,
     format_count,
     handle_error,
+    print_error,
+    print_header,
+    print_info,
     print_key_value,
+    print_success,
+    print_warning,
 )
 from src.config import settings
-from src.document_processing.kb_manager import KnowledgeBaseManager
 from src.document_processing.document_processor import DocumentProcessor
+from src.document_processing.kb_manager import KnowledgeBaseManager
 
 # Initialize KB manager instance
 kb_manager = KnowledgeBaseManager()
@@ -218,7 +215,7 @@ def reingest_documents():
 
         # Summary
         console.print()
-        print_success(f"Reingest complete!")
+        print_success("Reingest complete!")
         print_key_value("Successful", str(success_count))
         print_key_value("Errors", str(error_count))
         print_key_value("Total Chunks", str(total_chunks))
@@ -392,7 +389,7 @@ def regenerate_descriptions(
 
         # Summary
         console.print()
-        print_success(f"Description regeneration complete!")
+        print_success("Description regeneration complete!")
         print_key_value("Successful", str(success_count))
         print_key_value("Errors", str(error_count))
 

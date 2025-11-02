@@ -7,11 +7,13 @@ email attachments.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from icalendar import Calendar, Event as ICalEvent
-from dateutil import parser as date_parser
+from typing import Any, Dict, List
 
-from .base import Tool, ToolParameter, ParameterType, register_tool
+from dateutil import parser as date_parser
+from icalendar import Calendar
+from icalendar import Event as ICalEvent
+
+from .base import ParameterType, Tool, ToolParameter, register_tool
 
 logger = logging.getLogger(__name__)
 

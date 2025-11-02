@@ -10,7 +10,7 @@ import logging
 from io import StringIO
 from typing import Any, Dict, List
 
-from .base import Tool, ToolParameter, ParameterType, register_tool
+from .base import ParameterType, Tool, ToolParameter, register_tool
 
 logger = logging.getLogger(__name__)
 

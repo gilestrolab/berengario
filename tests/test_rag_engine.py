@@ -7,8 +7,6 @@ Tests system prompt generation and customization.
 from pathlib import Path
 from unittest.mock import mock_open, patch
 
-import pytest
-
 from src.rag.rag_engine import get_system_prompt
 
 

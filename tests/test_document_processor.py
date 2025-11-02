@@ -10,7 +10,6 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from docx import Document as DocxDocument
-from pypdf import PdfWriter
 
 from src.document_processing.document_processor import DocumentProcessor
 

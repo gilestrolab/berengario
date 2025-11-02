@@ -8,9 +8,7 @@ individual email addresses and domain-based whitelisting.
 
 import logging
 from pathlib import Path
-from typing import List, Set
-
-from src.config import settings
+from typing import Set
 
 logger = logging.getLogger(__name__)
 

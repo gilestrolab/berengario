@@ -6,16 +6,15 @@ Handles query execution, context retrieval, and response generation.
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from llama_index.core import PromptTemplate
-from llama_index.core.response_synthesizers import ResponseMode
 from llama_index.llms.openai import OpenAI
 from openai import OpenAI as OpenAIClient
 
 from src.config import settings
 from src.document_processing.kb_manager import KnowledgeBaseManager
-from src.rag.tools import get_registry, ToolExecutor
+from src.rag.tools import ToolExecutor, get_registry
 
 logger = logging.getLogger(__name__)
 

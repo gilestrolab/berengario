@@ -4,10 +4,10 @@ Unit tests for email parser.
 Tests email parsing, whitelist integration, and HTML conversion.
 """
 
-import pytest
 from datetime import datetime
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
+import pytest
 from imap_tools import MailMessage
 
 from src.email.email_parser import (

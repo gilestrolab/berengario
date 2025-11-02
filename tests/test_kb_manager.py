@@ -6,13 +6,13 @@ Tests knowledge base operations with ChromaDB.
 
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
+from conftest import MockEmbedding
 from llama_index.core.schema import TextNode
 
 from src.document_processing.kb_manager import KnowledgeBaseManager
-from conftest import MockEmbedding
 
 
 class TestKnowledgeBaseManager:

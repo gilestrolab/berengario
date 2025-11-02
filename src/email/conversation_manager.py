@@ -5,19 +5,16 @@ This module provides conversation management for both email and webchat,
 supporting thread tracking, message storage, and context retrieval.
 """
 
-import hashlib
 import logging
 import re
 from datetime import datetime
-from typing import List, Optional, Dict, Any
-
-from sqlalchemy.orm import Session
+from typing import Any, Dict, List, Optional
 
 from src.email.db_manager import db_manager
 from src.email.db_models import (
+    ChannelType,
     Conversation,
     ConversationMessage,
-    ChannelType,
     MessageType,
 )
 

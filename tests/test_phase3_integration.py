@@ -7,8 +7,6 @@ Real-world integration testing will be done with actual emails.
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from src.email.email_sender import format_response_email
 from src.rag.query_handler import QueryHandler
 
@@ -114,8 +112,8 @@ class TestPhase3Integration:
 
 def test_phase3_components_importable():
     """Smoke test: verify all Phase 3 components can be imported."""
-    from src.email.email_sender import EmailSender, email_sender, format_response_email
     from src.email.email_processor import EmailProcessor
+    from src.email.email_sender import EmailSender, email_sender, format_response_email
     from src.rag.query_handler import QueryHandler
     from src.rag.rag_engine import RAGEngine
 

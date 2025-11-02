@@ -364,6 +364,7 @@ class DocumentProcessor:
             Exception: If crawling fails.
         """
         from datetime import datetime
+
         from src.document_processing.web_crawler import WebCrawler
 
         logger.info(f"Processing URL: {url} (depth={crawl_depth})")

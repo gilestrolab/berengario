@@ -5,17 +5,17 @@ This module provides a framework for LLM function calling, enabling
 the generation of attachments like calendar files, CSV exports, etc.
 """
 
-from .base import Tool, ToolRegistry, ToolParameter, get_registry
+from .base import Tool, ToolParameter, ToolRegistry, get_registry
 from .calendar_tools import create_calendar_event, create_calendar_from_data
-from .export_tools import export_to_csv, create_text_file, create_json_file
+from .export_tools import create_json_file, create_text_file, export_to_csv
 from .tool_executor import ToolExecutor
 from .whitelist_tools import (
-    add_to_teach_whitelist,
-    remove_from_teach_whitelist,
     add_to_query_whitelist,
-    remove_from_query_whitelist,
-    set_tool_context,
+    add_to_teach_whitelist,
     clear_tool_context,
+    remove_from_query_whitelist,
+    remove_from_teach_whitelist,
+    set_tool_context,
 )
 
 __all__ = [
@@ -29,4 +29,10 @@ __all__ = [
     "export_to_csv",
     "create_text_file",
     "create_json_file",
+    "add_to_query_whitelist",
+    "add_to_teach_whitelist",
+    "clear_tool_context",
+    "remove_from_query_whitelist",
+    "remove_from_teach_whitelist",
+    "set_tool_context",
 ]

@@ -5,27 +5,26 @@ Manages system backups (create, list, delete, cleanup).
 """
 
 import logging
-from pathlib import Path
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import typer
 
 from src.cli.utils import (
-    console,
-    print_success,
-    print_error,
-    print_warning,
-    print_info,
-    print_header,
-    create_table,
-    create_progress,
     confirm_destructive,
+    console,
+    create_progress,
+    create_table,
     format_bytes,
     format_count,
     handle_error,
+    print_error,
+    print_header,
+    print_info,
     print_key_value,
+    print_success,
+    print_warning,
 )
-from src.config import settings
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -224,7 +223,7 @@ def cleanup_backups(
                 logger.error(f"Failed to delete {backup['filename']}: {e}")
 
         console.print()
-        print_success(f"Cleanup complete")
+        print_success("Cleanup complete")
         print_key_value("Deleted", str(deleted_count))
         print_key_value("Remaining", str(len(backups) - deleted_count))
 

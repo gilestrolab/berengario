@@ -4,19 +4,19 @@ CLI utility functions for console output, formatting, and user interaction.
 
 import sys
 from typing import Optional
+
+import typer
+from rich import box
 from rich.console import Console
-from rich.table import Table
+from rich.panel import Panel
 from rich.progress import (
+    BarColumn,
     Progress,
     SpinnerColumn,
-    TextColumn,
-    BarColumn,
     TaskProgressColumn,
+    TextColumn,
 )
-from rich.panel import Panel
-from rich import box
-import typer
-
+from rich.table import Table
 
 # Global console instance
 console = Console()

@@ -7,41 +7,41 @@ Provides a REST API and web UI for real-time RAG queries with conversation threa
 import logging
 import secrets
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
-from dataclasses import dataclass, field
 
 from fastapi import (
-    FastAPI,
-    Request,
-    Response,
-    HTTPException,
     BackgroundTasks,
     Depends,
-    UploadFile,
+    FastAPI,
     File,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
 )
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, EmailStr
 
-from src.config import settings
-from src.rag.query_handler import QueryHandler
-from src.rag.rag_engine import get_system_prompt
-from src.email.email_sender import EmailSender
-from src.email.whitelist_validator import WhitelistValidator
-from src.email.conversation_manager import (
-    conversation_manager,
-    ChannelType,
-    MessageType,
-)
-from src.document_processing.kb_manager import KnowledgeBaseManager
-from src.document_processing.document_processor import DocumentProcessor
-from src.api.admin.whitelist_manager import WhitelistManager
-from src.api.admin.document_manager import DocumentManager
 from src.api.admin.audit_logger import AdminAuditLogger
 from src.api.admin.backup_manager import BackupManager
+from src.api.admin.document_manager import DocumentManager
+from src.api.admin.whitelist_manager import WhitelistManager
+from src.config import settings
+from src.document_processing.document_processor import DocumentProcessor
+from src.document_processing.kb_manager import KnowledgeBaseManager
+from src.email.conversation_manager import (
+    ChannelType,
+    MessageType,
+    conversation_manager,
+)
+from src.email.email_sender import EmailSender
+from src.email.whitelist_validator import WhitelistValidator
+from src.rag.query_handler import QueryHandler
+from src.rag.rag_engine import get_system_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -483,8 +483,6 @@ class SessionManager:
         """
         if session_id not in self.sessions:
             return False
-
-        session = self.sessions[session_id]
 
         # Cleanup session attachments
         session_dir = settings.email_temp_dir / f"web_{session_id}"
@@ -1218,8 +1216,9 @@ async def list_conversations(
     Returns:
         ConversationsResponse with list of conversations
     """
-    from src.email.db_models import Conversation, ConversationMessage
     from sqlalchemy import desc, func
+
+    from src.email.db_models import Conversation, ConversationMessage
 
     user_email = session.email if hasattr(session, "email") and session.email else None
     if not user_email:
@@ -1439,8 +1438,9 @@ async def search_conversations(
     Returns:
         ConversationSearchResponse with matching conversations
     """
-    from src.email.db_models import Conversation, ConversationMessage
     from sqlalchemy import desc, func, or_
+
+    from src.email.db_models import Conversation, ConversationMessage
 
     user_email = session.email if hasattr(session, "email") and session.email else None
     if not user_email:
@@ -2181,7 +2181,7 @@ async def upload_document(
 
             return {
                 "success": True,
-                "message": f"Document uploaded and processed successfully",
+                "message": "Document uploaded and processed successfully",
                 "filename": file.filename,
                 "chunks_added": chunks_added,
             }
@@ -2330,7 +2330,7 @@ async def list_crawled_urls(
                 try:
                     dt = datetime.fromtimestamp(url["last_crawled"])
                     url["last_crawled_formatted"] = dt.strftime("%Y-%m-%d %H:%M:%S")
-                except:
+                except Exception:
                     url["last_crawled_formatted"] = "Unknown"
 
         logger.info(f"Admin {session.email} listed crawled URLs ({len(urls)} found)")
@@ -2595,7 +2595,7 @@ async def create_backup(
                         body_text=f"Backup creation failed: {str(e)}",
                         body_html=None,
                     )
-                except:
+                except Exception:
                     pass
 
         # Add to background tasks

@@ -7,9 +7,8 @@ Supports single URL and limited-depth crawling with clean content extraction.
 import hashlib
 import logging
 import time
-from pathlib import Path
 from typing import Dict, List, Optional, Set
-from urllib.parse import urljoin, urlparse, urlunparse, parse_qs, urlencode
+from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
 
 import requests
 import trafilatura
@@ -182,7 +181,7 @@ class WebCrawler:
             for chunk in response.iter_content(chunk_size=8192):
                 content += chunk
                 if len(content) > self.max_size_bytes:
-                    logger.error(f"Content exceeded size limit during download")
+                    logger.error("Content exceeded size limit during download")
                     return None
 
             html = content.decode(response.encoding or "utf-8", errors="replace")

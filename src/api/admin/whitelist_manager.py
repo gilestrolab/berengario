@@ -5,9 +5,9 @@ Handles reading, writing, and managing whitelist files while preserving comments
 """
 
 import logging
-from pathlib import Path
-from typing import List, Dict, Tuple
 import re
+from pathlib import Path
+from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 

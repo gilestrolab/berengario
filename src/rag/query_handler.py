@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Dict, Optional
 
 from src.rag.rag_engine import RAGEngine
-from src.rag.tools import set_tool_context, clear_tool_context
+from src.rag.tools import clear_tool_context, set_tool_context
 
 logger = logging.getLogger(__name__)
 

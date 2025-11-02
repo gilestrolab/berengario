@@ -5,11 +5,9 @@ Tests database connection management, session handling, and
 database operations for both SQLite and MariaDB backends.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-from sqlalchemy import create_engine
-from sqlalchemy.pool import StaticPool
+import pytest
 
 from src.email.db_manager import DatabaseManager
 from src.email.db_models import Base, ProcessedMessage

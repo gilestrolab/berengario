@@ -13,7 +13,7 @@ This module orchestrates:
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
 from imap_tools import MailMessage
 
@@ -21,16 +21,16 @@ from src.config import settings
 from src.document_processing.document_processor import DocumentProcessor
 from src.document_processing.kb_manager import KnowledgeBaseManager
 from src.email.attachment_handler import AttachmentHandler, AttachmentInfo
+from src.email.conversation_manager import (
+    ChannelType,
+    MessageType,
+    conversation_manager,
+)
 from src.email.email_client import EmailClient
 from src.email.email_parser import EmailMessage, EmailParser
 from src.email.email_sender import EmailSender, format_response_email
 from src.email.message_tracker import MessageTracker
 from src.email.whitelist_validator import WhitelistValidator
-from src.email.conversation_manager import (
-    conversation_manager,
-    ChannelType,
-    MessageType,
-)
 from src.rag.tools.pending_actions import get_pending_action_manager
 
 # Lazy imports to avoid circular dependency
@@ -387,8 +387,6 @@ class EmailProcessor:
                             )
 
                         # Process email body as text document
-                        from pathlib import Path
-
                         # Create descriptive filename
                         date_str = (
                             email.date.strftime("%Y-%m-%d")
@@ -1109,9 +1107,9 @@ If you believe you should have access, please contact the administrator at {sett
                         to_address=email.sender.email,
                         subject=subject_reply,
                         body_text=(
-                            f"Error: Could not find confirmation token in your email.\n\n"
-                            f"Please reply to the original confirmation email, or include the full confirmation token.\n\n"
-                            f"Example: Just reply to the confirmation email, or type: CONFIRM <your-token-here>"
+                            "Error: Could not find confirmation token in your email.\n\n"
+                            "Please reply to the original confirmation email, or include the full confirmation token.\n\n"
+                            "Example: Just reply to the confirmation email, or type: CONFIRM <your-token-here>"
                         ),
                         body_html=None,
                     )

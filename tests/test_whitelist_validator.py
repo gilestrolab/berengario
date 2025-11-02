@@ -4,10 +4,11 @@ Unit tests for email whitelist validator.
 Tests whitelist validation with domain wildcards and individual addresses.
 """
 
-import pytest
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from unittest.mock import patch
+
+import pytest
 
 from src.email.whitelist_validator import WhitelistValidator
 

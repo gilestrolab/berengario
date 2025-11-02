@@ -5,13 +5,14 @@ Provides functions to manage teach and query whitelists, restricted to admin use
 """
 
 import logging
-from typing import Any, Dict
 from pathlib import Path
+from typing import Any, Dict
 
-from .base import Tool, ToolParameter, ParameterType, register_tool
-from .pending_actions import get_pending_action_manager
 from src.config import settings
 from src.email.email_sender import EmailSender
+
+from .base import ParameterType, Tool, ToolParameter, register_tool
+from .pending_actions import get_pending_action_manager
 
 logger = logging.getLogger(__name__)
 

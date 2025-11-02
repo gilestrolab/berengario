@@ -5,11 +5,11 @@ Generates 2-sentence summaries of documents using LLM for display in the admin p
 """
 
 import logging
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
 
-from openai import OpenAI
 from llama_index.core.schema import TextNode
+from openai import OpenAI
 
 from src.config import settings
 from src.email.db_manager import db_manager

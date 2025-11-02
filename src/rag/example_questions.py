@@ -8,10 +8,9 @@ that users can ask based on the available knowledge base content.
 import json
 import logging
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 from src.rag.rag_engine import RAGEngine
-from src.config import settings
 
 logger = logging.getLogger(__name__)
 

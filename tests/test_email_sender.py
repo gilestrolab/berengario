@@ -6,7 +6,7 @@ Tests SMTP email sending, response formatting, and error handling.
 
 import smtplib
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, mock_open, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 

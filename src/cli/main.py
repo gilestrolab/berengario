@@ -4,14 +4,13 @@ RAGInbox CLI - Command-line interface for RAGInbox administration.
 Provides unified command-line access to knowledge base, database, and backup operations.
 """
 
-import sys
 import logging
-from typing import Optional
+import sys
 
 import typer
 from rich.console import Console
 
-from src.cli.commands import kb, db, backup
+from src.cli.commands import backup, db, kb
 from src.cli.utils import print_error, print_info
 from src.config import settings
 

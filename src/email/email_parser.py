@@ -14,7 +14,7 @@ This module provides parsing of email messages with support for:
 import logging
 import re
 from datetime import datetime
-from email.utils import parseaddr, parsedate_to_datetime
+from email.utils import parseaddr
 from typing import List, Optional, Tuple
 
 import html2text
@@ -342,10 +342,10 @@ class EmailParser:
                 # Check if this looks like a signature (followed by short lines or empty lines)
                 if i < len(lines) - 1:
                     remaining_lines = lines[i + 1 :]
-                    non_empty = [l for l in remaining_lines[:5] if l.strip()]
+                    non_empty = [line for line in remaining_lines[:5] if line.strip()]
                     # If most remaining lines are short (< 50 chars), likely a signature
                     if len(non_empty) <= 3 or all(
-                        len(l.strip()) < 50 for l in non_empty[:3]
+                        len(line.strip()) < 50 for line in non_empty[:3]
                     ):
                         sig_start = i
                         break

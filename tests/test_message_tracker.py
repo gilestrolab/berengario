@@ -4,13 +4,14 @@ Unit tests for message tracker.
 Tests the message tracking interface for email processing.
 """
 
-import pytest
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
-from src.email.message_tracker import MessageTracker
+import pytest
+
 from src.email.db_manager import DatabaseManager
-from src.email.db_models import ProcessedMessage, ProcessingStats
+from src.email.db_models import ProcessedMessage
+from src.email.message_tracker import MessageTracker
 
 
 @pytest.fixture
