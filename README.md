@@ -8,7 +8,7 @@ RAGInbox is a flexible infrastructure that combines document processing, vector 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/gilestrolab/RAGInbox/workflows/CI/badge.svg)](https://github.com/gilestrolab/RAGInbox/actions/workflows/ci.yml)
 [![Docker Build](https://github.com/gilestrolab/RAGInbox/workflows/Docker%20Build/badge.svg)](https://github.com/gilestrolab/RAGInbox/actions/workflows/docker.yml)
-[![codecov](https://codecov.io/gh/gilestrolab/RAGInbox/branch/main/graph/badge.svg)](https://codecov.io/gh/gilestrolab/RAGInbox)
+[![codecov](https://codecov.io/gh/gilestrolab/RAGInbox/branch/master/graph/badge.svg)](https://codecov.io/gh/gilestrolab/RAGInbox)
 
 ## Features
 
