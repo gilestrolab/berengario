@@ -155,15 +155,77 @@ class DocumentProcessor:
             file_path: Path to CSV file.
 
         Returns:
-            CSV content formatted as text.
+            CSV content formatted as text optimized for semantic search.
 
         Raises:
             Exception: If CSV reading fails.
         """
         try:
+            # Try reading with headers first
             df = pd.read_csv(file_path)
-            # Convert DataFrame to a readable text format
-            return df.to_string(index=False)
+
+            # Check if the file likely has no real headers (too many unnamed columns)
+            unnamed_cols = [col for col in df.columns if 'Unnamed' in str(col)]
+            if len(unnamed_cols) > len(df.columns) / 2:
+                # Re-read without treating first row as header
+                df = pd.read_csv(file_path, header=None)
+                has_headers = False
+            else:
+                has_headers = True
+
+            # Convert DataFrame to a semantic-search-friendly format
+            lines = []
+
+            # Add filename as context
+            lines.append(f"Document: {file_path.name}")
+            lines.append("")
+
+            if has_headers:
+                # Format with column names for each row
+                for idx, row in df.iterrows():
+                    # Skip completely empty rows
+                    if row.isna().all():
+                        lines.append("")
+                        continue
+
+                    row_lines = []
+                    for col_name, value in row.items():
+                        if pd.notna(value) and str(value).strip():
+                            row_lines.append(f"{col_name}: {value}")
+
+                    if row_lines:
+                        lines.extend(row_lines)
+                        lines.append("")  # Empty line between rows
+            else:
+                # Format as simple rows (for CSVs without headers)
+                for idx, row in df.iterrows():
+                    # Skip rows with only empty/zero values
+                    row_values = [str(val) for val in row if pd.notna(val) and str(val).strip() and str(val) != '0']
+
+                    if not row_values:
+                        lines.append("")  # Preserve spacing for term breaks
+                        continue
+
+                    # Check if first column looks like a section header (contains month/term)
+                    first_val = str(row[0]).strip() if pd.notna(row[0]) else ""
+
+                    if len(row_values) == 1 or 'term' in first_val.lower():
+                        # Section header
+                        lines.append(first_val)
+                        lines.append("")
+                    else:
+                        # Regular data row - format as "Date: Event [Notes]"
+                        date_col = first_val
+                        event_col = str(row[1]).strip() if len(row) > 1 and pd.notna(row[1]) else ""
+                        notes_col = str(row[2]).strip() if len(row) > 2 and pd.notna(row[2]) else ""
+
+                        if event_col:
+                            line = f"Date: {date_col} - Event: {event_col}"
+                            if notes_col:
+                                line += f" - Notes: {notes_col}"
+                            lines.append(line)
+
+            return "\n".join(lines)
         except Exception as e:
             logger.error(f"Error reading CSV file {file_path}: {e}")
             raise

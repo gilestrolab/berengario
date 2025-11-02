@@ -276,11 +276,73 @@ class EmailParser:
             logger.error(f"Error converting HTML to text: {e}")
             return ""
 
+    def strip_signature(self, text: str) -> str:
+        """
+        Remove email signature from body text.
+
+        Detects and removes common signature patterns:
+        - Standard signature delimiter (-- )
+        - "Sent from..." lines
+        - Common closing phrases followed by contact info
+
+        Args:
+            text: Email body text
+
+        Returns:
+            Text with signature removed.
+        """
+        if not text:
+            return text
+
+        lines = text.split('\n')
+
+        # Find signature start position
+        sig_start = None
+
+        for i, line in enumerate(lines):
+            line_stripped = line.strip()
+
+            # Standard signature delimiter
+            if line_stripped == '--' or line_stripped == '-- ':
+                sig_start = i
+                break
+
+            # "Sent from..." patterns
+            if line_stripped.lower().startswith(('sent from', 'get outlook for', 'download')):
+                sig_start = i
+                break
+
+            # Common signature starters (must be followed by mostly empty or short lines)
+            signature_starters = [
+                'best regards', 'best', 'regards', 'cheers', 'thanks', 'thank you',
+                'sincerely', 'yours', 'kind regards', 'warm regards', 'cordially',
+                'respectfully', 'with appreciation', 'many thanks'
+            ]
+
+            if any(line_stripped.lower().startswith(starter) for starter in signature_starters):
+                # Check if this looks like a signature (followed by short lines or empty lines)
+                if i < len(lines) - 1:
+                    remaining_lines = lines[i+1:]
+                    non_empty = [l for l in remaining_lines[:5] if l.strip()]
+                    # If most remaining lines are short (< 50 chars), likely a signature
+                    if len(non_empty) <= 3 or all(len(l.strip()) < 50 for l in non_empty[:3]):
+                        sig_start = i
+                        break
+
+        # Return text before signature
+        if sig_start is not None:
+            body_without_sig = '\n'.join(lines[:sig_start]).strip()
+            logger.debug(f"Stripped signature starting at line {sig_start}")
+            return body_without_sig
+
+        return text
+
     def extract_body(self, message: MailMessage) -> Tuple[str, str]:
         """
         Extract body text and HTML from message.
 
         Prefers text/plain, falls back to text/html with conversion.
+        Automatically strips email signatures from body text.
 
         Args:
             message: MailMessage object from imap-tools
@@ -304,6 +366,10 @@ class EmailParser:
             if not body_text and body_html:
                 body_text = self.html_to_text(body_html)
                 logger.debug("Converted HTML to text for body")
+
+            # Strip signature from body text
+            if body_text:
+                body_text = self.strip_signature(body_text)
 
         except Exception as e:
             logger.error(f"Error extracting body: {e}")

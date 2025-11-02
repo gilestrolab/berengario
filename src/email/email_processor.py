@@ -299,6 +299,11 @@ class EmailProcessor:
         Process email for knowledge base ingestion.
 
         Extracts attachments, processes them into text chunks, and adds to KB.
+        Implements hash-based deduplication to prevent reingesting identical content:
+        - Computes SHA-256 hash of each attachment and email body
+        - Checks if hash already exists in knowledge base
+        - Skips processing if document already exists
+        - Sends acknowledgment email including duplicate count
 
         Args:
             email: Parsed EmailMessage
@@ -310,6 +315,7 @@ class EmailProcessor:
         message_id = email.message_id
         attachments_processed = 0
         chunks_created = 0
+        duplicates_skipped = 0
         processed_files: List[AttachmentInfo] = []
 
         try:
@@ -338,6 +344,34 @@ class EmailProcessor:
                         )
                         temp_file.write(body_text)
                         temp_file.close()
+
+                        # Check if email body content already exists in KB
+                        body_file_path = Path(temp_file.name)
+                        body_hash = self.doc_processor.compute_file_hash(body_file_path)
+
+                        if self.kb_manager.document_exists(body_hash):
+                            logger.info(
+                                f"Email body content from {email.sender.email} already in KB (hash: {body_hash[:8]}...)"
+                            )
+                            # Clean up temp file
+                            body_file_path.unlink(missing_ok=True)
+
+                            self.message_tracker.mark_processed(
+                                message_id=message_id,
+                                sender=email.sender.email,
+                                subject=email.subject,
+                                status="success",
+                                attachment_count=0,
+                                chunks_created=0,
+                            )
+
+                            return ProcessingResult(
+                                message_id=message_id,
+                                success=True,
+                                action="kb_ingestion",
+                                attachments_processed=0,
+                                chunks_created=0,
+                            )
 
                         # Process email body as text document
                         from pathlib import Path
@@ -428,8 +462,9 @@ class EmailProcessor:
                     file_hash = self.doc_processor.compute_file_hash(attachment.filepath)
                     if self.kb_manager.document_exists(file_hash):
                         logger.info(
-                            f"Document {attachment.filename} already in KB (hash: {file_hash[:8]}...)"
+                            f"Document {attachment.filename} already in KB (hash: {file_hash[:8]}...), skipping"
                         )
+                        duplicates_skipped += 1
                         continue
 
                     # Process document into text nodes
@@ -477,12 +512,13 @@ class EmailProcessor:
 
             logger.info(
                 f"KB ingestion complete: {attachments_processed}/{len(attachments)} "
-                f"attachments, {chunks_created} chunks"
+                f"attachments processed, {chunks_created} chunks created, "
+                f"{duplicates_skipped} duplicates skipped"
             )
 
             # Send acknowledgment email to the contributor
-            if chunks_created > 0:
-                self._send_kb_acknowledgment(email, attachments_processed, chunks_created)
+            if chunks_created > 0 or duplicates_skipped > 0:
+                self._send_kb_acknowledgment(email, attachments_processed, chunks_created, duplicates_skipped)
 
             return ProcessingResult(
                 message_id=message_id,
@@ -730,7 +766,8 @@ class EmailProcessor:
         self,
         email: EmailMessage,
         attachments_processed: int,
-        chunks_created: int
+        chunks_created: int,
+        duplicates_skipped: int = 0
     ) -> None:
         """
         Send acknowledgment email after successful KB ingestion.
@@ -739,6 +776,7 @@ class EmailProcessor:
             email: Original EmailMessage that was processed
             attachments_processed: Number of attachments successfully added
             chunks_created: Number of text chunks created
+            duplicates_skipped: Number of duplicate documents skipped
         """
         try:
             # Format summary of what was added
@@ -747,17 +785,24 @@ class EmailProcessor:
             else:
                 content_summary = "email content"
 
+            # Build duplicate info section
+            duplicate_text = ""
+            duplicate_html = ""
+            if duplicates_skipped > 0:
+                duplicate_text = f"\n- Duplicates skipped: {duplicates_skipped} (already in knowledge base)"
+                duplicate_html = f"\n<li><strong>Duplicates skipped:</strong> {duplicates_skipped} (already in knowledge base)</li>"
+
             # Build acknowledgment message
             subject = f"Re: {email.subject}"
 
             body_text = f"""Thank you for contributing to the {settings.instance_name} knowledge base.
 
-The following material has been successfully added:
+The following material has been successfully processed:
 - Source: {content_summary}
 - Text chunks created: {chunks_created}
-- Received from: {email.sender.email}
+- Received from: {email.sender.email}{duplicate_text}
 
-This content is now available for queries from authorized users.
+{"This content is now available for queries from authorized users." if chunks_created > 0 else "Note: All documents were already present in the knowledge base."}
 
 ---
 {settings.instance_name}
@@ -765,14 +810,14 @@ This content is now available for queries from authorized users.
 
             body_html = f"""<p>Thank you for contributing to the <strong>{settings.instance_name}</strong> knowledge base.</p>
 
-<p>The following material has been successfully added:</p>
+<p>The following material has been successfully processed:</p>
 <ul>
 <li><strong>Source:</strong> {content_summary}</li>
 <li><strong>Text chunks created:</strong> {chunks_created}</li>
-<li><strong>Received from:</strong> {email.sender.email}</li>
+<li><strong>Received from:</strong> {email.sender.email}</li>{duplicate_html}
 </ul>
 
-<p>This content is now available for queries from authorized users.</p>
+<p>{"This content is now available for queries from authorized users." if chunks_created > 0 else "Note: All documents were already present in the knowledge base."}</p>
 
 <hr>
 <p><em>{settings.instance_name}</em><br>

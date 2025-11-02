@@ -387,3 +387,80 @@ def regenerate_descriptions(
 
     except Exception as e:
         handle_error(e, "regenerating descriptions")
+
+
+@app.command("query")
+def query_kb(
+    query: str = typer.Argument(..., help="Question to ask the knowledge base"),
+    show_sources: bool = typer.Option(True, "--sources/--no-sources", help="Show source documents"),
+    top_k: int = typer.Option(5, "--top-k", "-k", help="Number of sources to retrieve"),
+):
+    """
+    Query the knowledge base with a question.
+
+    Example:
+        raginbox-cli kb query "When is the FYP examination week?"
+    """
+    try:
+        from src.rag.query_handler import QueryHandler
+
+        print_header("Knowledge Base Query")
+        console.print(f"[bold]Question:[/bold] {query}")
+        console.print()
+
+        # Create query handler
+        handler = QueryHandler()
+
+        # Process query
+        with console.status("[bold cyan]Searching knowledge base...", spinner="dots"):
+            result = handler.process_query(
+                query_text=query,
+                user_email="cli@localhost",
+                context={"top_k": top_k}
+            )
+
+        if not result["success"]:
+            print_error(f"Query failed: {result.get('error', 'Unknown error')}")
+            raise typer.Exit(1)
+
+        # Display response
+        console.print()
+        console.print("[bold cyan]Response:[/bold cyan]")
+        console.print()
+        console.print(result["response"])
+        console.print()
+
+        # Display sources if requested
+        if show_sources and result.get("sources"):
+            console.print("[bold cyan]Sources:[/bold cyan]")
+            console.print()
+
+            for i, source in enumerate(result["sources"], 1):
+                filename = source.get("filename", "Unknown")
+                score = source.get("score", 0)
+
+                console.print(f"[bold]{i}. {filename}[/bold] (relevance: {score:.3f})")
+
+                # Show metadata if available
+                metadata = source.get("metadata", {})
+                if metadata:
+                    if metadata.get("sender"):
+                        console.print(f"   From: {metadata['sender']}")
+                    if metadata.get("subject"):
+                        console.print(f"   Subject: {metadata['subject']}")
+                    if metadata.get("date"):
+                        console.print(f"   Date: {metadata['date']}")
+
+                # Show text excerpt
+                text = source.get("content", "")
+                if text:
+                    # Truncate long excerpts
+                    excerpt = text[:300] + "..." if len(text) > 300 else text
+                    console.print(f"   [dim]{excerpt}[/dim]")
+
+                console.print()
+
+        print_success("Query complete")
+
+    except Exception as e:
+        handle_error(e, "querying knowledge base")

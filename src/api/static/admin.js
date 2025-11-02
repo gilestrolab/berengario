@@ -362,6 +362,12 @@ class AdminPanel {
             // Get description if available
             const description = this.descriptions && this.descriptions[doc.filename];
             const hasDescription = description && description.description;
+            const descriptionText = hasDescription ? this.escapeHtml(description.description) : '';
+
+            // Info button - only show if description exists
+            const infoButton = hasDescription ? `
+                <button class="btn-info" onclick="adminPanel.toggleDescriptionForDoc(this)" title="Show/hide description">ℹ️</button>
+            ` : '';
 
             const downloadButton = canDownload ? `
                 <button class="btn-download" onclick="adminPanel.downloadDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')" title="Download">
@@ -378,7 +384,11 @@ class AdminPanel {
             return `
                 <div class="document-item">
                     <div class="document-info">
-                        <div class="filename" title="${this.escapeHtml(displayName)}">${this.escapeHtml(displayName)}</div>
+                        <div class="filename-row">
+                            <div class="filename" title="${this.escapeHtml(displayName)}">${this.escapeHtml(displayName)}</div>
+                            ${infoButton}
+                        </div>
+                        ${hasDescription ? `<div class="document-description">${descriptionText}</div>` : ''}
                     </div>
                     <div class="document-actions">
                         ${viewButton}
@@ -941,21 +951,26 @@ class AdminPanel {
         }
     }
 
-    toggleDescription(button) {
-        const descriptionContent = button.parentElement.querySelector('.description-content');
-        const toggleIcon = button.querySelector('.toggle-icon');
-        const toggleText = button.querySelector('.toggle-text');
+    toggleDescriptionForDoc(button) {
+        // Find the document-info container
+        const documentInfo = button.closest('.document-info');
+        if (!documentInfo) return;
 
-        if (descriptionContent.style.display === 'none') {
-            // Show description
-            descriptionContent.style.display = 'block';
-            toggleIcon.textContent = '▼';
-            toggleText.textContent = 'Hide Description';
-        } else {
+        // Find the description div
+        const descriptionDiv = documentInfo.querySelector('.document-description');
+        if (!descriptionDiv) return;
+
+        // Toggle visibility
+        if (descriptionDiv.classList.contains('visible')) {
             // Hide description
-            descriptionContent.style.display = 'none';
-            toggleIcon.textContent = '▶';
-            toggleText.textContent = 'Show Description';
+            descriptionDiv.classList.remove('visible');
+            button.classList.remove('active');
+            button.title = 'Show description';
+        } else {
+            // Show description
+            descriptionDiv.classList.add('visible');
+            button.classList.add('active');
+            button.title = 'Hide description';
         }
     }
 
