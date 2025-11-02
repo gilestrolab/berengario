@@ -22,7 +22,9 @@ data/
 │   ├── chroma.sqlite3     # Metadata and index
 │   └── {collection_id}/   # Vector embeddings (binary)
 ├── config/                # Configuration files
-│   └── allowed_senders.txt # Email whitelist
+│   ├── allowed_teachers.txt # Teaching whitelist
+│   ├── allowed_queriers.txt # Query whitelist
+│   └── allowed_admins.txt   # Admin whitelist
 ├── logs/                  # Application logs
 │   └── dols_gpt.log       # Main log file
 ├── temp_attachments/      # Temporary email attachments (ephemeral)
@@ -84,12 +86,21 @@ CHROMA_DB_PATH=data/chroma_db
 **Purpose**: Configuration files for runtime behavior
 
 **Contents**:
-- `allowed_senders.txt`: Email whitelist (one address/domain per line)
+- `allowed_teachers.txt`: Email whitelist for KB contributions (teaching permission)
+- `allowed_queriers.txt`: Email whitelist for RAG queries (query permission)
+- `allowed_admins.txt`: Email whitelist for admin panel access (admin permission)
+- `custom_prompt.txt` (optional): Custom system prompt additions
+- `email_footer.txt` (optional): Custom email footer
 
 **Usage**:
-- Define which email addresses can contribute to KB
+- **Dual Whitelist System**: Separate permissions for teaching vs querying
+  - **Teachers**: Can add content to KB via CC'd/BCC'd/forwarded emails
+  - **Queriers**: Can send direct questions and receive RAG-powered replies
+  - **Admins**: Have full access (can teach, query, and access admin panel)
+- **Hierarchical**: Admins can do everything teachers can; teachers can query
 - Supports domain wildcards (e.g., `@imperial.ac.uk`)
 - Comments start with `#`
+- One address/domain per line
 
 **Size**: Very small (<10KB typically)
 
@@ -103,8 +114,20 @@ volumes:
 
 **Configuration**:
 ```bash
-EMAIL_WHITELIST_FILE=data/config/allowed_senders.txt
+# Teaching whitelist (who can add content to KB)
+EMAIL_TEACH_WHITELIST_FILE=data/config/allowed_teachers.txt
+EMAIL_TEACH_WHITELIST_ENABLED=true
+
+# Query whitelist (who can ask questions)
+EMAIL_QUERY_WHITELIST_FILE=data/config/allowed_queriers.txt
+EMAIL_QUERY_WHITELIST_ENABLED=true
+
+# Admin whitelist (who can access admin panel)
+EMAIL_ADMIN_WHITELIST_FILE=data/config/allowed_admins.txt
+EMAIL_ADMIN_WHITELIST_ENABLED=true
 ```
+
+**See Also**: `docs/EMAIL_PROCESSING_RULES.md` for detailed whitelist validation logic
 
 ---
 
@@ -239,7 +262,7 @@ volumes:
 - ✅ `data/documents/` - Source documents
 
 ### Optional (Nice to Have)
-- ⚠️ Configuration files (`.env`, `data/config/allowed_senders.txt`, `data/logs/`)
+- ⚠️ Configuration files (`.env`, `data/config/allowed_*.txt`, `data/logs/`)
 
 ### Not Required
 - ❌ `data/temp_attachments/` - Temporary files (auto-deleted)

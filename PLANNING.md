@@ -55,9 +55,12 @@ RAGInbox is a configurable RAG (Retrieval-Augmented Generation) infrastructure d
 
 ```
 RAGInbox/
-├── Documents/                      # Source documents for KB
 ├── data/
-│   └── chroma_db/                 # Vector database storage
+│   ├── documents/                 # Source documents for KB
+│   ├── chroma_db/                 # Vector database storage
+│   ├── config/                    # Configuration files (whitelists, custom prompts)
+│   ├── logs/                      # Application logs
+│   └── temp_attachments/          # Temporary email attachments
 ├── src/
 │   ├── __init__.py
 │   ├── config.py                  # Configuration management
@@ -65,7 +68,7 @@ RAGInbox/
 │   ├── document_processing/
 │   │   ├── __init__.py
 │   │   ├── document_processor.py  # Document parsing and chunking
-│   │   ├── file_watcher.py        # Monitor Documents folder
+│   │   ├── file_watcher.py        # Monitor data/documents folder
 │   │   └── kb_manager.py          # Vector DB operations
 │   ├── email/                     # Phase 2
 │   │   ├── __init__.py
@@ -145,7 +148,7 @@ RAGInbox/
 
 ## Development Workflow
 
-### Phase 1: Core RAG Setup (Current)
+### Phase 1: Core RAG Setup ✅ (Complete)
 1. Project structure setup
 2. Configuration management
 3. Document processor implementation
@@ -153,7 +156,7 @@ RAGInbox/
 5. Basic query engine
 6. Unit tests
 
-### Phase 2: Email Inbox Integration (Current)
+### Phase 2: Email Inbox Integration ✅ (Complete)
 1. **IMAP Client Implementation**
    - Connect to IMAP server with SSL/TLS
    - Authenticate using credentials from .env
@@ -204,27 +207,33 @@ RAGInbox/
    - Test message tracking
    - Integration tests with document processor
 
-### Phase 3: Email Response
+### Phase 3: Email Response ✅ (Complete)
 1. Query detection and routing
 2. RAG query integration
-3. Response generation
-4. SMTP email sending
-5. Logging and monitoring
-6. Unit tests
+3. Response generation with HTML/markdown/text formatting
+4. SMTP email sending with TLS
+5. Conversation threading support
+6. Logging and monitoring
+7. Unit tests
 
-### Phase 4: Web Frontend
+### Phase 4: Web Frontend ✅ (Complete)
 1. FastAPI endpoints
-2. Chat interface UI
-3. Session management
-4. Response streaming (optional)
-5. Frontend tests
+2. Chat interface UI (mobile-responsive)
+3. OTP-based passwordless authentication
+4. Session management with configurable timeout
+5. Source citations and attachments display
+6. Conversation history persistence
+7. Admin panel (whitelist management, document browser, backups)
+8. Frontend tests
 
-### Phase 5: Docker & Deployment
-1. Dockerfile creation
+### Phase 5: Docker & Deployment ✅ (Complete)
+1. Dockerfile creation (multi-stage build)
 2. Docker Compose configuration
 3. Environment setup
 4. Volume management
-5. Service orchestration
+5. Multi-platform builds (amd64, arm64)
+6. CI/CD with GitHub Actions
+7. GitHub Container Registry publishing
 
 ## Code Style & Conventions
 
@@ -270,12 +279,30 @@ All configuration via environment variables in `.env` file:
 - `CHUNK_SIZE`, `CHUNK_OVERLAP`: Document chunking parameters
 - `TOP_K_RETRIEVAL`: Number of documents to retrieve for context
 
-### Email Configuration (Phase 2)
-- `IMAP_SERVER`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASSWORD`: Email inbox (IMAP)
-- `SMTP_SERVER`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`: Email sending (SMTP)
+### Email Configuration (Phase 2-3)
+- `IMAP_SERVER`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASSWORD`, `IMAP_USE_SSL`: Email inbox (IMAP)
+- `SMTP_SERVER`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_USE_TLS`: Email sending (SMTP)
 - `EMAIL_CHECK_INTERVAL`: Polling frequency (seconds)
 - `EMAIL_TARGET_ADDRESS`: Target email address for this instance
 - `EMAIL_DISPLAY_NAME`: Display name in email responses
+- `FORWARD_TO_KB_ENABLED`, `FORWARD_SUBJECT_PREFIXES`: Forwarded email detection
+
+### Whitelist Configuration (Dual Permission System)
+- `EMAIL_TEACH_WHITELIST_FILE`, `EMAIL_TEACH_WHITELIST_ENABLED`: Who can add to KB
+- `EMAIL_QUERY_WHITELIST_FILE`, `EMAIL_QUERY_WHITELIST_ENABLED`: Who can query KB
+- `EMAIL_ADMIN_WHITELIST_FILE`, `EMAIL_ADMIN_WHITELIST_ENABLED`: Who can access admin panel
+- Hierarchical: Admins > Teachers > Queriers
+
+### Web Interface Configuration (Phase 4)
+- `API_HOST`, `API_PORT`, `API_RELOAD`: FastAPI server settings
+- `CORS_ORIGINS`: Allowed CORS origins
+- `WEB_SESSION_TIMEOUT`: Session timeout in seconds
+- `DISABLE_OTP_FOR_DEV`: Disable OTP authentication for development (security warning)
+
+### RAG Customization
+- `RAG_CUSTOM_PROMPT_FILE`: Path to custom system prompt additions
+- `EMAIL_RESPONSE_FORMAT`: Email format (html/markdown/text)
+- `EMAIL_CUSTOM_FOOTER_FILE`: Path to custom email footer
 
 ## Example Instance Deployments
 

@@ -1,5 +1,9 @@
 # Phase 2: Email Inbox Integration - Implementation Plan
 
+> **📜 HISTORICAL DOCUMENT**: This was the planning document for Phase 2 implementation.
+> **Status**: Phase 2 is now complete (as of 2025-10-29).
+> **Current Documentation**: See [EMAIL_PROCESSING_RULES.md](EMAIL_PROCESSING_RULES.md) and [README.md](../README.md) for current system behavior.
+
 ## Overview
 
 Phase 2 adds email inbox monitoring to RAGInbox, enabling automatic knowledge base updates from CC'd emails with attachments. This allows instances to receive documents via email instead of manual uploads.

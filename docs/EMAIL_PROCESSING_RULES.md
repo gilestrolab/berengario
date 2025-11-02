@@ -97,50 +97,78 @@ Subject: Fwd: Department meeting notes
 └────────────┬────────────────────┘
              │
              ▼
-    ┌────────────────────┐
-    │ Is sender          │
-    │ whitelisted?       │
-    └────┬───────────┬───┘
-         │ No        │ Yes
-         ▼           ▼
-    ┌─────────┐  ┌──────────────────┐
-    │ Reject  │  │ Check recipient  │
-    │         │  │ field            │
-    └─────────┘  └────┬─────────┬───┘
-                      │         │
-                 To: bot?    CC/BCC?
-                      │         │
-                      ▼         ▼
-              ┌──────────────────┐  ┌──────────────┐
-              │ Forwarded email? │  │ KB INGESTION │
-              │ (Fw:, Fwd:, etc) │  │    MODE      │
-              └─────┬───────┬────┘  └──────────────┘
-                    │ Yes   │ No           │
-                    ▼       ▼              ▼
-           ┌──────────────┐ ┌──────────┐  Add to vector DB
-           │ KB INGESTION │ │  QUERY   │  (body + attachments)
-           │    MODE      │ │  MODE    │
-           └──────────────┘ └──────────┘
-                    │            │
-                    ▼            ▼
-           Add to vector DB  Send reply
-           (body + attachments) using RAG
+    ┌────────────────────────┐
+    │ Check recipient field  │
+    └─────┬────────┬─────────┘
+          │        │
+     To: bot?   CC/BCC?
+          │        │
+          ▼        ▼
+  ┌───────────────────────┐  ┌────────────────────────┐
+  │ Forwarded email?      │  │ Check TEACH whitelist  │
+  │ (Fw:, Fwd:, etc)      │  │ (allowed_teachers.txt) │
+  └────┬────────┬─────────┘  └────┬───────────┬───────┘
+       │ Yes    │ No              │ Yes       │ No
+       ▼        ▼                 ▼           ▼
+  ┌──────────┐ ┌──────────────┐  │      ┌─────────┐
+  │ Check    │ │ Check QUERY  │  │      │ Reject  │
+  │ TEACH    │ │  whitelist   │  │      └─────────┘
+  │whitelist │ │ (allowed_    │  │
+  └──┬───┬───┘ │ queriers.txt)│  │
+     │Yes│No   └─┬────────┬───┘  │
+     ▼   ▼      │ Yes    │ No    ▼
+  ┌────┐┌────┐  ▼        ▼    ┌──────────────┐
+  │ KB ││Rej.│┌────┐┌────────┐│ KB INGESTION │
+  │ING.││    ││QRY ││ Reject ││    MODE      │
+  └────┘└────┘│MODE││        │└──────┬───────┘
+              └──┬─┘└────────┘       │
+                 │                   │
+                 ▼                   ▼
+          Send RAG reply    Add to vector DB
+                            (body + attachments)
 ```
+
+**Key Points**:
+- **Two separate whitelist checks**: Teaching whitelist for KB ingestion, Query whitelist for queries
+- **Hierarchical**: Admins and teachers can also query (parent validator pattern)
+- **Forwarded emails** (To: bot) check teaching whitelist, not query whitelist
+- **CC/BCC emails** always check teaching whitelist
 
 ---
 
 ## Whitelist Security
 
-### Who Needs to be Whitelisted?
+### Dual Whitelist System
 
-- **For queries (To: bot)**: No whitelist required
-- **For KB ingestion (CC/BCC/Fwd)**: Sender must be whitelisted
+RAGInbox uses **three separate whitelists** with hierarchical permissions:
+
+1. **Teaching Whitelist** (`allowed_teachers.txt`)
+   - Controls who can add content to the knowledge base
+   - Required for: CC'd, BCC'd, and forwarded emails
+   - Prevents unauthorized KB pollution
+
+2. **Query Whitelist** (`allowed_queriers.txt`)
+   - Controls who can ask questions and receive RAG replies
+   - Required for: Direct emails (To: bot)
+   - Optional: can be disabled for public access
+
+3. **Admin Whitelist** (`allowed_admins.txt`)
+   - Controls who can access the admin panel
+   - Full permissions: can teach, query, and manage system
+
+**Hierarchical Permissions**:
+- **Admins** can do everything (teach + query + admin panel)
+- **Teachers** can teach and query
+- **Queriers** can only query
 
 ### Whitelist Configuration
 
-**File**: `data/config/allowed_senders.txt`
+**Files**:
+- `data/config/allowed_teachers.txt` - Teaching permission
+- `data/config/allowed_queriers.txt` - Query permission
+- `data/config/allowed_admins.txt` - Admin permission
 
-**Syntax**:
+**Syntax** (same for all files):
 ```
 # Individual addresses
 alice@imperial.ac.uk
@@ -149,12 +177,16 @@ bob@imperial.ac.uk
 # Domain wildcards (all users from domain)
 @imperial.ac.uk
 @ic.ac.uk
+
+# Comments start with #
+# One address/domain per line
 ```
 
-**Why whitelist?**
-- Prevents unauthorized users from polluting the knowledge base
-- Ensures KB content comes from trusted sources
-- Queries from anyone are fine (they just get RAG responses)
+**Why dual whitelists?**
+- **Separate concerns**: Teaching vs querying are different permissions
+- **Flexible access control**: Public can query, only staff can teach
+- **Security**: Prevents unauthorized KB pollution while allowing queries
+- **Scalability**: Teachers automatically get query access
 
 ---
 
@@ -297,7 +329,7 @@ All 47 email parser tests passing ✓
 A: If the bot appears in `To:`, it's treated as a query (unless it's a forwarded email). Other recipients are irrelevant.
 
 **Q: Can I query the bot if I'm not whitelisted?**
-A: Yes! Queries (To: bot) don't require whitelist. Only KB contributions do.
+A: Depends on the query whitelist setting. If `EMAIL_QUERY_WHITELIST_ENABLED=false`, anyone can query. If enabled, only whitelisted queriers can. KB contributions always require the teaching whitelist.
 
 **Q: What happens to forwarded emails sent To: the bot?**
 A: If forwarded detection is enabled (default), they're added to KB instead of triggering a reply. The subject is checked for prefixes like "Fw:" or "Fwd:".
@@ -337,9 +369,18 @@ EMAIL_CHECK_INTERVAL=300  # seconds
 FORWARD_TO_KB_ENABLED=true  # Treat forwarded emails as KB content
 FORWARD_SUBJECT_PREFIXES=fw,fwd  # Customize for your language
 
-# Whitelist
-EMAIL_WHITELIST_ENABLED=true
-EMAIL_WHITELIST_FILE=data/config/allowed_senders.txt
+# Dual Whitelist System
+# Teaching whitelist (who can add content to KB)
+EMAIL_TEACH_WHITELIST_FILE=data/config/allowed_teachers.txt
+EMAIL_TEACH_WHITELIST_ENABLED=true
+
+# Query whitelist (who can ask questions)
+EMAIL_QUERY_WHITELIST_FILE=data/config/allowed_queriers.txt
+EMAIL_QUERY_WHITELIST_ENABLED=true
+
+# Admin whitelist (who can access admin panel)
+EMAIL_ADMIN_WHITELIST_FILE=data/config/allowed_admins.txt
+EMAIL_ADMIN_WHITELIST_ENABLED=true
 ```
 
 **See also**:

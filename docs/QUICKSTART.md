@@ -33,7 +33,7 @@ OPENAI_API_KEY=your-key-here
 
 ### Process Documents
 
-Add documents to `Documents/` folder, then:
+Add documents to `data/documents/` folder, then:
 
 ```bash
 raginbox --mode process
@@ -83,12 +83,12 @@ cat .env | grep OPENAI_API_KEY
 ### No documents found
 ```bash
 # Check documents path
-ls Documents/
+ls data/documents/
 ```
 
 ## Next Steps
 
-1. **Add your documents** to `Documents/` folder
+1. **Add your documents** to `data/documents/` folder
 2. **Process them**: `raginbox --mode process`
 3. **Start querying**: `raginbox --mode query --query "..."`
 
