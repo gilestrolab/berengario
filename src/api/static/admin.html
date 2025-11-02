@@ -720,6 +720,466 @@
         #upload-status .upload-file-processing {
             color: var(--primary, #007bff);
         }
+
+        /* ====================================
+           MOBILE RESPONSIVE STYLES
+           ==================================== */
+
+        /* Tablets (768px and below) */
+        @media (max-width: 768px) {
+            .admin-container {
+                padding: 0 1rem 3rem 1rem;
+                margin: 1rem auto;
+            }
+
+            .admin-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .admin-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .admin-header .back-link {
+                width: 100%;
+                text-align: center;
+            }
+
+            /* Tabs - Horizontal scrolling */
+            .tabs {
+                overflow-x: auto;
+                overflow-y: hidden;
+                flex-wrap: nowrap;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: thin;
+            }
+
+            .tab {
+                padding: 0.875rem 1.5rem;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+
+            /* Whitelist controls - stack on mobile */
+            .whitelist-controls {
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+
+            .whitelist-controls input {
+                width: 100%;
+            }
+
+            .whitelist-controls button {
+                width: 100%;
+            }
+
+            /* Document items - better touch targets */
+            .document-item {
+                padding: 0.75rem;
+            }
+
+            .document-actions {
+                margin-left: 0.5rem;
+            }
+
+            .document-actions button {
+                width: 32px;
+                height: 32px;
+                font-size: 1.1rem;
+            }
+
+            /* Modal - more space on mobile */
+            .modal-content {
+                margin: 1rem;
+                padding: 1.5rem;
+                max-height: 85vh;
+            }
+
+            .modal-header h2 {
+                font-size: 1.25rem;
+            }
+
+            /* Model info grid - single column */
+            .model-info {
+                grid-template-columns: 1fr;
+            }
+
+            /* Upload controls - stack vertically */
+            .upload-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .upload-controls input[type="url"] {
+                width: 100% !important;
+            }
+
+            .upload-controls select {
+                width: 100% !important;
+            }
+
+            /* Backup items - stack info and actions */
+            .backup-item {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+
+            .backup-actions {
+                width: 100%;
+                justify-content: stretch;
+            }
+
+            .backup-actions button {
+                flex: 1;
+            }
+        }
+
+        /* Large Phones (640px and below) */
+        @media (max-width: 640px) {
+            .admin-container {
+                padding: 0 0.875rem 2.5rem 0.875rem;
+                margin: 0.875rem auto;
+            }
+
+            .admin-header h1 {
+                font-size: 1.375rem;
+            }
+
+            .tab {
+                padding: 0.75rem 1.25rem;
+                font-size: 0.9375rem;
+            }
+
+            /* Section headers more compact */
+            .whitelist-section h3,
+            .backup-section h3,
+            .settings-card h3 {
+                font-size: 1.125rem;
+            }
+
+            /* Form controls more compact */
+            .whitelist-controls input,
+            .whitelist-controls button {
+                padding: 0.625rem 0.875rem;
+                font-size: 0.9375rem;
+            }
+
+            /* Document section header */
+            .section-header {
+                padding: 0.75rem 0.875rem;
+            }
+
+            .section-header .title {
+                font-size: 0.9375rem;
+            }
+
+            /* Modal full screen on small devices */
+            .modal-content {
+                margin: 0.5rem;
+                padding: 1.25rem;
+                max-height: 90vh;
+                max-width: calc(100% - 1rem);
+            }
+
+            .modal-header {
+                margin-bottom: 0.875rem;
+                padding-bottom: 0.875rem;
+            }
+
+            .modal-header h2 {
+                font-size: 1.125rem;
+            }
+
+            .modal-body pre {
+                font-size: 0.8125rem;
+                padding: 0.875rem;
+            }
+
+            /* Settings cards */
+            .settings-card {
+                padding: 1.25rem;
+            }
+
+            .model-detail {
+                flex-direction: column;
+                gap: 0.375rem;
+                padding: 0.625rem 0;
+            }
+
+            .model-detail-value {
+                font-size: 0.8125rem;
+            }
+
+            /* Textareas */
+            #custom-prompt,
+            #full-prompt {
+                font-size: 0.8125rem;
+                min-height: 150px;
+            }
+
+            /* Buttons */
+            .btn-create-backup,
+            .btn-save-prompt,
+            .btn-upload,
+            .btn-upload-process {
+                padding: 0.625rem 1.25rem;
+                font-size: 0.9375rem;
+            }
+
+            /* Document info - better wrapping */
+            .document-info .filename {
+                font-size: 0.875rem;
+            }
+
+            /* Whitelist items more compact */
+            .whitelist-item {
+                padding: 0.625rem;
+                font-size: 0.9375rem;
+            }
+
+            .whitelist-item button {
+                font-size: 0.8125rem;
+                padding: 0.375rem 0.625rem;
+            }
+        }
+
+        /* Small Phones (480px and below) */
+        @media (max-width: 480px) {
+            .admin-container {
+                padding: 0 0.75rem 2rem 0.75rem;
+                margin: 0.75rem auto;
+            }
+
+            .admin-header {
+                margin-bottom: 1.25rem;
+            }
+
+            .admin-header h1 {
+                font-size: 1.25rem;
+            }
+
+            .tab {
+                padding: 0.625rem 1rem;
+                font-size: 0.875rem;
+            }
+
+            /* Very compact sections */
+            .whitelist-section,
+            .backup-section,
+            .documents-section,
+            .webcrawl-section {
+                margin-bottom: 1.25rem;
+            }
+
+            .whitelist-section h3,
+            .backup-section h3 {
+                font-size: 1rem;
+                margin-bottom: 0.75rem;
+            }
+
+            /* Very compact form controls */
+            .whitelist-controls input,
+            .whitelist-controls button {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.875rem;
+            }
+
+            /* Document items very compact */
+            .document-item {
+                padding: 0.5rem;
+                font-size: 0.875rem;
+            }
+
+            .document-info .filename {
+                font-size: 0.8125rem;
+            }
+
+            .document-info .btn-info {
+                width: 18px;
+                height: 18px;
+                font-size: 0.6875rem;
+            }
+
+            .document-actions button {
+                width: 28px;
+                height: 28px;
+                font-size: 1rem;
+            }
+
+            /* Section headers very compact */
+            .section-header {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.875rem;
+            }
+
+            .section-header .toggle-icon {
+                font-size: 1rem;
+            }
+
+            .section-header .count {
+                font-size: 0.8125rem;
+                padding: 0.1875rem 0.625rem;
+            }
+
+            /* Modal - near full screen */
+            .modal-content {
+                margin: 0.25rem;
+                padding: 1rem;
+                max-height: 95vh;
+                max-width: calc(100% - 0.5rem);
+                border-radius: 4px;
+            }
+
+            .modal-header {
+                margin-bottom: 0.75rem;
+                padding-bottom: 0.75rem;
+            }
+
+            .modal-header h2 {
+                font-size: 1rem;
+            }
+
+            .modal-close {
+                min-width: 28px;
+                height: 28px;
+                font-size: 1.25rem;
+            }
+
+            .modal-body pre {
+                font-size: 0.75rem;
+                padding: 0.75rem;
+            }
+
+            /* Settings very compact */
+            .settings-card {
+                padding: 1rem;
+            }
+
+            .settings-card h3 {
+                font-size: 1rem;
+            }
+
+            .settings-card h4 {
+                font-size: 0.9375rem;
+            }
+
+            .model-card {
+                padding: 0.875rem;
+            }
+
+            .model-card h4 {
+                font-size: 0.9375rem;
+            }
+
+            .model-detail {
+                padding: 0.5rem 0;
+                font-size: 0.8125rem;
+            }
+
+            .model-detail-label,
+            .model-detail-value {
+                font-size: 0.8125rem;
+            }
+
+            /* Textareas very compact */
+            #custom-prompt,
+            #full-prompt {
+                font-size: 0.75rem;
+                min-height: 120px;
+                padding: 0.625rem;
+            }
+
+            /* Buttons very compact */
+            .btn-create-backup,
+            .btn-save-prompt,
+            .btn-upload,
+            .btn-upload-process {
+                padding: 0.5rem 1rem;
+                font-size: 0.875rem;
+            }
+
+            /* Whitelist items very compact */
+            .whitelist-item {
+                padding: 0.5rem;
+                font-size: 0.875rem;
+            }
+
+            .whitelist-list {
+                padding: 0.875rem;
+                max-height: 300px;
+            }
+
+            /* Backup items very compact */
+            .backup-item {
+                padding: 0.875rem;
+            }
+
+            .backup-info .backup-name {
+                font-size: 0.9375rem;
+            }
+
+            .backup-info .backup-metadata {
+                font-size: 0.8125rem;
+            }
+
+            .backup-actions button {
+                padding: 0.5rem 0.875rem;
+                font-size: 0.8125rem;
+            }
+
+            /* Upload section */
+            .upload-section {
+                padding: 1.25rem;
+            }
+
+            .upload-section h3 {
+                font-size: 1rem;
+            }
+
+            /* Crawl controls */
+            #crawl-url-input,
+            #crawl-depth-select {
+                padding: 0.625rem !important;
+                font-size: 0.875rem !important;
+            }
+        }
+
+        /* Landscape Mode for Tablets */
+        @media (max-width: 1024px) and (orientation: landscape) {
+            .admin-container {
+                padding-bottom: 2rem;
+            }
+
+            .modal-content {
+                max-height: 75vh;
+            }
+        }
+
+        /* Touch device optimizations */
+        @media (hover: none) and (pointer: coarse) {
+            /* Increase tap targets for touch devices */
+            .tab {
+                padding: 1rem 1.5rem;
+            }
+
+            .btn-icon,
+            .document-actions button,
+            .whitelist-item button,
+            .backup-actions button {
+                min-width: 44px;
+                min-height: 44px;
+            }
+
+            .delete-conversation-btn {
+                min-width: 40px;
+                min-height: 40px;
+            }
+        }
     </style>
 </head>
 <body>
