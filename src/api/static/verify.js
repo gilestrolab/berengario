@@ -143,10 +143,12 @@ class VerifyPage {
 
     setLoading(loading) {
         if (loading) {
+            this.submitBtn.style.display = 'flex';
             this.submitBtn.disabled = true;
             this.submitBtn.classList.add('loading');
             this.otpInput.disabled = true;
         } else {
+            this.submitBtn.style.display = 'none';
             this.submitBtn.disabled = false;
             this.submitBtn.classList.remove('loading');
             this.otpInput.disabled = false;
