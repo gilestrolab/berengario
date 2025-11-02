@@ -191,9 +191,10 @@ class KnowledgeBaseManager:
         """
         try:
             # Get all chunks with this hash
+            # Note: ids are always returned by default
             results = self.collection.get(
                 where={"file_hash": file_hash},
-                include=["documents", "metadatas", "ids"]
+                include=["documents", "metadatas"]
             )
 
             if not results["documents"]:
