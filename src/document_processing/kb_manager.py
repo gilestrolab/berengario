@@ -251,6 +251,35 @@ class KnowledgeBaseManager:
             logger.error(f"Failed to delete document: {e}")
             raise
 
+    def get_document_by_filename(self, filename: str) -> Optional[dict]:
+        """
+        Get document metadata by filename.
+
+        Args:
+            filename: Name of the file.
+
+        Returns:
+            Dictionary with document metadata (file_hash, file_mtime, etc.)
+            or None if document not found.
+        """
+        try:
+            # Get nodes with this filename
+            results = self.collection.get(
+                where={"filename": filename},
+                include=["metadatas"],
+                limit=1
+            )
+
+            if not results["metadatas"]:
+                return None
+
+            # Return first metadata (all chunks have same document metadata)
+            return results["metadatas"][0]
+
+        except Exception as e:
+            logger.error(f"Error getting document by filename: {e}")
+            return None
+
     def delete_document_by_filename(self, filename: str) -> int:
         """
         Delete all nodes associated with a filename.

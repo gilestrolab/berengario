@@ -114,17 +114,22 @@ class RAGEngine:
         self.llm_model = llm_model or settings.openrouter_model
         self.enable_function_calling = enable_function_calling
 
-        # Initialize LLM (uses Naga.ac with non-OpenAI models)
-        # Provide context_window to bypass OpenAI model validation
+        # Initialize LLM (uses OpenAI-compatible API like Naga.ac)
+        # WORKAROUND: Use "gpt-4" to pass validation, but actual model is sent to API
+        # The custom api_base will route to the correct model (self.llm_model)
         self.llm = OpenAI(
-            model=self.llm_model,
+            model="gpt-4",  # Dummy model name for validation
             api_key=settings.openrouter_api_key,
             api_base=settings.openrouter_api_base,
             temperature=0.1,  # Low temperature for factual responses
-            context_window=200000,  # Claude 3.5 Sonnet context window
+            context_window=200000,  # Large context window
             max_tokens=4096,
             is_chat_model=True,
-            default_headers={"HTTP-Referer": "https://github.com/imperial-dols/dols-gpt"},
+            default_headers={
+                "HTTP-Referer": "https://github.com/imperial-dols/dols-gpt",
+            },
+            # Additional model parameters to override in API calls
+            additional_kwargs={"model": self.llm_model},  # Pass actual model in API calls
         )
 
         # Initialize tool system for function calling

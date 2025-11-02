@@ -294,11 +294,18 @@ class DocumentProcessor:
             # Compute file hash for deduplication
             file_hash = self.compute_file_hash(file_path)
 
+            # Get file modification timestamp for versioning
+            file_stat = file_path.stat()
+            file_mtime = file_stat.st_mtime
+            file_size = file_stat.st_size
+
             # Create base metadata
             metadata = {
                 "filename": file_path.name,
                 "file_path": str(file_path),
                 "file_hash": file_hash,
+                "file_mtime": file_mtime,  # Modification timestamp for versioning
+                "file_size": file_size,
                 "source_type": source_type,
                 "file_type": file_path.suffix.lower(),
             }

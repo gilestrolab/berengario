@@ -458,14 +458,44 @@ class EmailProcessor:
             # Process each attachment
             for attachment in attachments:
                 try:
-                    # Check if document already exists in KB
+                    # Compute file hash and get file modification time
                     file_hash = self.doc_processor.compute_file_hash(attachment.filepath)
+                    file_stat = attachment.filepath.stat()
+                    file_mtime = file_stat.st_mtime
+
+                    # Check if document with same content already exists
                     if self.kb_manager.document_exists(file_hash):
                         logger.info(
                             f"Document {attachment.filename} already in KB (hash: {file_hash[:8]}...), skipping"
                         )
                         duplicates_skipped += 1
                         continue
+
+                    # Check if document with same filename but different content exists
+                    existing_doc = self.kb_manager.get_document_by_filename(attachment.filename)
+                    if existing_doc:
+                        existing_hash = existing_doc.get("file_hash")
+                        existing_mtime = existing_doc.get("file_mtime", 0)
+
+                        # Different content, check timestamps
+                        if file_mtime > existing_mtime:
+                            # New version is newer, replace old version
+                            logger.info(
+                                f"Replacing older version of {attachment.filename} "
+                                f"(old: {existing_hash[:8]}..., new: {file_hash[:8]}...)"
+                            )
+                            chunks_deleted = self.kb_manager.delete_document_by_filename(
+                                attachment.filename
+                            )
+                            logger.info(f"Deleted {chunks_deleted} chunks from old version")
+                        else:
+                            # New version is older, skip
+                            logger.info(
+                                f"Skipping older version of {attachment.filename} "
+                                f"(existing version is newer)"
+                            )
+                            duplicates_skipped += 1
+                            continue
 
                     # Process document into text nodes
                     extra_metadata = {
