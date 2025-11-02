@@ -177,6 +177,20 @@ class DocumentDeleteRequest(BaseModel):
     archive: bool = True
 
 
+class CrawlRequest(BaseModel):
+    """Request model for URL crawling."""
+
+    url: str
+    crawl_depth: int = 1
+
+
+class CrawledUrlResponse(BaseModel):
+    """Response model for crawled URL list."""
+
+    urls: List[Dict]
+    total_count: int
+
+
 # OTP Management
 @dataclass
 class OTPEntry:
@@ -2111,6 +2125,301 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"Error uploading document: {str(e)}")
 
 
+# Web Crawling Endpoints
+@app.post("/api/admin/crawl", response_model=AdminActionResponse)
+async def crawl_url(
+    request: CrawlRequest,
+    session: Session = Depends(require_admin),
+):
+    """
+    Crawl a URL and add content to knowledge base.
+
+    Requires admin privileges.
+
+    Args:
+        request: Crawl request with URL and depth
+        session: Admin session (injected by dependency)
+
+    Returns:
+        AdminActionResponse with crawling details
+
+    Raises:
+        HTTPException: If URL is invalid or crawling fails
+    """
+    try:
+        logger.info(f"Admin {session.email} initiated crawl: {request.url} (depth={request.crawl_depth})")
+
+        # Process URL with DocumentProcessor
+        nodes = document_processor.process_url(
+            url=request.url,
+            crawl_depth=request.crawl_depth,
+            extra_metadata={
+                "crawled_via": "admin_interface",
+                "crawled_by": session.email,
+            }
+        )
+
+        # Add to knowledge base
+        pages_crawled = 0
+        chunks_added = 0
+        if nodes:
+            kb_manager.add_nodes(nodes)
+            chunks_added = len(nodes)
+
+            # Count unique pages (by url_hash)
+            unique_urls = set()
+            for node in nodes:
+                if hasattr(node, 'metadata') and 'url_hash' in node.metadata:
+                    unique_urls.add(node.metadata['url_hash'])
+            pages_crawled = len(unique_urls)
+
+            logger.info(
+                f"Crawled {pages_crawled} pages from {request.url}: "
+                f"{chunks_added} chunks added to KB"
+            )
+
+        # Log to audit trail
+        audit_logger.log_action(
+            session.email,
+            "url_crawl",
+            request.url,
+            "success",
+            f"pages:{pages_crawled},chunks:{chunks_added},depth:{request.crawl_depth}"
+        )
+
+        message = (
+            f"Successfully crawled {pages_crawled} page(s) from {request.url}. "
+            f"Added {chunks_added} chunks to knowledge base."
+        )
+
+        return AdminActionResponse(
+            success=True,
+            message=message,
+            details={
+                "url": request.url,
+                "pages_crawled": pages_crawled,
+                "chunks_added": chunks_added,
+                "crawl_depth": request.crawl_depth,
+            },
+        )
+
+    except ValueError as e:
+        # Invalid URL or crawling error
+        audit_logger.log_action(
+            session.email,
+            "url_crawl",
+            request.url,
+            "error",
+            str(e)
+        )
+        logger.error(f"Error crawling {request.url}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        audit_logger.log_action(
+            session.email,
+            "url_crawl",
+            request.url,
+            "error",
+            str(e)
+        )
+        logger.error(f"Error crawling {request.url}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error crawling URL: {str(e)}")
+
+
+@app.get("/api/admin/crawled-urls", response_model=CrawledUrlResponse)
+async def list_crawled_urls(
+    session: Session = Depends(require_admin),
+):
+    """
+    List all crawled URLs in the knowledge base.
+
+    Requires admin privileges.
+
+    Args:
+        session: Admin session (injected by dependency)
+
+    Returns:
+        CrawledUrlResponse with list of crawled URLs
+    """
+    try:
+        urls = kb_manager.get_crawled_urls()
+
+        # Format timestamps for display
+        from datetime import datetime
+        for url in urls:
+            if url.get('last_crawled'):
+                try:
+                    dt = datetime.fromtimestamp(url['last_crawled'])
+                    url['last_crawled_formatted'] = dt.strftime('%Y-%m-%d %H:%M:%S')
+                except:
+                    url['last_crawled_formatted'] = 'Unknown'
+
+        logger.info(
+            f"Admin {session.email} listed crawled URLs ({len(urls)} found)"
+        )
+
+        return CrawledUrlResponse(
+            urls=urls,
+            total_count=len(urls),
+        )
+    except Exception as e:
+        logger.error(f"Error listing crawled URLs: {e}")
+        raise HTTPException(status_code=500, detail=f"Error listing crawled URLs: {str(e)}")
+
+
+@app.delete("/api/admin/crawled-urls/all", response_model=AdminActionResponse)
+async def delete_all_crawled_urls(
+    session: Session = Depends(require_admin),
+):
+    """
+    Delete all crawled URLs from the knowledge base.
+
+    Requires admin privileges.
+
+    Args:
+        session: Admin session (injected by dependency)
+
+    Returns:
+        AdminActionResponse with deletion summary
+
+    Raises:
+        HTTPException: If deletion fails
+    """
+    try:
+        # Get all crawled URLs
+        urls = kb_manager.get_crawled_urls()
+
+        if not urls:
+            return AdminActionResponse(
+                success=True,
+                message="No crawled URLs to delete",
+                details={
+                    "urls_deleted": 0,
+                    "chunks_removed": 0,
+                },
+            )
+
+        # Delete each URL
+        total_chunks = 0
+        for url_data in urls:
+            try:
+                chunks = kb_manager.delete_document_by_url_hash(url_data["url_hash"])
+                total_chunks += chunks
+            except Exception as e:
+                logger.warning(f"Error deleting URL {url_data['source_url']}: {e}")
+                continue
+
+        # Log to audit trail
+        audit_logger.log_action(
+            session.email,
+            "url_delete_all",
+            f"{len(urls)} URLs",
+            "success",
+            f"urls:{len(urls)},chunks:{total_chunks}"
+        )
+
+        message = (
+            f"Deleted all {len(urls)} crawled URL(s). "
+            f"{total_chunks} chunks removed from KB."
+        )
+
+        logger.info(f"Admin {session.email}: {message}")
+
+        return AdminActionResponse(
+            success=True,
+            message=message,
+            details={
+                "urls_deleted": len(urls),
+                "chunks_removed": total_chunks,
+            },
+        )
+
+    except Exception as e:
+        audit_logger.log_action(
+            session.email,
+            "url_delete_all",
+            "all URLs",
+            "error",
+            str(e)
+        )
+        logger.error(f"Error deleting all crawled URLs: {e}")
+        raise HTTPException(status_code=500, detail=f"Error deleting all URLs: {str(e)}")
+
+
+@app.delete("/api/admin/crawled-urls/{url_hash}", response_model=AdminActionResponse)
+async def delete_crawled_url(
+    url_hash: str,
+    session: Session = Depends(require_admin),
+):
+    """
+    Delete a crawled URL from the knowledge base.
+
+    Requires admin privileges.
+
+    Args:
+        url_hash: SHA-256 hash of the URL to delete
+        session: Admin session (injected by dependency)
+
+    Returns:
+        AdminActionResponse with deletion details
+
+    Raises:
+        HTTPException: If URL not found or deletion fails
+    """
+    try:
+        # Get URL info before deletion
+        url_info = kb_manager.get_document_by_url_hash(url_hash)
+        if not url_info:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Crawled URL not found with hash: {url_hash}"
+            )
+
+        source_url = url_info.get('source_url', 'Unknown')
+
+        # Delete from KB
+        chunks_removed = kb_manager.delete_document_by_url_hash(url_hash)
+
+        # Log to audit trail
+        audit_logger.log_action(
+            session.email,
+            "url_delete",
+            source_url,
+            "success",
+            f"hash:{url_hash},chunks:{chunks_removed}"
+        )
+
+        message = (
+            f"Deleted crawled URL '{source_url}'. "
+            f"{chunks_removed} chunks removed from KB."
+        )
+
+        logger.info(f"Admin {session.email}: {message}")
+
+        return AdminActionResponse(
+            success=True,
+            message=message,
+            details={
+                "url": source_url,
+                "url_hash": url_hash,
+                "chunks_removed": chunks_removed,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        audit_logger.log_action(
+            session.email,
+            "url_delete",
+            f"hash:{url_hash}",
+            "error",
+            str(e)
+        )
+        logger.error(f"Error deleting crawled URL {url_hash}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error deleting URL: {str(e)}")
+
+
 # Backup endpoints
 @app.post("/api/admin/backup/create")
 async def create_backup(
@@ -2524,6 +2833,97 @@ async def get_config():
         "instance_description": settings.instance_description,
         "organization": settings.organization,
     }
+
+
+# Example Questions Endpoints
+@app.post("/api/admin/example-questions/generate", response_model=AdminActionResponse)
+async def generate_example_questions_endpoint(
+    session: Session = Depends(require_admin),
+):
+    """
+    Generate example questions based on the knowledge base.
+
+    Requires admin privileges.
+
+    Args:
+        session: Admin session (injected by dependency)
+
+    Returns:
+        AdminActionResponse with generation details
+
+    Raises:
+        HTTPException: If generation fails
+    """
+    try:
+        from src.rag.example_questions import generate_and_save_example_questions
+
+        logger.info(f"Admin {session.email} requested example question generation")
+
+        # Generate and save questions
+        result = generate_and_save_example_questions(rag_engine=query_handler.rag_engine, count=15)
+
+        # Log to audit trail
+        audit_logger.log_action(
+            session.email,
+            "generate_example_questions",
+            "knowledge_base",
+            "success",
+            f"generated:{result['count']}"
+        )
+
+        message = f"Successfully generated {result['count']} example questions"
+        logger.info(f"Admin {session.email}: {message}")
+
+        return AdminActionResponse(
+            success=True,
+            message=message,
+            details={
+                "count": result['count'],
+                "generated_at": result['generated_at'],
+            },
+        )
+
+    except Exception as e:
+        audit_logger.log_action(
+            session.email,
+            "generate_example_questions",
+            "knowledge_base",
+            "error",
+            str(e)
+        )
+        logger.error(f"Error generating example questions: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error generating example questions: {str(e)}")
+
+
+@app.get("/api/example-questions")
+async def get_example_questions():
+    """
+    Get example questions for the knowledge base.
+
+    Public endpoint - no authentication required.
+
+    Returns:
+        Dictionary with:
+            - questions: List of example question strings
+            - count: Number of questions
+            - generated_at: Timestamp of generation
+    """
+    try:
+        from src.rag.example_questions import load_example_questions
+
+        result = load_example_questions()
+        return result
+
+    except FileNotFoundError:
+        # Return empty list if not generated yet
+        return {
+            "questions": [],
+            "count": 0,
+            "generated_at": None,
+        }
+    except Exception as e:
+        logger.error(f"Error loading example questions: {e}")
+        raise HTTPException(status_code=500, detail=f"Error loading example questions: {str(e)}")
 
 
 @app.get("/health")

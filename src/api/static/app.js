@@ -49,6 +49,9 @@ class ChatApp {
         // Load current session history (for in-memory messages)
         await this.loadHistory();
 
+        // Load example questions
+        await this.loadExampleQuestions();
+
         // Setup event listeners
         this.setupEventListeners();
 
@@ -463,10 +466,23 @@ class ChatApp {
                         <h2 id="welcome-title">Welcome to ${instanceName}</h2>
                         <p id="welcome-description">${instanceDescription}</p>
                         <p class="welcome-hint">Your conversation history will be saved during this session.</p>
+
+                        <!-- Example Questions -->
+                        <div id="example-questions-container" style="display: none; margin-top: 2rem;">
+                            <p style="font-size: 0.9rem; color: var(--text-secondary, #666); margin-bottom: 0.75rem;">
+                                Try asking:
+                            </p>
+                            <div id="example-questions" class="example-questions">
+                                <!-- Questions will be inserted here by JavaScript -->
+                            </div>
+                        </div>
                     </div>
                 `;
                 this.sessionId = null;
                 this.showToast('Conversation cleared', 'success');
+
+                // Display example questions again
+                this.displayExampleQuestions();
             } else {
                 this.showToast('Failed to clear conversation', 'error');
             }
@@ -803,8 +819,21 @@ class ChatApp {
                     <h2 id="welcome-title">Welcome to ${this.config?.instance_name || 'RAGInbox'}</h2>
                     <p id="welcome-description">${this.config?.instance_description || 'Ask me anything about the knowledge base documents.'}</p>
                     <p class="welcome-hint">Start a new conversation below.</p>
+
+                    <!-- Example Questions -->
+                    <div id="example-questions-container" style="display: none; margin-top: 2rem;">
+                        <p style="font-size: 0.9rem; color: var(--text-secondary, #666); margin-bottom: 0.75rem;">
+                            Try asking:
+                        </p>
+                        <div id="example-questions" class="example-questions">
+                            <!-- Questions will be inserted here by JavaScript -->
+                        </div>
+                    </div>
                 </div>
             `;
+
+            // Display example questions
+            this.displayExampleQuestions();
         }
 
         // Update UI
@@ -863,6 +892,74 @@ class ChatApp {
             month: 'short',
             day: 'numeric'
         });
+    }
+
+    async loadExampleQuestions() {
+        try {
+            const response = await fetch('/api/example-questions');
+            const data = await response.json();
+
+            if (data.questions && data.questions.length > 0) {
+                // Store all questions
+                this.allExampleQuestions = data.questions;
+                // Display random 3 questions
+                this.displayExampleQuestions();
+            }
+        } catch (error) {
+            console.error('Error loading example questions:', error);
+            // Silently fail - example questions are optional
+        }
+    }
+
+    displayExampleQuestions() {
+        const container = document.getElementById('example-questions-container');
+        const questionsDiv = document.getElementById('example-questions');
+
+        if (!container || !questionsDiv || !this.allExampleQuestions || this.allExampleQuestions.length === 0) {
+            return;
+        }
+
+        // Hide if conversation has started
+        if (this.currentConversationId || (this.messagesContainer && this.messagesContainer.querySelectorAll('.message').length > 0)) {
+            container.style.display = 'none';
+            return;
+        }
+
+        // Select 3 random questions
+        const selectedQuestions = this.getRandomQuestions(this.allExampleQuestions, 3);
+
+        // Clear and populate
+        questionsDiv.innerHTML = '';
+        selectedQuestions.forEach(question => {
+            const chip = document.createElement('button');
+            chip.className = 'example-question-chip';
+            chip.textContent = question;
+            chip.onclick = () => this.selectExampleQuestion(question);
+            questionsDiv.appendChild(chip);
+        });
+
+        // Show container
+        container.style.display = 'block';
+    }
+
+    getRandomQuestions(questions, count) {
+        // Shuffle array and take first 'count' items
+        const shuffled = [...questions].sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, Math.min(count, shuffled.length));
+    }
+
+    selectExampleQuestion(question) {
+        // Fill input with the question
+        this.queryInput.value = question;
+
+        // Hide example questions
+        const container = document.getElementById('example-questions-container');
+        if (container) {
+            container.style.display = 'none';
+        }
+
+        // Send the query
+        this.sendQuery();
     }
 }
 

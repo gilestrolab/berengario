@@ -330,6 +330,100 @@ class DocumentProcessor:
             logger.error(f"Failed to process document {file_path}: {e}")
             raise
 
+    def process_url(
+        self,
+        url: str,
+        crawl_depth: int = 1,
+        extra_metadata: Optional[Dict] = None,
+    ) -> List[TextNode]:
+        """
+        Process web content from URL(s) into chunked text nodes.
+
+        Args:
+            url: URL to crawl and process.
+            crawl_depth: Depth of crawling (1 = single page, 2 = follow links once).
+            extra_metadata: Additional metadata to attach to nodes.
+
+        Returns:
+            List of TextNode objects with text chunks and metadata.
+
+        Raises:
+            ValueError: If URL is invalid.
+            Exception: If crawling fails.
+        """
+        from datetime import datetime
+        from src.document_processing.web_crawler import WebCrawler
+
+        logger.info(f"Processing URL: {url} (depth={crawl_depth})")
+
+        try:
+            # Initialize crawler
+            crawler = WebCrawler()
+
+            # Crawl URL(s)
+            pages = crawler.crawl_url(url, crawl_depth=crawl_depth)
+
+            if not pages:
+                logger.warning(f"No content extracted from {url}")
+                return []
+
+            all_nodes = []
+
+            # Process each crawled page
+            for page_data in pages:
+                page_url = page_data["url"]
+                content = page_data["content"]
+                url_hash = page_data["url_hash"]
+                depth = page_data["depth"]
+
+                if not content.strip():
+                    logger.warning(f"Empty content from {page_url}")
+                    continue
+
+                # Compute content hash (different from URL hash)
+                content_hash = hashlib.sha256(content.encode()).hexdigest()
+
+                # Current timestamp for last_crawled
+                crawl_timestamp = datetime.now().timestamp()
+
+                # Create base metadata
+                metadata = {
+                    "filename": f"Web: {page_url[:100]}",  # Truncated URL for display
+                    "source_type": "web",
+                    "source_url": page_url,
+                    "url_hash": url_hash,
+                    "content_hash": content_hash,
+                    "last_crawled": crawl_timestamp,
+                    "crawl_depth": depth,
+                    "file_type": ".html",
+                }
+
+                # Add extra metadata if provided
+                if extra_metadata:
+                    metadata.update(extra_metadata)
+
+                # Create Document object for LlamaIndex
+                document = Document(text=content, metadata=metadata)
+
+                # Split into chunks
+                nodes = self.splitter.get_nodes_from_documents([document])
+
+                all_nodes.extend(nodes)
+
+                logger.info(
+                    f"Successfully processed {page_url}: {len(nodes)} chunks created"
+                )
+
+            logger.info(
+                f"URL processing complete: {len(all_nodes)} total chunks from {len(pages)} pages"
+            )
+
+            return all_nodes
+
+        except Exception as e:
+            logger.error(f"Failed to process URL {url}: {e}")
+            raise
+
     def process_directory(
         self,
         directory_path: Path,

@@ -201,6 +201,20 @@ class Settings(BaseSettings):
         default=0.7, description="Minimum similarity score for retrieval"
     )
 
+    # Web Crawling Configuration
+    crawl_timeout: int = Field(
+        default=30, description="Request timeout for web crawling (seconds)"
+    )
+    crawl_max_size_mb: int = Field(
+        default=10, description="Maximum page size for crawling (megabytes)"
+    )
+    crawl_delay: float = Field(
+        default=1.0, description="Delay between crawl requests (seconds)"
+    )
+    crawl_max_pages: int = Field(
+        default=50, description="Maximum pages to crawl per URL"
+    )
+
     # RAG Customization
     rag_custom_prompt_file: Optional[Path] = Field(
         default=None,

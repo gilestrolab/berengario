@@ -39,6 +39,13 @@ dependencies = [
     "pandas>=2.2.0",
     "openpyxl>=3.1.0",
 
+    # Web Crawling
+    "beautifulsoup4>=4.12.0",
+    "trafilatura>=1.12.0",
+    "requests>=2.32.0",
+    "validators>=0.34.0",
+    "lxml>=5.3.0",
+
     # Email Handling (Phase 2)
     "imap-tools>=1.7.0",
     "html2text>=2024.2.26",

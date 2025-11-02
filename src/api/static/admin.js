@@ -11,6 +11,7 @@ class AdminPanel {
             admins: []
         };
         this.documents = [];
+        this.crawledUrls = [];
         this.backups = [];
         this.init();
     }
@@ -145,6 +146,11 @@ class AdminPanel {
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.toggle('active', content.id === `${tabName}-tab`);
         });
+
+        // Load data for specific tabs on first switch
+        if (tabName === 'webcrawl' && this.crawledUrls.length === 0) {
+            this.loadCrawledUrls();
+        }
     }
 
     async loadAllWhitelists() {
@@ -517,6 +523,218 @@ class AdminPanel {
             await this.loadDocuments();
         } catch (error) {
             console.error('Error deleting document:', error);
+            this.showToast(error.message, 'error');
+        }
+    }
+
+    // Web Crawling Methods
+    async crawlUrl() {
+        const urlInput = document.getElementById('crawl-url-input');
+        const depthSelect = document.getElementById('crawl-depth-select');
+        const crawlBtn = document.getElementById('crawl-btn');
+        const statusDiv = document.getElementById('crawl-status');
+
+        const url = urlInput.value.trim();
+        const depth = parseInt(depthSelect.value);
+
+        if (!url) {
+            this.showToast('Please enter a URL', 'error');
+            return;
+        }
+
+        // Basic URL validation
+        try {
+            new URL(url);
+        } catch (e) {
+            this.showToast('Please enter a valid URL (including http:// or https://)', 'error');
+            return;
+        }
+
+        // Disable button and show processing
+        crawlBtn.disabled = true;
+        crawlBtn.textContent = 'Crawling...';
+        statusDiv.innerHTML = '<div class="upload-file-processing">🔄 Crawling URL, please wait...</div>';
+
+        try {
+            const response = await fetch('/api/admin/crawl', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    url: url,
+                    crawl_depth: depth,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to crawl URL');
+            }
+
+            // Success
+            statusDiv.innerHTML = `
+                <div class="upload-file-success">
+                    ✓ Successfully crawled ${data.details.pages_crawled} page(s)<br>
+                    Added ${data.details.chunks_added} chunks to knowledge base
+                </div>
+            `;
+
+            this.showToast(data.message, 'success');
+
+            // Clear input and reload list
+            urlInput.value = '';
+            await this.loadCrawledUrls();
+
+        } catch (error) {
+            console.error('Error crawling URL:', error);
+            statusDiv.innerHTML = `<div class="upload-file-error">✗ Error: ${this.escapeHtml(error.message)}</div>`;
+            this.showToast(error.message, 'error');
+        } finally {
+            // Re-enable button
+            crawlBtn.disabled = false;
+            crawlBtn.textContent = 'Crawl URL';
+        }
+    }
+
+    async loadCrawledUrls() {
+        try {
+            const response = await fetch('/api/admin/crawled-urls');
+
+            if (!response.ok) {
+                throw new Error('Failed to load crawled URLs');
+            }
+
+            const data = await response.json();
+            this.crawledUrls = data.urls;
+
+            this.renderCrawledUrls();
+        } catch (error) {
+            console.error('Error loading crawled URLs:', error);
+            this.renderCrawledUrlsError(error.message);
+        }
+    }
+
+    renderCrawledUrls() {
+        const container = document.getElementById('crawled-urls-list');
+        if (!container) return;
+
+        if (!this.crawledUrls || this.crawledUrls.length === 0) {
+            container.innerHTML = '<div class="empty-state">No crawled URLs in knowledge base</div>';
+            return;
+        }
+
+        const itemsHtml = this.crawledUrls.map(url => {
+            const displayUrl = url.source_url.length > 80
+                ? url.source_url.substring(0, 77) + '...'
+                : url.source_url;
+
+            const crawledDate = url.last_crawled_formatted || 'Unknown';
+
+            return `
+                <div class="document-item">
+                    <div class="document-info">
+                        <div class="filename-row">
+                            <div class="filename" title="${this.escapeHtml(url.source_url)}">
+                                🌐 ${this.escapeHtml(displayUrl)}
+                            </div>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary, #999); margin-top: 0.25rem;">
+                            Crawled: ${this.escapeHtml(crawledDate)} | Depth: ${url.crawl_depth || 1}
+                        </div>
+                    </div>
+                    <div class="document-actions">
+                        <button class="btn-view" onclick="window.open('${this.escapeHtml(url.source_url)}', '_blank')" title="Open URL">
+                            🔗
+                        </button>
+                        <button class="btn-delete" onclick="adminPanel.deleteCrawledUrl('${this.escapeHtml(url.url_hash)}', '${this.escapeHtml(url.source_url)}')" title="Delete">
+                            🗑
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const html = `
+            <div class="section">
+                <div class="section-header">
+                    <h4>
+                        Crawled URLs
+                        <span class="count">${this.crawledUrls.length}</span>
+                    </h4>
+                </div>
+                <div class="section-content">
+                    ${itemsHtml}
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = html;
+    }
+
+    renderCrawledUrlsError(message) {
+        const container = document.getElementById('crawled-urls-list');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="empty-state" style="color: var(--danger, #dc3545);">
+                Error loading crawled URLs: ${this.escapeHtml(message)}
+            </div>
+        `;
+    }
+
+    async deleteCrawledUrl(urlHash, sourceUrl) {
+        if (!confirm(`Delete crawled URL?\n\n${sourceUrl}`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/crawled-urls/${urlHash}`, {
+                method: 'DELETE',
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to delete URL');
+            }
+
+            this.showToast(data.message, 'success');
+            await this.loadCrawledUrls();
+        } catch (error) {
+            console.error('Error deleting crawled URL:', error);
+            this.showToast(error.message, 'error');
+        }
+    }
+
+    async deleteAllCrawledUrls() {
+        const count = this.crawledUrls ? this.crawledUrls.length : 0;
+
+        if (count === 0) {
+            this.showToast('No crawled URLs to delete', 'info');
+            return;
+        }
+
+        if (!confirm(`⚠️ WARNING: This will delete ALL ${count} crawled URL(s) from the knowledge base.\n\nThis action cannot be undone.\n\nAre you sure you want to continue?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/admin/crawled-urls/all', {
+                method: 'DELETE',
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to delete all URLs');
+            }
+
+            this.showToast(data.message, 'success');
+            await this.loadCrawledUrls();
+        } catch (error) {
+            console.error('Error deleting all crawled URLs:', error);
             this.showToast(error.message, 'error');
         }
     }
@@ -948,6 +1166,86 @@ class AdminPanel {
                 saveButton.disabled = false;
                 saveButton.textContent = 'Save Custom Prompt';
             }
+        }
+    }
+
+    async generateExampleQuestions() {
+        const generateButton = document.getElementById('generate-questions-btn');
+        const statusSpan = document.getElementById('questions-generate-status');
+        const previewDiv = document.getElementById('example-questions-preview');
+        const questionsList = document.getElementById('questions-list');
+
+        if (!generateButton) return;
+
+        // Disable button and show processing
+        generateButton.disabled = true;
+        generateButton.textContent = 'Generating...';
+        if (statusSpan) {
+            statusSpan.textContent = '⏳ Analyzing knowledge base...';
+            statusSpan.style.color = 'var(--primary, #007bff)';
+        }
+
+        try {
+            const response = await fetch('/api/admin/example-questions/generate', {
+                method: 'POST',
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to generate example questions');
+            }
+
+            // Success
+            this.showToast(data.message, 'success');
+            if (statusSpan) {
+                statusSpan.textContent = `✓ Generated ${data.details.count} questions`;
+                statusSpan.style.color = 'var(--success, #28a745)';
+            }
+
+            // Load and display the questions
+            await this.loadExampleQuestions();
+
+        } catch (error) {
+            console.error('Error generating example questions:', error);
+            this.showToast(error.message, 'error');
+            if (statusSpan) {
+                statusSpan.textContent = '✗ Generation failed';
+                statusSpan.style.color = 'var(--danger, #dc3545)';
+            }
+        } finally {
+            // Re-enable button
+            if (generateButton) {
+                generateButton.disabled = false;
+                generateButton.textContent = 'Generate Example Questions';
+            }
+        }
+    }
+
+    async loadExampleQuestions() {
+        const previewDiv = document.getElementById('example-questions-preview');
+        const questionsList = document.getElementById('questions-list');
+
+        if (!previewDiv || !questionsList) return;
+
+        try {
+            const response = await fetch('/api/example-questions');
+            const data = await response.json();
+
+            if (data.questions && data.questions.length > 0) {
+                // Show preview
+                previewDiv.style.display = 'block';
+
+                // Build list
+                questionsList.innerHTML = data.questions.map(q =>
+                    `<li>${this.escapeHtml(q)}</li>`
+                ).join('');
+            } else {
+                previewDiv.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Error loading example questions:', error);
+            previewDiv.style.display = 'none';
         }
     }
 

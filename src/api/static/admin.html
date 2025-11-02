@@ -732,6 +732,7 @@
         <div class="tabs">
             <button class="tab active" data-tab="whitelists">Whitelists</button>
             <button class="tab" data-tab="documents">Documents</button>
+            <button class="tab" data-tab="webcrawl">Web Crawling</button>
             <button class="tab" data-tab="backups">Backups</button>
             <button class="tab" data-tab="settings">Settings</button>
         </div>
@@ -812,6 +813,51 @@
             </div>
         </div>
 
+        <!-- Web Crawling Tab -->
+        <div id="webcrawl-tab" class="tab-content">
+            <div class="webcrawl-section">
+                <div class="upload-section">
+                    <h3>Crawl Website</h3>
+                    <p style="margin-bottom: 1rem; color: var(--text-secondary, #666); font-size: 0.875rem;">
+                        Enter a URL to crawl and add its content to the knowledge base. The crawler will extract clean text from the page(s).
+                    </p>
+                    <div class="upload-controls">
+                        <input type="url" id="crawl-url-input" placeholder="https://example.com/documentation"
+                               style="flex: 1; padding: 0.75rem; border: 1px solid var(--border, #ddd); border-radius: 4px; font-size: 1rem;">
+                        <select id="crawl-depth-select"
+                                style="padding: 0.75rem; border: 1px solid var(--border, #ddd); border-radius: 4px; font-size: 1rem; background: white;">
+                            <option value="1">Single Page</option>
+                            <option value="2">2 Levels (Follow Links)</option>
+                        </select>
+                        <button class="btn-upload-process" onclick="adminPanel.crawlUrl()" id="crawl-btn">
+                            Crawl URL
+                        </button>
+                    </div>
+                    <div id="crawl-status" style="margin-top: 1rem;"></div>
+                </div>
+
+                <!-- Delete All Section -->
+                <div style="margin: 1rem 0; padding: 1rem; background: var(--bg-secondary, #f8f9fa); border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong style="color: var(--text-primary, #333);">Bulk Actions</strong>
+                        <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary, #666);">
+                            Delete all crawled URLs from the knowledge base
+                        </p>
+                    </div>
+                    <button onclick="adminPanel.deleteAllCrawledUrls()"
+                            style="padding: 0.75rem 1.5rem; background: var(--danger, #dc3545); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; font-weight: 500; transition: background 0.3s;"
+                            onmouseover="this.style.background='#c82333'"
+                            onmouseout="this.style.background='var(--danger, #dc3545)'">
+                        Delete All URLs
+                    </button>
+                </div>
+
+                <div class="documents-list" id="crawled-urls-list">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Backups Tab -->
         <div id="backups-tab" class="tab-content">
             <div class="backup-section">
@@ -882,6 +928,28 @@
                             Save Custom Prompt
                         </button>
                         <span id="prompt-save-status" style="color: var(--text-secondary, #666); font-size: 0.875rem;"></span>
+                    </div>
+                </div>
+
+                <!-- Example Questions -->
+                <div class="settings-card" style="margin-top: 2rem;">
+                    <h3>Example Questions</h3>
+                    <p style="margin-bottom: 1rem; color: var(--text-secondary, #666); font-size: 0.875rem;">
+                        Generate example questions based on your knowledge base content. These questions will be displayed
+                        in the chat interface to help users understand what they can ask.
+                    </p>
+
+                    <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;">
+                        <button class="btn-upload-process" onclick="adminPanel.generateExampleQuestions()" id="generate-questions-btn">
+                            Generate Example Questions
+                        </button>
+                        <span id="questions-generate-status" style="color: var(--text-secondary, #666); font-size: 0.875rem;"></span>
+                    </div>
+
+                    <div id="example-questions-preview" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--bg-secondary, #f8f9fa); border-radius: 4px; border-left: 3px solid var(--primary, #007bff);">
+                        <h4 style="margin: 0 0 0.75rem 0; font-size: 0.95rem;">Generated Questions:</h4>
+                        <ul id="questions-list" style="margin: 0; padding-left: 1.5rem; color: var(--text-secondary, #666); font-size: 0.875rem; line-height: 1.8;">
+                        </ul>
                     </div>
                 </div>
             </div>

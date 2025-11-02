@@ -311,6 +311,122 @@ class KnowledgeBaseManager:
             logger.error(f"Failed to delete document: {e}")
             raise
 
+    def get_document_by_url_hash(self, url_hash: str) -> Optional[dict]:
+        """
+        Get web document metadata by URL hash.
+
+        Args:
+            url_hash: SHA-256 hash of the normalized URL.
+
+        Returns:
+            Dictionary with document metadata (url_hash, source_url, last_crawled, etc.)
+            or None if document not found.
+        """
+        try:
+            # Get nodes with this url_hash
+            results = self.collection.get(
+                where={"url_hash": url_hash},
+                include=["metadatas"],
+                limit=1
+            )
+
+            if not results["metadatas"]:
+                return None
+
+            # Return first metadata (all chunks have same document metadata)
+            return results["metadatas"][0]
+
+        except Exception as e:
+            logger.error(f"Error getting document by url_hash: {e}")
+            return None
+
+    def get_crawled_urls(self) -> List[dict]:
+        """
+        Get list of all crawled web URLs in the knowledge base.
+
+        Returns:
+            List of dictionaries containing web document metadata:
+            - source_url: Original URL
+            - url_hash: SHA-256 hash of normalized URL
+            - content_hash: SHA-256 hash of content
+            - last_crawled: Unix timestamp of last crawl
+            - crawl_depth: Depth at which URL was crawled
+        """
+        try:
+            # Check if collection is empty first
+            if self.collection.count() == 0:
+                logger.info("Collection is empty, no crawled URLs")
+                return []
+
+            # Get all documents with source_type="web"
+            results = self.collection.get(
+                where={"source_type": "web"},
+                include=["metadatas"]
+            )
+
+            # Handle None or empty results
+            if not results or not results.get("metadatas"):
+                logger.info("No documents with source_type='web' found")
+                return []
+
+            # Extract unique URLs by url_hash
+            unique_urls = {}
+            for metadata in results["metadatas"]:
+                if not metadata:  # Skip None metadata
+                    continue
+
+                url_hash = metadata.get("url_hash")
+                if url_hash and url_hash not in unique_urls:
+                    unique_urls[url_hash] = {
+                        "source_url": metadata.get("source_url"),
+                        "url_hash": url_hash,
+                        "content_hash": metadata.get("content_hash"),
+                        "last_crawled": metadata.get("last_crawled"),
+                        "crawl_depth": metadata.get("crawl_depth"),
+                    }
+
+            # Sort by last_crawled (most recent first)
+            url_list = list(unique_urls.values())
+            url_list.sort(key=lambda x: x.get("last_crawled", 0), reverse=True)
+
+            logger.info(f"Found {len(url_list)} unique crawled URLs")
+            return url_list
+
+        except Exception as e:
+            logger.error(f"Error getting crawled URLs: {e}", exc_info=True)
+            return []
+
+    def delete_document_by_url_hash(self, url_hash: str) -> int:
+        """
+        Delete all nodes associated with a URL hash.
+
+        Args:
+            url_hash: SHA-256 hash of the normalized URL to delete.
+
+        Returns:
+            Number of nodes deleted.
+
+        Raises:
+            Exception: If deletion fails.
+        """
+        try:
+            # Get all nodes with this url_hash
+            results = self.collection.get(where={"url_hash": url_hash})
+            node_ids = results["ids"]
+
+            if not node_ids:
+                logger.info(f"No nodes found for url_hash {url_hash}")
+                return 0
+
+            # Delete nodes
+            self.collection.delete(ids=node_ids)
+            logger.info(f"Deleted {len(node_ids)} nodes for url_hash {url_hash}")
+
+            return len(node_ids)
+        except Exception as e:
+            logger.error(f"Failed to delete web document: {e}")
+            raise
+
     def get_document_count(self) -> int:
         """
         Get the total number of nodes in the knowledge base.
