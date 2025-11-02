@@ -31,7 +31,9 @@ def handler(temp_dir):
     return AttachmentHandler(temp_dir=temp_dir, max_size=10 * 1024 * 1024)  # 10MB
 
 
-def create_mock_attachment(filename="test.pdf", content=b"test content", content_type="application/pdf"):
+def create_mock_attachment(
+    filename="test.pdf", content=b"test content", content_type="application/pdf"
+):
     """Create mock attachment."""
     att = MagicMock()
     att.filename = filename
@@ -73,11 +75,15 @@ class TestAttachmentHandler:
 
     def test_validate_file_type_unsupported_mime(self, handler):
         """Test rejection of unsupported MIME type."""
-        assert handler.validate_file_type("test.pdf", "application/x-executable") is False
+        assert (
+            handler.validate_file_type("test.pdf", "application/x-executable") is False
+        )
 
     def test_validate_file_type_mime_with_charset(self, handler):
         """Test MIME type validation with charset parameter."""
-        assert handler.validate_file_type("test.txt", "text/plain; charset=utf-8") is True
+        assert (
+            handler.validate_file_type("test.txt", "text/plain; charset=utf-8") is True
+        )
 
     def test_validate_file_size_within_limit(self, handler):
         """Test file size within limit."""
@@ -120,8 +126,11 @@ class TestAttachmentHandler:
     def test_extract_attachments_multiple_files(self, handler):
         """Test extraction of multiple attachments."""
         mock_att1 = create_mock_attachment("doc1.pdf", b"Content 1")
-        mock_att2 = create_mock_attachment("doc2.docx", b"Content 2",
-                                           "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        mock_att2 = create_mock_attachment(
+            "doc2.docx",
+            b"Content 2",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
         message = MagicMock()
         message.attachments = [mock_att1, mock_att2]
 
@@ -134,7 +143,9 @@ class TestAttachmentHandler:
     def test_extract_attachments_unsupported_type(self, handler):
         """Test extraction skips unsupported file types."""
         mock_att1 = create_mock_attachment("document.pdf", b"PDF content")
-        mock_att2 = create_mock_attachment("malware.exe", b"Bad content", "application/x-executable")
+        mock_att2 = create_mock_attachment(
+            "malware.exe", b"Bad content", "application/x-executable"
+        )
         message = MagicMock()
         message.attachments = [mock_att1, mock_att2]
 
@@ -263,6 +274,7 @@ class TestAttachmentHandler:
         # Set modification time to 10 days ago
         old_time = time.time() - (10 * 86400)
         import os
+
         os.utime(old_file, (old_time, old_time))
 
         # Create recent file

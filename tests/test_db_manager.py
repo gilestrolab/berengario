@@ -72,9 +72,11 @@ class TestDatabaseManager:
 
         # Verify message was committed
         with test_db_manager.get_session() as session:
-            found = session.query(ProcessedMessage).filter_by(
-                message_id="<test@example.com>"
-            ).first()
+            found = (
+                session.query(ProcessedMessage)
+                .filter_by(message_id="<test@example.com>")
+                .first()
+            )
             assert found is not None
             assert found.sender == "test@example.com"
 
@@ -92,9 +94,11 @@ class TestDatabaseManager:
 
         # Verify message was not committed
         with test_db_manager.get_session() as session:
-            found = session.query(ProcessedMessage).filter_by(
-                message_id="<test@example.com>"
-            ).first()
+            found = (
+                session.query(ProcessedMessage)
+                .filter_by(message_id="<test@example.com>")
+                .first()
+            )
             assert found is None
 
     def test_get_engine_info(self, test_db_manager):

@@ -12,7 +12,16 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 
-from fastapi import FastAPI, Request, Response, HTTPException, BackgroundTasks, Depends, UploadFile, File
+from fastapi import (
+    FastAPI,
+    Request,
+    Response,
+    HTTPException,
+    BackgroundTasks,
+    Depends,
+    UploadFile,
+    File,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, EmailStr
@@ -22,7 +31,11 @@ from src.rag.query_handler import QueryHandler
 from src.rag.rag_engine import get_system_prompt
 from src.email.email_sender import EmailSender
 from src.email.whitelist_validator import WhitelistValidator
-from src.email.conversation_manager import conversation_manager, ChannelType, MessageType
+from src.email.conversation_manager import (
+    conversation_manager,
+    ChannelType,
+    MessageType,
+)
 from src.document_processing.kb_manager import KnowledgeBaseManager
 from src.document_processing.document_processor import DocumentProcessor
 from src.api.admin.whitelist_manager import WhitelistManager
@@ -209,7 +222,9 @@ class OTPEntry:
     code: str
     email: str
     created_at: datetime = field(default_factory=datetime.now)
-    expires_at: datetime = field(default_factory=lambda: datetime.now() + timedelta(minutes=5))
+    expires_at: datetime = field(
+        default_factory=lambda: datetime.now() + timedelta(minutes=5)
+    )
     attempts: int = 0
     max_attempts: int = 5
 
@@ -250,7 +265,7 @@ class OTPManager:
             6-digit OTP code
         """
         # Generate random 6-digit code
-        code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+        code = "".join([str(secrets.randbelow(10)) for _ in range(6)])
 
         # Store OTP entry
         self.otps[email.lower()] = OTPEntry(code=code, email=email.lower())
@@ -301,7 +316,10 @@ class OTPManager:
                 return False, f"Invalid OTP. {remaining} attempts remaining."
             else:
                 del self.otps[email]
-                return False, "Invalid OTP. Maximum attempts reached. Please request a new one."
+                return (
+                    False,
+                    "Invalid OTP. Maximum attempts reached. Please request a new one.",
+                )
 
     def cleanup_expired(self):
         """Remove expired OTP entries."""
@@ -351,13 +369,21 @@ class Session:
         self.is_admin = is_admin
         self.last_activity = datetime.now()
         admin_status = " (admin)" if is_admin else ""
-        logger.info(f"Session {self.session_id} authenticated for {email}{admin_status}")
+        logger.info(
+            f"Session {self.session_id} authenticated for {email}{admin_status}"
+        )
 
     def is_authenticated(self) -> bool:
         """Check if session is authenticated."""
         return self.authenticated and self.email is not None
 
-    def add_message(self, role: str, content: str, sources: Optional[List] = None, attachments: Optional[List] = None):
+    def add_message(
+        self,
+        role: str,
+        content: str,
+        sources: Optional[List] = None,
+        attachments: Optional[List] = None,
+    ):
         """
         Add a message to conversation history.
 
@@ -465,6 +491,7 @@ class SessionManager:
         if session_dir.exists():
             try:
                 import shutil
+
                 shutil.rmtree(session_dir)
                 logger.info(f"Cleaned up attachments for session {session_id}")
             except Exception as e:
@@ -567,6 +594,7 @@ async def cleanup_old_attachments():
             mtime = datetime.fromtimestamp(session_dir.stat().st_mtime)
             if mtime < cutoff:
                 import shutil
+
                 shutil.rmtree(session_dir)
                 logger.info(f"Cleaned up old attachment directory: {session_dir.name}")
     except Exception as e:
@@ -739,6 +767,7 @@ async def require_admin(request: Request) -> Session:
 
 # API Endpoints
 
+
 # Authentication Endpoints
 @app.post("/api/auth/request-otp", response_model=AuthResponse)
 async def request_otp(request: OTPRequest, background_tasks: BackgroundTasks):
@@ -760,7 +789,7 @@ async def request_otp(request: OTPRequest, background_tasks: BackgroundTasks):
         return AuthResponse(
             success=False,
             message="Access denied. Your email address is not authorized to use this system. "
-                   "Please contact your administrator if you believe this is an error.",
+            "Please contact your administrator if you believe this is an error.",
         )
 
     # Development mode: Skip OTP email sending
@@ -952,7 +981,11 @@ async def query(
     # Session is already authenticated via dependency
     set_session_cookie(response, session.session_id)
 
-    user_identifier = session.email if hasattr(session, 'email') and session.email else f"web_user_{session.session_id[:8]}"
+    user_identifier = (
+        session.email
+        if hasattr(session, "email") and session.email
+        else f"web_user_{session.session_id[:8]}"
+    )
 
     # Determine thread_id: use existing conversation or create new
     thread_id = None
@@ -976,13 +1009,15 @@ async def query(
             if existing_conv.sender != user_identifier:
                 raise HTTPException(
                     status_code=403,
-                    detail="Access denied. You can only continue your own conversations."
+                    detail="Access denied. You can only continue your own conversations.",
                 )
 
             thread_id = existing_conv.thread_id
             channel = existing_conv.channel
 
-            logger.info(f"Continuing conversation {query_request.conversation_id} (thread: {thread_id})")
+            logger.info(
+                f"Continuing conversation {query_request.conversation_id} (thread: {thread_id})"
+            )
     else:
         # Create new conversation with session-based thread_id
         thread_id = f"webchat_{session.session_id}"
@@ -1014,7 +1049,7 @@ async def query(
         result = query_handler.process_query(
             query_text=query_request.query,
             user_email=user_identifier,
-            is_admin=session.is_admin if hasattr(session, 'is_admin') else False,
+            is_admin=session.is_admin if hasattr(session, "is_admin") else False,
             context=context,
         )
 
@@ -1058,7 +1093,9 @@ async def query(
                 attachment_url = {
                     "filename": filename,
                     "url": f"/api/attachments/{session.session_id}/{filename}",
-                    "content_type": attachment.get("content_type", "application/octet-stream"),
+                    "content_type": attachment.get(
+                        "content_type", "application/octet-stream"
+                    ),
                 }
                 attachment_urls.append(attachment_url)
 
@@ -1184,7 +1221,7 @@ async def list_conversations(
     from src.email.db_models import Conversation, ConversationMessage
     from sqlalchemy import desc, func
 
-    user_email = session.email if hasattr(session, 'email') and session.email else None
+    user_email = session.email if hasattr(session, "email") and session.email else None
     if not user_email:
         return ConversationsResponse(conversations=[], total_count=0)
 
@@ -1219,14 +1256,22 @@ async def list_conversations(
             subject = None
             if first_message:
                 # Truncate preview to 100 chars
-                preview = (first_message.content[:100] + "...") if len(first_message.content) > 100 else first_message.content
+                preview = (
+                    (first_message.content[:100] + "...")
+                    if len(first_message.content) > 100
+                    else first_message.content
+                )
                 subject = first_message.subject
 
             conversation_items.append(
                 ConversationListItem(
                     id=conv.id,
                     thread_id=conv.thread_id,
-                    channel=conv.channel.value if hasattr(conv.channel, 'value') else str(conv.channel),
+                    channel=(
+                        conv.channel.value
+                        if hasattr(conv.channel, "value")
+                        else str(conv.channel)
+                    ),
                     sender=conv.sender,
                     created_at=conv.created_at.isoformat(),
                     last_message_at=conv.last_message_at.isoformat(),
@@ -1242,7 +1287,9 @@ async def list_conversations(
         )
 
 
-@app.get("/api/conversations/{conversation_id}", response_model=ConversationMessagesResponse)
+@app.get(
+    "/api/conversations/{conversation_id}", response_model=ConversationMessagesResponse
+)
 async def get_conversation_messages(
     conversation_id: int,
     session: Session = Depends(require_auth),
@@ -1264,7 +1311,7 @@ async def get_conversation_messages(
     """
     from src.email.db_models import Conversation, ConversationMessage
 
-    user_email = session.email if hasattr(session, 'email') and session.email else None
+    user_email = session.email if hasattr(session, "email") and session.email else None
     if not user_email:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -1282,7 +1329,7 @@ async def get_conversation_messages(
         if conversation.sender != user_email:
             raise HTTPException(
                 status_code=403,
-                detail="Access denied. You can only view your own conversations."
+                detail="Access denied. You can only view your own conversations.",
             )
 
         # Get all messages ordered by message_order
@@ -1311,7 +1358,11 @@ async def get_conversation_messages(
         return ConversationMessagesResponse(
             conversation_id=conversation.id,
             thread_id=conversation.thread_id,
-            channel=conversation.channel.value if hasattr(conversation.channel, 'value') else str(conversation.channel),
+            channel=(
+                conversation.channel.value
+                if hasattr(conversation.channel, "value")
+                else str(conversation.channel)
+            ),
             messages=message_list,
         )
 
@@ -1338,7 +1389,7 @@ async def delete_conversation(
     """
     from src.email.db_models import Conversation
 
-    user_email = session.email if hasattr(session, 'email') and session.email else None
+    user_email = session.email if hasattr(session, "email") and session.email else None
     if not user_email:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -1356,7 +1407,7 @@ async def delete_conversation(
         if conversation.sender != user_email:
             raise HTTPException(
                 status_code=403,
-                detail="Access denied. You can only delete your own conversations."
+                detail="Access denied. You can only delete your own conversations.",
             )
 
         # Delete conversation (messages cascade delete automatically)
@@ -1364,7 +1415,9 @@ async def delete_conversation(
         db_session.delete(conversation)
         db_session.commit()
 
-        logger.info(f"User {user_email} deleted conversation {conversation_id} (thread: {thread_id})")
+        logger.info(
+            f"User {user_email} deleted conversation {conversation_id} (thread: {thread_id})"
+        )
 
         return {"success": True, "message": "Conversation deleted"}
 
@@ -1389,7 +1442,7 @@ async def search_conversations(
     from src.email.db_models import Conversation, ConversationMessage
     from sqlalchemy import desc, func, or_
 
-    user_email = session.email if hasattr(session, 'email') and session.email else None
+    user_email = session.email if hasattr(session, "email") and session.email else None
     if not user_email:
         return ConversationSearchResponse(results=[], query=q, total_results=0)
 
@@ -1458,7 +1511,11 @@ async def search_conversations(
                 ConversationListItem(
                     id=conv.id,
                     thread_id=conv.thread_id,
-                    channel=conv.channel.value if hasattr(conv.channel, 'value') else str(conv.channel),
+                    channel=(
+                        conv.channel.value
+                        if hasattr(conv.channel, "value")
+                        else str(conv.channel)
+                    ),
                     sender=conv.sender,
                     created_at=conv.created_at.isoformat(),
                     last_message_at=conv.last_message_at.isoformat(),
@@ -1501,7 +1558,7 @@ async def download_attachment(
     if session.session_id != session_id:
         raise HTTPException(
             status_code=403,
-            detail="Access denied. You can only download your own attachments."
+            detail="Access denied. You can only download your own attachments.",
         )
 
     filepath = settings.email_temp_dir / f"web_{session_id}" / filename
@@ -1586,10 +1643,14 @@ async def get_whitelist(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error reading whitelist {whitelist_type}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error reading whitelist: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error reading whitelist: {str(e)}"
+        )
 
 
-@app.post("/api/admin/whitelists/{whitelist_type}/add", response_model=AdminActionResponse)
+@app.post(
+    "/api/admin/whitelists/{whitelist_type}/add", response_model=AdminActionResponse
+)
 async def add_whitelist_entry(
     whitelist_type: str,
     request: WhitelistEntryRequest,
@@ -1655,7 +1716,9 @@ async def add_whitelist_entry(
         raise HTTPException(status_code=500, detail=f"Error adding entry: {str(e)}")
 
 
-@app.delete("/api/admin/whitelists/{whitelist_type}/remove", response_model=AdminActionResponse)
+@app.delete(
+    "/api/admin/whitelists/{whitelist_type}/remove", response_model=AdminActionResponse
+)
 async def remove_whitelist_entry(
     whitelist_type: str,
     request: WhitelistEntryRequest,
@@ -1738,16 +1801,16 @@ async def list_documents(
     """
     try:
         documents = document_manager.list_documents()
-        logger.info(
-            f"Admin {session.email} listed documents ({len(documents)} found)"
-        )
+        logger.info(f"Admin {session.email} listed documents ({len(documents)} found)")
         return DocumentListResponse(
             documents=documents,
             total_count=len(documents),
         )
     except Exception as e:
         logger.error(f"Error listing documents: {e}")
-        raise HTTPException(status_code=500, detail=f"Error listing documents: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error listing documents: {str(e)}"
+        )
 
 
 @app.get("/api/admin/documents/descriptions")
@@ -1778,7 +1841,9 @@ async def get_document_descriptions(
         }
     except Exception as e:
         logger.error(f"Error retrieving document descriptions: {e}")
-        raise HTTPException(status_code=500, detail=f"Error retrieving descriptions: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error retrieving descriptions: {str(e)}"
+        )
 
 
 @app.delete("/api/admin/documents/{file_hash}", response_model=AdminActionResponse)
@@ -1838,7 +1903,9 @@ async def delete_document(
             success=False,
         )
         logger.error(f"Error deleting document {file_hash}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error deleting document: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error deleting document: {str(e)}"
+        )
 
 
 @app.get("/api/admin/documents/{file_hash}/view")
@@ -1864,34 +1931,39 @@ async def view_document(
     try:
         # Get document info
         documents = document_manager.list_documents()
-        doc = next((d for d in documents if d.get('file_hash') == file_hash), None)
+        doc = next((d for d in documents if d.get("file_hash") == file_hash), None)
 
         if not doc:
-            raise HTTPException(status_code=404, detail=f"Document not found with hash: {file_hash}")
+            raise HTTPException(
+                status_code=404, detail=f"Document not found with hash: {file_hash}"
+            )
 
         # Get content from KB
         content = kb_manager.get_document_content(file_hash)
 
         if not content:
-            raise HTTPException(status_code=404, detail=f"No content found for document: {doc['filename']}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No content found for document: {doc['filename']}",
+            )
 
         # Log the view action
         audit_logger.log_action(
             session.email,
             "document_view",
-            doc['filename'],
+            doc["filename"],
             "success",
-            f"hash:{file_hash}"
+            f"hash:{file_hash}",
         )
 
         logger.info(f"Admin {session.email} viewed document: {doc['filename']}")
 
         return {
             "success": True,
-            "filename": doc['filename'],
+            "filename": doc["filename"],
             "file_hash": file_hash,
-            "source_type": doc.get('source_type'),
-            "file_type": doc.get('file_type'),
+            "source_type": doc.get("source_type"),
+            "file_type": doc.get("file_type"),
             "content": content,
         }
 
@@ -1925,21 +1997,23 @@ async def download_document(
     try:
         # Get document info
         documents = document_manager.list_documents()
-        doc = next((d for d in documents if d.get('file_hash') == file_hash), None)
+        doc = next((d for d in documents if d.get("file_hash") == file_hash), None)
 
         if not doc:
-            raise HTTPException(status_code=404, detail=f"Document not found with hash: {file_hash}")
+            raise HTTPException(
+                status_code=404, detail=f"Document not found with hash: {file_hash}"
+            )
 
         # Only allow download of file-sourced documents (manual uploads or file ingestion)
         # Email-sourced documents don't have physical files to download
-        allowed_source_types = ['manual', 'file']
-        if doc.get('source_type') not in allowed_source_types:
+        allowed_source_types = ["manual", "file"]
+        if doc.get("source_type") not in allowed_source_types:
             raise HTTPException(
                 status_code=400,
-                detail=f"Cannot download documents from source type: {doc.get('source_type')}. Only manual/file uploads can be downloaded."
+                detail=f"Cannot download documents from source type: {doc.get('source_type')}. Only manual/file uploads can be downloaded.",
             )
 
-        filename = doc['filename']
+        filename = doc["filename"]
         file_path = document_manager.documents_path / filename
 
         if not file_path.exists():
@@ -1947,26 +2021,22 @@ async def download_document(
 
         # Log the download action
         audit_logger.log_action(
-            session.email,
-            "document_download",
-            filename,
-            "success",
-            f"hash:{file_hash}"
+            session.email, "document_download", filename, "success", f"hash:{file_hash}"
         )
 
         logger.info(f"Admin {session.email} downloaded document: {filename}")
 
         # Determine content type based on file extension
         content_type = "application/octet-stream"
-        if filename.endswith('.pdf'):
+        if filename.endswith(".pdf"):
             content_type = "application/pdf"
-        elif filename.endswith('.docx'):
+        elif filename.endswith(".docx"):
             content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        elif filename.endswith('.doc'):
+        elif filename.endswith(".doc"):
             content_type = "application/msword"
-        elif filename.endswith('.txt'):
+        elif filename.endswith(".txt"):
             content_type = "text/plain"
-        elif filename.endswith('.csv'):
+        elif filename.endswith(".csv"):
             content_type = "text/csv"
 
         return FileResponse(
@@ -1979,7 +2049,9 @@ async def download_document(
         raise
     except Exception as e:
         logger.error(f"Error downloading document {file_hash}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error downloading document: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error downloading document: {str(e)}"
+        )
 
 
 @app.post("/api/admin/documents/upload")
@@ -2004,13 +2076,13 @@ async def upload_document(
     """
     try:
         # Validate file type
-        allowed_extensions = {'.pdf', '.docx', '.doc', '.txt', '.csv'}
+        allowed_extensions = {".pdf", ".docx", ".doc", ".txt", ".csv"}
         file_ext = Path(file.filename).suffix.lower()
 
         if file_ext not in allowed_extensions:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported file type: {file_ext}. Allowed: {', '.join(allowed_extensions)}"
+                detail=f"Unsupported file type: {file_ext}. Allowed: {', '.join(allowed_extensions)}",
             )
 
         # Create temp directory if it doesn't exist
@@ -2023,7 +2095,7 @@ async def upload_document(
         try:
             # Read and save file
             content = await file.read()
-            with open(temp_file_path, 'wb') as f:
+            with open(temp_file_path, "wb") as f:
                 f.write(content)
 
             logger.info(f"Saved uploaded file to: {temp_file_path}")
@@ -2037,13 +2109,14 @@ async def upload_document(
             final_filename = file.filename
             if permanent_path.exists():
                 # Add timestamp to avoid overwriting
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                name_parts = file.filename.rsplit('.', 1)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                name_parts = file.filename.rsplit(".", 1)
                 final_filename = f"{name_parts[0]}_{timestamp}.{name_parts[1]}"
                 permanent_path = documents_dir / final_filename
 
             # Copy to permanent location
             import shutil
+
             shutil.copy2(temp_file_path, permanent_path)
             logger.info(f"Saved permanent copy to: {permanent_path}")
 
@@ -2057,7 +2130,7 @@ async def upload_document(
                     "uploaded_by": session.email,
                     "filename": final_filename,  # Original filename (or with timestamp if duplicate)
                     "file_path": str(permanent_path),  # Point to permanent location
-                }
+                },
             )
 
             # Add to knowledge base
@@ -2065,28 +2138,37 @@ async def upload_document(
             if nodes:
                 kb_manager.add_nodes(nodes)
                 chunks_added = len(nodes)
-                logger.info(f"Processed uploaded document: {final_filename} ({chunks_added} chunks)")
+                logger.info(
+                    f"Processed uploaded document: {final_filename} ({chunks_added} chunks)"
+                )
 
                 # Generate and save document description
                 try:
-                    from src.document_processing.description_generator import description_generator
+                    from src.document_processing.description_generator import (
+                        description_generator,
+                    )
 
                     # Use relative path from project root
                     relative_path = str(permanent_path)
-                    if relative_path.startswith('/app/'):
-                        relative_path = relative_path[5:]  # Remove '/app/' prefix in Docker
+                    if relative_path.startswith("/app/"):
+                        relative_path = relative_path[
+                            5:
+                        ]  # Remove '/app/' prefix in Docker
 
                     description_generator.generate_and_save(
                         file_path=relative_path,
                         filename=final_filename,
                         chunks=nodes,
                         file_size=len(content),
-                        file_type=file_ext.lstrip('.'),
+                        file_type=file_ext.lstrip("."),
                     )
                     logger.info(f"Generated description for: {final_filename}")
                 except Exception as e:
                     # Don't fail the upload if description generation fails
-                    logger.error(f"Error generating description for {final_filename}: {e}", exc_info=True)
+                    logger.error(
+                        f"Error generating description for {final_filename}: {e}",
+                        exc_info=True,
+                    )
 
             # Log to audit trail
             audit_logger.log_action(
@@ -2094,7 +2176,7 @@ async def upload_document(
                 "document_upload",
                 file.filename,
                 "success",
-                f"chunks:{chunks_added}"
+                f"chunks:{chunks_added}",
             )
 
             return {
@@ -2119,10 +2201,12 @@ async def upload_document(
             "document_upload",
             file.filename if file else "unknown",
             "error",
-            str(e)
+            str(e),
         )
         logger.error(f"Error uploading document {file.filename}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error uploading document: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error uploading document: {str(e)}"
+        )
 
 
 # Web Crawling Endpoints
@@ -2147,7 +2231,9 @@ async def crawl_url(
         HTTPException: If URL is invalid or crawling fails
     """
     try:
-        logger.info(f"Admin {session.email} initiated crawl: {request.url} (depth={request.crawl_depth})")
+        logger.info(
+            f"Admin {session.email} initiated crawl: {request.url} (depth={request.crawl_depth})"
+        )
 
         # Process URL with DocumentProcessor
         nodes = document_processor.process_url(
@@ -2156,7 +2242,7 @@ async def crawl_url(
             extra_metadata={
                 "crawled_via": "admin_interface",
                 "crawled_by": session.email,
-            }
+            },
         )
 
         # Add to knowledge base
@@ -2169,8 +2255,8 @@ async def crawl_url(
             # Count unique pages (by url_hash)
             unique_urls = set()
             for node in nodes:
-                if hasattr(node, 'metadata') and 'url_hash' in node.metadata:
-                    unique_urls.add(node.metadata['url_hash'])
+                if hasattr(node, "metadata") and "url_hash" in node.metadata:
+                    unique_urls.add(node.metadata["url_hash"])
             pages_crawled = len(unique_urls)
 
             logger.info(
@@ -2184,7 +2270,7 @@ async def crawl_url(
             "url_crawl",
             request.url,
             "success",
-            f"pages:{pages_crawled},chunks:{chunks_added},depth:{request.crawl_depth}"
+            f"pages:{pages_crawled},chunks:{chunks_added},depth:{request.crawl_depth}",
         )
 
         message = (
@@ -2206,21 +2292,13 @@ async def crawl_url(
     except ValueError as e:
         # Invalid URL or crawling error
         audit_logger.log_action(
-            session.email,
-            "url_crawl",
-            request.url,
-            "error",
-            str(e)
+            session.email, "url_crawl", request.url, "error", str(e)
         )
         logger.error(f"Error crawling {request.url}: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         audit_logger.log_action(
-            session.email,
-            "url_crawl",
-            request.url,
-            "error",
-            str(e)
+            session.email, "url_crawl", request.url, "error", str(e)
         )
         logger.error(f"Error crawling {request.url}: {e}")
         raise HTTPException(status_code=500, detail=f"Error crawling URL: {str(e)}")
@@ -2246,17 +2324,16 @@ async def list_crawled_urls(
 
         # Format timestamps for display
         from datetime import datetime
-        for url in urls:
-            if url.get('last_crawled'):
-                try:
-                    dt = datetime.fromtimestamp(url['last_crawled'])
-                    url['last_crawled_formatted'] = dt.strftime('%Y-%m-%d %H:%M:%S')
-                except:
-                    url['last_crawled_formatted'] = 'Unknown'
 
-        logger.info(
-            f"Admin {session.email} listed crawled URLs ({len(urls)} found)"
-        )
+        for url in urls:
+            if url.get("last_crawled"):
+                try:
+                    dt = datetime.fromtimestamp(url["last_crawled"])
+                    url["last_crawled_formatted"] = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    url["last_crawled_formatted"] = "Unknown"
+
+        logger.info(f"Admin {session.email} listed crawled URLs ({len(urls)} found)")
 
         return CrawledUrlResponse(
             urls=urls,
@@ -2264,7 +2341,9 @@ async def list_crawled_urls(
         )
     except Exception as e:
         logger.error(f"Error listing crawled URLs: {e}")
-        raise HTTPException(status_code=500, detail=f"Error listing crawled URLs: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error listing crawled URLs: {str(e)}"
+        )
 
 
 @app.delete("/api/admin/crawled-urls/all", response_model=AdminActionResponse)
@@ -2315,7 +2394,7 @@ async def delete_all_crawled_urls(
             "url_delete_all",
             f"{len(urls)} URLs",
             "success",
-            f"urls:{len(urls)},chunks:{total_chunks}"
+            f"urls:{len(urls)},chunks:{total_chunks}",
         )
 
         message = (
@@ -2336,14 +2415,12 @@ async def delete_all_crawled_urls(
 
     except Exception as e:
         audit_logger.log_action(
-            session.email,
-            "url_delete_all",
-            "all URLs",
-            "error",
-            str(e)
+            session.email, "url_delete_all", "all URLs", "error", str(e)
         )
         logger.error(f"Error deleting all crawled URLs: {e}")
-        raise HTTPException(status_code=500, detail=f"Error deleting all URLs: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error deleting all URLs: {str(e)}"
+        )
 
 
 @app.delete("/api/admin/crawled-urls/{url_hash}", response_model=AdminActionResponse)
@@ -2371,11 +2448,10 @@ async def delete_crawled_url(
         url_info = kb_manager.get_document_by_url_hash(url_hash)
         if not url_info:
             raise HTTPException(
-                status_code=404,
-                detail=f"Crawled URL not found with hash: {url_hash}"
+                status_code=404, detail=f"Crawled URL not found with hash: {url_hash}"
             )
 
-        source_url = url_info.get('source_url', 'Unknown')
+        source_url = url_info.get("source_url", "Unknown")
 
         # Delete from KB
         chunks_removed = kb_manager.delete_document_by_url_hash(url_hash)
@@ -2386,7 +2462,7 @@ async def delete_crawled_url(
             "url_delete",
             source_url,
             "success",
-            f"hash:{url_hash},chunks:{chunks_removed}"
+            f"hash:{url_hash},chunks:{chunks_removed}",
         )
 
         message = (
@@ -2410,11 +2486,7 @@ async def delete_crawled_url(
         raise
     except Exception as e:
         audit_logger.log_action(
-            session.email,
-            "url_delete",
-            f"hash:{url_hash}",
-            "error",
-            str(e)
+            session.email, "url_delete", f"hash:{url_hash}", "error", str(e)
         )
         logger.error(f"Error deleting crawled URL {url_hash}: {e}")
         raise HTTPException(status_code=500, detail=f"Error deleting URL: {str(e)}")
@@ -2454,7 +2526,9 @@ async def create_backup(
                 backup_manager.cleanup_old_backups(max_age_days=7, max_count=5)
 
                 # Generate download link using web base URL
-                download_url = f"{settings.web_base_url}/api/admin/backups/{backup_path.name}"
+                download_url = (
+                    f"{settings.web_base_url}/api/admin/backups/{backup_path.name}"
+                )
 
                 # Send email notification to admin
                 subject = f"[{settings.instance_name}] Data Backup Ready"
@@ -2506,7 +2580,7 @@ async def create_backup(
                     "backup_create",
                     backup_path.name,
                     "success",
-                    f"size:{backup_path.stat().st_size}"
+                    f"size:{backup_path.stat().st_size}",
                 )
 
                 logger.info(f"Admin {session.email} created backup: {backup_path.name}")
@@ -2587,7 +2661,9 @@ async def download_backup(
         backup_path = backup_manager.get_backup_path(filename)
 
         if not backup_path:
-            raise HTTPException(status_code=404, detail=f"Backup file not found: {filename}")
+            raise HTTPException(
+                status_code=404, detail=f"Backup file not found: {filename}"
+            )
 
         # Log the download
         audit_logger.log_action(
@@ -2595,7 +2671,7 @@ async def download_backup(
             "backup_download",
             filename,
             "success",
-            f"size:{backup_path.stat().st_size}"
+            f"size:{backup_path.stat().st_size}",
         )
 
         logger.info(f"Admin {session.email} downloaded backup: {filename}")
@@ -2610,7 +2686,9 @@ async def download_backup(
         raise
     except Exception as e:
         logger.error(f"Error downloading backup {filename}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error downloading backup: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error downloading backup: {str(e)}"
+        )
 
 
 @app.delete("/api/admin/backups/{filename}")
@@ -2637,7 +2715,9 @@ async def delete_backup(
         success = backup_manager.delete_backup(filename)
 
         if not success:
-            raise HTTPException(status_code=404, detail=f"Backup file not found: {filename}")
+            raise HTTPException(
+                status_code=404, detail=f"Backup file not found: {filename}"
+            )
 
         # Log the action
         audit_logger.log_action(
@@ -2681,7 +2761,7 @@ async def get_prompt_settings(session: Session = Depends(require_admin)):
             instance_name=settings.instance_name,
             instance_description=settings.instance_description,
             organization=settings.organization,
-            include_tools=True
+            include_tools=True,
         )
 
         # Get custom prompt content if it exists
@@ -2689,29 +2769,30 @@ async def get_prompt_settings(session: Session = Depends(require_admin)):
         custom_prompt_file = settings.rag_custom_prompt_file
         if custom_prompt_file and Path(custom_prompt_file).exists():
             try:
-                with open(custom_prompt_file, 'r', encoding='utf-8') as f:
+                with open(custom_prompt_file, "r", encoding="utf-8") as f:
                     custom_prompt = f.read()
             except Exception as e:
                 logger.error(f"Error reading custom prompt file: {e}")
 
         # Log the action
         audit_logger.log_action(
-            session.email,
-            "settings_view_prompt",
-            "system_prompt",
-            "success"
+            session.email, "settings_view_prompt", "system_prompt", "success"
         )
 
         return {
             "success": True,
             "full_prompt": full_prompt,
             "custom_prompt": custom_prompt,
-            "custom_prompt_file": str(custom_prompt_file) if custom_prompt_file else None,
+            "custom_prompt_file": (
+                str(custom_prompt_file) if custom_prompt_file else None
+            ),
         }
 
     except Exception as e:
         logger.error(f"Error getting prompt settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting prompt settings: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error getting prompt settings: {str(e)}"
+        )
 
 
 @app.post("/api/admin/settings/prompt")
@@ -2748,7 +2829,7 @@ async def update_prompt_settings(
         custom_prompt_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Write the custom prompt
-        with open(custom_prompt_file, 'w', encoding='utf-8') as f:
+        with open(custom_prompt_file, "w", encoding="utf-8") as f:
             f.write(custom_prompt)
 
         # Log the action
@@ -2757,10 +2838,12 @@ async def update_prompt_settings(
             "settings_update_prompt",
             "system_prompt",
             "success",
-            f"length:{len(custom_prompt)}"
+            f"length:{len(custom_prompt)}",
         )
 
-        logger.info(f"Admin {session.email} updated custom system prompt ({len(custom_prompt)} chars)")
+        logger.info(
+            f"Admin {session.email} updated custom system prompt ({len(custom_prompt)} chars)"
+        )
 
         return {
             "success": True,
@@ -2770,7 +2853,9 @@ async def update_prompt_settings(
 
     except Exception as e:
         logger.error(f"Error updating prompt settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Error updating prompt settings: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error updating prompt settings: {str(e)}"
+        )
 
 
 @app.get("/api/admin/settings/models")
@@ -2789,10 +2874,7 @@ async def get_model_settings(session: Session = Depends(require_admin)):
     try:
         # Log the action
         audit_logger.log_action(
-            session.email,
-            "settings_view_models",
-            "model_info",
-            "success"
+            session.email, "settings_view_models", "model_info", "success"
         )
 
         return {
@@ -2800,24 +2882,34 @@ async def get_model_settings(session: Session = Depends(require_admin)):
             "embedding": {
                 "model": settings.openai_embedding_model,
                 "api_base": settings.openai_api_base,
-                "provider": "Naga.ac" if "naga.ac" in settings.openai_api_base.lower() else "OpenAI",
+                "provider": (
+                    "Naga.ac"
+                    if "naga.ac" in settings.openai_api_base.lower()
+                    else "OpenAI"
+                ),
             },
             "llm": {
                 "model": settings.openrouter_model,
                 "api_base": settings.openrouter_api_base,
-                "provider": "Naga.ac" if "naga.ac" in settings.openrouter_api_base.lower() else "OpenRouter",
+                "provider": (
+                    "Naga.ac"
+                    if "naga.ac" in settings.openrouter_api_base.lower()
+                    else "OpenRouter"
+                ),
             },
             "rag": {
                 "chunk_size": settings.chunk_size,
                 "chunk_overlap": settings.chunk_overlap,
                 "top_k_retrieval": settings.top_k_retrieval,
                 "similarity_threshold": settings.similarity_threshold,
-            }
+            },
         }
 
     except Exception as e:
         logger.error(f"Error getting model settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting model settings: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error getting model settings: {str(e)}"
+        )
 
 
 @app.get("/api/config")
@@ -2860,7 +2952,9 @@ async def generate_example_questions_endpoint(
         logger.info(f"Admin {session.email} requested example question generation")
 
         # Generate and save questions
-        result = generate_and_save_example_questions(rag_engine=query_handler.rag_engine, count=15)
+        result = generate_and_save_example_questions(
+            rag_engine=query_handler.rag_engine, count=15
+        )
 
         # Log to audit trail
         audit_logger.log_action(
@@ -2868,7 +2962,7 @@ async def generate_example_questions_endpoint(
             "generate_example_questions",
             "knowledge_base",
             "success",
-            f"generated:{result['count']}"
+            f"generated:{result['count']}",
         )
 
         message = f"Successfully generated {result['count']} example questions"
@@ -2878,8 +2972,8 @@ async def generate_example_questions_endpoint(
             success=True,
             message=message,
             details={
-                "count": result['count'],
-                "generated_at": result['generated_at'],
+                "count": result["count"],
+                "generated_at": result["generated_at"],
             },
         )
 
@@ -2889,10 +2983,12 @@ async def generate_example_questions_endpoint(
             "generate_example_questions",
             "knowledge_base",
             "error",
-            str(e)
+            str(e),
         )
         logger.error(f"Error generating example questions: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error generating example questions: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error generating example questions: {str(e)}"
+        )
 
 
 @app.get("/api/example-questions")
@@ -2923,7 +3019,9 @@ async def get_example_questions():
         }
     except Exception as e:
         logger.error(f"Error loading example questions: {e}")
-        raise HTTPException(status_code=500, detail=f"Error loading example questions: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error loading example questions: {str(e)}"
+        )
 
 
 @app.get("/health")
@@ -2948,7 +3046,9 @@ async def startup_event():
         logger.error("⚠️  This is a DEVELOPMENT-ONLY mode with NO email verification.")
         logger.error("⚠️  Anyone with whitelist access can login without verification.")
         logger.error("⚠️  DO NOT USE THIS SETTING IN PRODUCTION!")
-        logger.error("⚠️  Set DISABLE_OTP_FOR_DEV=false to enable proper authentication.")
+        logger.error(
+            "⚠️  Set DISABLE_OTP_FOR_DEV=false to enable proper authentication."
+        )
         logger.error("=" * 80)
 
 

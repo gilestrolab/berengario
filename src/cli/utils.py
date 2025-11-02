@@ -6,7 +6,13 @@ import sys
 from typing import Optional
 from rich.console import Console
 from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    BarColumn,
+    TaskProgressColumn,
+)
 from rich.panel import Panel
 from rich import box
 import typer
@@ -92,7 +98,9 @@ def create_table(title: str, columns: list[str]) -> Table:
     Returns:
         Configured Table object
     """
-    table = Table(title=title, box=box.ROUNDED, show_header=True, header_style="bold cyan")
+    table = Table(
+        title=title, box=box.ROUNDED, show_header=True, header_style="bold cyan"
+    )
     for column in columns:
         table.add_column(column, style="white")
     return table
@@ -163,7 +171,7 @@ def format_bytes(bytes_size: int) -> str:
     Returns:
         Formatted string (e.g., "1.5 MB")
     """
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
         if bytes_size < 1024.0:
             return f"{bytes_size:.1f} {unit}"
         bytes_size /= 1024.0
@@ -183,7 +191,7 @@ def format_count(count: int, singular: str, plural: str = None) -> str:
         Formatted string (e.g., "5 documents")
     """
     if plural is None:
-        plural = singular + 's'
+        plural = singular + "s"
 
     return f"{count} {singular if count == 1 else plural}"
 

@@ -41,9 +41,9 @@ def set_tool_context(user_email: str, is_admin: bool, is_email_request: bool = F
     """
     global _tool_context
     _tool_context = {
-        'user_email': user_email,
-        'is_admin': is_admin,
-        'is_email_request': is_email_request,
+        "user_email": user_email,
+        "is_admin": is_admin,
+        "is_email_request": is_email_request,
     }
 
 
@@ -60,8 +60,8 @@ def _validate_admin_access() -> None:
     Raises:
         PermissionError: If requester is not an admin
     """
-    if not _tool_context.get('is_admin', False):
-        requester = _tool_context.get('user_email', 'unknown')
+    if not _tool_context.get("is_admin", False):
+        requester = _tool_context.get("user_email", "unknown")
         error_msg = f"Access denied: Only administrators can manage whitelists. Requester: {requester}"
         logger.warning(error_msg)
         raise PermissionError(error_msg)
@@ -79,8 +79,10 @@ def _add_to_whitelist_file(filepath: Path, email: str) -> None:
     # Read existing entries
     existing = set()
     if filepath.exists():
-        with open(filepath, 'r') as f:
-            existing = {line.strip() for line in f if line.strip() and not line.startswith('#')}
+        with open(filepath, "r") as f:
+            existing = {
+                line.strip() for line in f if line.strip() and not line.startswith("#")
+            }
 
     # Check if already exists
     if email in existing:
@@ -88,7 +90,7 @@ def _add_to_whitelist_file(filepath: Path, email: str) -> None:
         return
 
     # Add new entry
-    with open(filepath, 'a') as f:
+    with open(filepath, "a") as f:
         f.write(f"{email}\n")
     logger.info(f"Added {email} to whitelist {filepath}")
 
@@ -108,7 +110,7 @@ def _remove_from_whitelist_file(filepath: Path, email: str) -> bool:
         return False
 
     # Read all lines
-    with open(filepath, 'r') as f:
+    with open(filepath, "r") as f:
         lines = f.readlines()
 
     # Filter out the email to remove
@@ -124,7 +126,7 @@ def _remove_from_whitelist_file(filepath: Path, email: str) -> bool:
 
     if found:
         # Write back filtered lines
-        with open(filepath, 'w') as f:
+        with open(filepath, "w") as f:
             f.writelines(new_lines)
         return True
     else:
@@ -152,14 +154,14 @@ def add_to_teach_whitelist(email: str) -> Dict[str, Any]:
         if not email:
             raise ValueError("Email address cannot be empty")
 
-        admin_email = _tool_context.get('user_email', 'unknown')
-        is_email_request = _tool_context.get('is_email_request', False)
+        admin_email = _tool_context.get("user_email", "unknown")
+        is_email_request = _tool_context.get("is_email_request", False)
 
         # Email requests require confirmation to prevent spoofing
         if is_email_request:
             pending_mgr = get_pending_action_manager()
             action = pending_mgr.create_pending_action(
-                action_type='add_teach',
+                action_type="add_teach",
                 email_to_modify=email,
                 requested_by=admin_email,
             )
@@ -187,16 +189,18 @@ def add_to_teach_whitelist(email: str) -> Dict[str, Any]:
                     ),
                     body_html=None,
                 )
-                logger.info(f"Sent confirmation email to {admin_email} for action {action.action_id}")
+                logger.info(
+                    f"Sent confirmation email to {admin_email} for action {action.action_id}"
+                )
             except Exception as e:
                 logger.error(f"Failed to send confirmation email: {e}", exc_info=True)
 
             return {
-                'success': True,
-                'pending': True,
-                'action_id': action.action_id,
-                'email_sent': True,  # Flag to indicate confirmation email was already sent
-                'message': (
+                "success": True,
+                "pending": True,
+                "action_id": action.action_id,
+                "email_sent": True,  # Flag to indicate confirmation email was already sent
+                "message": (
                     f"A confirmation email has been sent to {admin_email}. "
                     f"Please reply to that email within 30 minutes to confirm adding '{email}' to the teach whitelist."
                 ),
@@ -211,20 +215,20 @@ def add_to_teach_whitelist(email: str) -> Dict[str, Any]:
         logger.info(f"Admin {admin_email} added {email} to teach whitelist")
 
         return {
-            'success': True,
-            'message': f"Successfully added '{email}' to the teach whitelist. They can now add content to the knowledge base.",
+            "success": True,
+            "message": f"Successfully added '{email}' to the teach whitelist. They can now add content to the knowledge base.",
         }
 
     except PermissionError as e:
         return {
-            'success': False,
-            'message': f"Permission denied: {str(e)}",
+            "success": False,
+            "message": f"Permission denied: {str(e)}",
         }
     except Exception as e:
         logger.error(f"Error adding to teach whitelist: {e}", exc_info=True)
         return {
-            'success': False,
-            'message': f"Error: {str(e)}",
+            "success": False,
+            "message": f"Error: {str(e)}",
         }
 
 
@@ -248,14 +252,14 @@ def remove_from_teach_whitelist(email: str) -> Dict[str, Any]:
         if not email:
             raise ValueError("Email address cannot be empty")
 
-        admin_email = _tool_context.get('user_email', 'unknown')
-        is_email_request = _tool_context.get('is_email_request', False)
+        admin_email = _tool_context.get("user_email", "unknown")
+        is_email_request = _tool_context.get("is_email_request", False)
 
         # Email requests require confirmation to prevent spoofing
         if is_email_request:
             pending_mgr = get_pending_action_manager()
             action = pending_mgr.create_pending_action(
-                action_type='remove_teach',
+                action_type="remove_teach",
                 email_to_modify=email,
                 requested_by=admin_email,
             )
@@ -283,16 +287,18 @@ def remove_from_teach_whitelist(email: str) -> Dict[str, Any]:
                     ),
                     body_html=None,
                 )
-                logger.info(f"Sent confirmation email to {admin_email} for action {action.action_id}")
+                logger.info(
+                    f"Sent confirmation email to {admin_email} for action {action.action_id}"
+                )
             except Exception as e:
                 logger.error(f"Failed to send confirmation email: {e}", exc_info=True)
 
             return {
-                'success': True,
-                'pending': True,
-                'action_id': action.action_id,
-                'email_sent': True,  # Flag to indicate confirmation email was already sent
-                'message': (
+                "success": True,
+                "pending": True,
+                "action_id": action.action_id,
+                "email_sent": True,  # Flag to indicate confirmation email was already sent
+                "message": (
                     f"A confirmation email has been sent to {admin_email}. "
                     f"Please reply to that email within 30 minutes to confirm removing '{email}' from the teach whitelist."
                 ),
@@ -305,25 +311,25 @@ def remove_from_teach_whitelist(email: str) -> Dict[str, Any]:
         if removed:
             logger.info(f"Admin {admin_email} removed {email} from teach whitelist")
             return {
-                'success': True,
-                'message': f"Successfully removed '{email}' from the teach whitelist.",
+                "success": True,
+                "message": f"Successfully removed '{email}' from the teach whitelist.",
             }
         else:
             return {
-                'success': False,
-                'message': f"'{email}' was not found in the teach whitelist.",
+                "success": False,
+                "message": f"'{email}' was not found in the teach whitelist.",
             }
 
     except PermissionError as e:
         return {
-            'success': False,
-            'message': f"Permission denied: {str(e)}",
+            "success": False,
+            "message": f"Permission denied: {str(e)}",
         }
     except Exception as e:
         logger.error(f"Error removing from teach whitelist: {e}", exc_info=True)
         return {
-            'success': False,
-            'message': f"Error: {str(e)}",
+            "success": False,
+            "message": f"Error: {str(e)}",
         }
 
 
@@ -347,14 +353,14 @@ def add_to_query_whitelist(email: str) -> Dict[str, Any]:
         if not email:
             raise ValueError("Email address cannot be empty")
 
-        admin_email = _tool_context.get('user_email', 'unknown')
-        is_email_request = _tool_context.get('is_email_request', False)
+        admin_email = _tool_context.get("user_email", "unknown")
+        is_email_request = _tool_context.get("is_email_request", False)
 
         # Email requests require confirmation to prevent spoofing
         if is_email_request:
             pending_mgr = get_pending_action_manager()
             action = pending_mgr.create_pending_action(
-                action_type='add_query',
+                action_type="add_query",
                 email_to_modify=email,
                 requested_by=admin_email,
             )
@@ -382,16 +388,18 @@ def add_to_query_whitelist(email: str) -> Dict[str, Any]:
                     ),
                     body_html=None,
                 )
-                logger.info(f"Sent confirmation email to {admin_email} for action {action.action_id}")
+                logger.info(
+                    f"Sent confirmation email to {admin_email} for action {action.action_id}"
+                )
             except Exception as e:
                 logger.error(f"Failed to send confirmation email: {e}", exc_info=True)
 
             return {
-                'success': True,
-                'pending': True,
-                'action_id': action.action_id,
-                'email_sent': True,  # Flag to indicate confirmation email was already sent
-                'message': (
+                "success": True,
+                "pending": True,
+                "action_id": action.action_id,
+                "email_sent": True,  # Flag to indicate confirmation email was already sent
+                "message": (
                     f"A confirmation email has been sent to {admin_email}. "
                     f"Please reply to that email within 30 minutes to confirm adding '{email}' to the query whitelist."
                 ),
@@ -406,20 +414,20 @@ def add_to_query_whitelist(email: str) -> Dict[str, Any]:
         logger.info(f"Admin {admin_email} added {email} to query whitelist")
 
         return {
-            'success': True,
-            'message': f"Successfully added '{email}' to the query whitelist. They can now ask questions.",
+            "success": True,
+            "message": f"Successfully added '{email}' to the query whitelist. They can now ask questions.",
         }
 
     except PermissionError as e:
         return {
-            'success': False,
-            'message': f"Permission denied: {str(e)}",
+            "success": False,
+            "message": f"Permission denied: {str(e)}",
         }
     except Exception as e:
         logger.error(f"Error adding to query whitelist: {e}", exc_info=True)
         return {
-            'success': False,
-            'message': f"Error: {str(e)}",
+            "success": False,
+            "message": f"Error: {str(e)}",
         }
 
 
@@ -443,14 +451,14 @@ def remove_from_query_whitelist(email: str) -> Dict[str, Any]:
         if not email:
             raise ValueError("Email address cannot be empty")
 
-        admin_email = _tool_context.get('user_email', 'unknown')
-        is_email_request = _tool_context.get('is_email_request', False)
+        admin_email = _tool_context.get("user_email", "unknown")
+        is_email_request = _tool_context.get("is_email_request", False)
 
         # Email requests require confirmation to prevent spoofing
         if is_email_request:
             pending_mgr = get_pending_action_manager()
             action = pending_mgr.create_pending_action(
-                action_type='remove_query',
+                action_type="remove_query",
                 email_to_modify=email,
                 requested_by=admin_email,
             )
@@ -478,16 +486,18 @@ def remove_from_query_whitelist(email: str) -> Dict[str, Any]:
                     ),
                     body_html=None,
                 )
-                logger.info(f"Sent confirmation email to {admin_email} for action {action.action_id}")
+                logger.info(
+                    f"Sent confirmation email to {admin_email} for action {action.action_id}"
+                )
             except Exception as e:
                 logger.error(f"Failed to send confirmation email: {e}", exc_info=True)
 
             return {
-                'success': True,
-                'pending': True,
-                'action_id': action.action_id,
-                'email_sent': True,  # Flag to indicate confirmation email was already sent
-                'message': (
+                "success": True,
+                "pending": True,
+                "action_id": action.action_id,
+                "email_sent": True,  # Flag to indicate confirmation email was already sent
+                "message": (
                     f"A confirmation email has been sent to {admin_email}. "
                     f"Please reply to that email within 30 minutes to confirm removing '{email}' from the query whitelist."
                 ),
@@ -500,25 +510,25 @@ def remove_from_query_whitelist(email: str) -> Dict[str, Any]:
         if removed:
             logger.info(f"Admin {admin_email} removed {email} from query whitelist")
             return {
-                'success': True,
-                'message': f"Successfully removed '{email}' from the query whitelist.",
+                "success": True,
+                "message": f"Successfully removed '{email}' from the query whitelist.",
             }
         else:
             return {
-                'success': False,
-                'message': f"'{email}' was not found in the query whitelist.",
+                "success": False,
+                "message": f"'{email}' was not found in the query whitelist.",
             }
 
     except PermissionError as e:
         return {
-            'success': False,
-            'message': f"Permission denied: {str(e)}",
+            "success": False,
+            "message": f"Permission denied: {str(e)}",
         }
     except Exception as e:
         logger.error(f"Error removing from query whitelist: {e}", exc_info=True)
         return {
-            'success': False,
-            'message': f"Error: {str(e)}",
+            "success": False,
+            "message": f"Error: {str(e)}",
         }
 
 

@@ -37,11 +37,7 @@ class DescriptionGenerator:
 
         logger.info("DescriptionGenerator initialized")
 
-    def generate_description(
-        self,
-        chunks: List[TextNode],
-        max_chunks: int = 3
-    ) -> str:
+    def generate_description(self, chunks: List[TextNode], max_chunks: int = 3) -> str:
         """
         Generate a 2-sentence description from document chunks.
 
@@ -77,8 +73,11 @@ Provide only the 2-sentence summary, nothing else:"""
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that creates concise document summaries."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that creates concise document summaries.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0.3,  # Lower temperature for more consistent summaries
                 max_tokens=150,  # Limit to keep it concise
@@ -92,7 +91,7 @@ Provide only the 2-sentence summary, nothing else:"""
         except Exception as e:
             logger.error(f"Error generating description with LLM: {e}")
             # Fallback: use first sentence of first chunk
-            fallback = sample_chunks[0].text.split('.')[0] + "."
+            fallback = sample_chunks[0].text.split(".")[0] + "."
             if len(fallback) > 200:
                 fallback = fallback[:197] + "..."
             return fallback + " (Auto-generated summary)"
@@ -226,8 +225,12 @@ Provide only the 2-sentence summary, nothing else:"""
                     "file_size": desc.file_size,
                     "file_type": desc.file_type,
                     "chunk_count": desc.chunk_count,
-                    "created_at": desc.created_at.isoformat() if desc.created_at else None,
-                    "updated_at": desc.updated_at.isoformat() if desc.updated_at else None,
+                    "created_at": (
+                        desc.created_at.isoformat() if desc.created_at else None
+                    ),
+                    "updated_at": (
+                        desc.updated_at.isoformat() if desc.updated_at else None
+                    ),
                 }
                 for desc in descriptions
             ]

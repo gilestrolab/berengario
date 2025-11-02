@@ -75,9 +75,7 @@ class TestEmailClient:
 
         assert result is True
         assert client.is_connected() is True
-        mock_mailbox.login.assert_called_once_with(
-            "test@example.com", "test_password"
-        )
+        mock_mailbox.login.assert_called_once_with("test@example.com", "test_password")
 
     def test_connect_already_connected(self, mock_settings, mock_mailbox):
         """Test connecting when already connected."""
@@ -278,7 +276,7 @@ class TestEmailClient:
         result = client.mark_seen("12345")
 
         assert result is True
-        mock_mailbox.flag.assert_called_once_with("12345", ['\\Seen'], True)
+        mock_mailbox.flag.assert_called_once_with("12345", ["\\Seen"], True)
 
     def test_mark_unseen(self, mock_settings, mock_mailbox):
         """Test marking message as unseen."""
@@ -288,7 +286,7 @@ class TestEmailClient:
         result = client.mark_unseen("12345")
 
         assert result is True
-        mock_mailbox.flag.assert_called_once_with("12345", ['\\Seen'], False)
+        mock_mailbox.flag.assert_called_once_with("12345", ["\\Seen"], False)
 
     def test_get_folder_list(self, mock_settings, mock_mailbox):
         """Test getting folder list."""

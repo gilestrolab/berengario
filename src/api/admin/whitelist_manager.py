@@ -28,8 +28,8 @@ class WhitelistManager:
     }
 
     # Email validation regex (simplified)
-    EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-    DOMAIN_REGEX = re.compile(r'^@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+    DOMAIN_REGEX = re.compile(r"^@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
     def __init__(self, base_path: Path = None):
         """
@@ -82,7 +82,7 @@ class WhitelistManager:
             return {"entries": [], "comments": [], "raw_lines": []}
 
         try:
-            with open(path, 'r') as f:
+            with open(path, "r") as f:
                 raw_lines = f.readlines()
 
             entries = []
@@ -90,11 +90,11 @@ class WhitelistManager:
 
             for line in raw_lines:
                 line = line.strip()
-                if not line or line.startswith('#'):
+                if not line or line.startswith("#"):
                     comments.append(line)
                 else:
                     # Extract email/domain (ignore inline comments)
-                    entry = line.split('#')[0].strip()
+                    entry = line.split("#")[0].strip()
                     if entry:
                         entries.append(entry)
 
@@ -111,10 +111,7 @@ class WhitelistManager:
             raise
 
     def write_whitelist(
-        self,
-        whitelist_type: str,
-        entries: List[str],
-        preserve_comments: bool = True
+        self, whitelist_type: str, entries: List[str], preserve_comments: bool = True
     ) -> bool:
         """
         Write whitelist file with entries.
@@ -159,8 +156,8 @@ class WhitelistManager:
                 lines.append(entry)
 
             # Write to file
-            with open(path, 'w') as f:
-                f.write('\n'.join(lines) + '\n')
+            with open(path, "w") as f:
+                f.write("\n".join(lines) + "\n")
 
             logger.info(f"Wrote {len(entries)} entries to {whitelist_type} whitelist")
             return True
@@ -239,7 +236,7 @@ class WhitelistManager:
         entry = entry.strip()
 
         # Check if it's a domain wildcard (@domain.com)
-        if entry.startswith('@'):
+        if entry.startswith("@"):
             return bool(self.DOMAIN_REGEX.match(entry))
 
         # Otherwise, validate as email address
@@ -255,7 +252,7 @@ class WhitelistManager:
         Returns:
             "domain" or "email"
         """
-        return "domain" if entry.startswith('@') else "email"
+        return "domain" if entry.startswith("@") else "email"
 
     def count_entries(self, whitelist_type: str) -> Tuple[int, int]:
         """
@@ -270,7 +267,7 @@ class WhitelistManager:
         data = self.read_whitelist(whitelist_type)
         entries = data["entries"]
 
-        emails = [e for e in entries if not e.startswith('@')]
-        domains = [e for e in entries if e.startswith('@')]
+        emails = [e for e in entries if not e.startswith("@")]
+        domains = [e for e in entries if e.startswith("@")]
 
         return len(emails), len(domains)

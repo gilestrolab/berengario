@@ -94,8 +94,12 @@ class EmailMessage(BaseModel):
     is_whitelisted: bool = Field(default=False, description="Sender is whitelisted")
     is_cced: bool = Field(default=False, description="Is CC'd message")
     attachment_count: int = Field(default=0, description="Number of attachments")
-    in_reply_to: Optional[str] = Field(default=None, description="In-Reply-To header for threading")
-    references: Optional[str] = Field(default=None, description="References header for threading")
+    in_reply_to: Optional[str] = Field(
+        default=None, description="In-Reply-To header for threading"
+    )
+    references: Optional[str] = Field(
+        default=None, description="References header for threading"
+    )
 
     @field_validator("subject")
     @classmethod
@@ -293,7 +297,7 @@ class EmailParser:
         if not text:
             return text
 
-        lines = text.split('\n')
+        lines = text.split("\n")
 
         # Find signature start position
         sig_start = None
@@ -302,35 +306,53 @@ class EmailParser:
             line_stripped = line.strip()
 
             # Standard signature delimiter
-            if line_stripped == '--' or line_stripped == '-- ':
+            if line_stripped == "--" or line_stripped == "-- ":
                 sig_start = i
                 break
 
             # "Sent from..." patterns
-            if line_stripped.lower().startswith(('sent from', 'get outlook for', 'download')):
+            if line_stripped.lower().startswith(
+                ("sent from", "get outlook for", "download")
+            ):
                 sig_start = i
                 break
 
             # Common signature starters (must be followed by mostly empty or short lines)
             signature_starters = [
-                'best regards', 'best', 'regards', 'cheers', 'thanks', 'thank you',
-                'sincerely', 'yours', 'kind regards', 'warm regards', 'cordially',
-                'respectfully', 'with appreciation', 'many thanks'
+                "best regards",
+                "best",
+                "regards",
+                "cheers",
+                "thanks",
+                "thank you",
+                "sincerely",
+                "yours",
+                "kind regards",
+                "warm regards",
+                "cordially",
+                "respectfully",
+                "with appreciation",
+                "many thanks",
             ]
 
-            if any(line_stripped.lower().startswith(starter) for starter in signature_starters):
+            if any(
+                line_stripped.lower().startswith(starter)
+                for starter in signature_starters
+            ):
                 # Check if this looks like a signature (followed by short lines or empty lines)
                 if i < len(lines) - 1:
-                    remaining_lines = lines[i+1:]
+                    remaining_lines = lines[i + 1 :]
                     non_empty = [l for l in remaining_lines[:5] if l.strip()]
                     # If most remaining lines are short (< 50 chars), likely a signature
-                    if len(non_empty) <= 3 or all(len(l.strip()) < 50 for l in non_empty[:3]):
+                    if len(non_empty) <= 3 or all(
+                        len(l.strip()) < 50 for l in non_empty[:3]
+                    ):
                         sig_start = i
                         break
 
         # Return text before signature
         if sig_start is not None:
-            body_without_sig = '\n'.join(lines[:sig_start]).strip()
+            body_without_sig = "\n".join(lines[:sig_start]).strip()
             logger.debug(f"Stripped signature starting at line {sig_start}")
             return body_without_sig
 
@@ -457,9 +479,13 @@ class EmailParser:
                 raise ValueError("Invalid sender address")
 
             # Check whitelist (for logging only - actual validation done by EmailProcessor)
-            is_whitelisted = self.validator.is_allowed(sender.email) if self.validator else False
+            is_whitelisted = (
+                self.validator.is_allowed(sender.email) if self.validator else False
+            )
             if not is_whitelisted and self.validator:
-                logger.debug(f"Message from {sender.email} not in parser's whitelist (check EmailProcessor validators)")
+                logger.debug(
+                    f"Message from {sender.email} not in parser's whitelist (check EmailProcessor validators)"
+                )
 
             # Parse recipients
             to_addresses = self.parse_email_list(message.to or "")

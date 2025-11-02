@@ -158,8 +158,7 @@ class KnowledgeBaseManager:
         try:
             # Get all chunks with this hash
             results = self.collection.get(
-                where={"file_hash": file_hash},
-                include=["documents", "metadatas"]
+                where={"file_hash": file_hash}, include=["documents", "metadatas"]
             )
 
             if not results["documents"]:
@@ -169,7 +168,9 @@ class KnowledgeBaseManager:
             # Concatenate all chunk texts
             # Note: Chunks may have overlap, but this gives the full content
             full_text = "\n\n".join(results["documents"])
-            logger.info(f"Retrieved {len(results['documents'])} chunks for hash {file_hash}")
+            logger.info(
+                f"Retrieved {len(results['documents'])} chunks for hash {file_hash}"
+            )
 
             return full_text
         except Exception as e:
@@ -193,8 +194,7 @@ class KnowledgeBaseManager:
             # Get all chunks with this hash
             # Note: ids are always returned by default
             results = self.collection.get(
-                where={"file_hash": file_hash},
-                include=["documents", "metadatas"]
+                where={"file_hash": file_hash}, include=["documents", "metadatas"]
             )
 
             if not results["documents"]:
@@ -206,11 +206,7 @@ class KnowledgeBaseManager:
             for i, (doc_id, text, metadata) in enumerate(
                 zip(results["ids"], results["documents"], results["metadatas"])
             ):
-                node = TextNode(
-                    id_=doc_id,
-                    text=text,
-                    metadata=metadata
-                )
+                node = TextNode(id_=doc_id, text=text, metadata=metadata)
                 chunks.append(node)
 
             logger.info(f"Retrieved {len(chunks)} chunks for hash {file_hash}")
@@ -265,9 +261,7 @@ class KnowledgeBaseManager:
         try:
             # Get nodes with this filename
             results = self.collection.get(
-                where={"filename": filename},
-                include=["metadatas"],
-                limit=1
+                where={"filename": filename}, include=["metadatas"], limit=1
             )
 
             if not results["metadatas"]:
@@ -325,9 +319,7 @@ class KnowledgeBaseManager:
         try:
             # Get nodes with this url_hash
             results = self.collection.get(
-                where={"url_hash": url_hash},
-                include=["metadatas"],
-                limit=1
+                where={"url_hash": url_hash}, include=["metadatas"], limit=1
             )
 
             if not results["metadatas"]:
@@ -360,8 +352,7 @@ class KnowledgeBaseManager:
 
             # Get all documents with source_type="web"
             results = self.collection.get(
-                where={"source_type": "web"},
-                include=["metadatas"]
+                where={"source_type": "web"}, include=["metadatas"]
             )
 
             # Handle None or empty results

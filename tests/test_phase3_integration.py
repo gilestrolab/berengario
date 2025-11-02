@@ -44,9 +44,9 @@ class TestPhase3Integration:
         assert "<html>" in html
         assert "vacation policy" in html.lower()
         assert "policy.pdf" in html
-        assert "class=\"response\"" in html
-        assert "class=\"sources\"" in html
-        assert "class=\"footer\"" in html
+        assert 'class="response"' in html
+        assert 'class="sources"' in html
+        assert 'class="footer"' in html
 
     def test_query_handler_basic_flow(self):
         """Test that QueryHandler can process a basic query."""

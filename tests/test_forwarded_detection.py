@@ -19,6 +19,7 @@ def parser_without_forward():
     """EmailParser with forwarded detection disabled."""
     # Temporarily override settings
     from src.config import settings
+
     original = settings.forward_to_kb_enabled
     settings.forward_to_kb_enabled = False
     parser = EmailParser()
@@ -176,6 +177,7 @@ class TestCustomForwardPrefixes:
     def test_custom_prefixes_italian(self):
         """Test Italian forwarding prefix 'I:'."""
         from src.config import settings
+
         original = settings.forward_subject_prefixes
         settings.forward_subject_prefixes = "i,inoltro"
 
@@ -191,6 +193,7 @@ class TestCustomForwardPrefixes:
     def test_custom_prefixes_spanish(self):
         """Test Spanish forwarding prefix 'RV:'."""
         from src.config import settings
+
         original = settings.forward_subject_prefixes
         settings.forward_subject_prefixes = "rv,reen"
 
@@ -206,6 +209,7 @@ class TestCustomForwardPrefixes:
     def test_multiple_custom_prefixes(self):
         """Test multiple custom prefixes."""
         from src.config import settings
+
         original = settings.forward_subject_prefixes
         settings.forward_subject_prefixes = "fw,fwd,i,rv,tr"
 
@@ -222,6 +226,7 @@ class TestCustomForwardPrefixes:
     def test_empty_prefix_list(self):
         """Test empty prefix list disables detection."""
         from src.config import settings
+
         original = settings.forward_subject_prefixes
         settings.forward_subject_prefixes = ""
 

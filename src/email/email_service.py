@@ -84,7 +84,7 @@ class EmailService:
             return self.check_interval
 
         # Exponential backoff: 2^(failures) * check_interval, capped at 300s
-        delay = min(300, (2 ** self.failure_count) * self.check_interval)
+        delay = min(300, (2**self.failure_count) * self.check_interval)
         return delay
 
     def _process_inbox(self) -> bool:

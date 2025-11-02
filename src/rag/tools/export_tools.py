@@ -46,18 +46,18 @@ def export_to_csv(
         writer.writeheader()
         writer.writerows(data)
 
-        csv_content = output.getvalue().encode('utf-8')
+        csv_content = output.getvalue().encode("utf-8")
 
         # Ensure filename has .csv extension
-        if not filename.endswith('.csv'):
+        if not filename.endswith(".csv"):
             filename = f"{filename}.csv"
 
         logger.info(f"Exported {len(data)} rows to CSV")
 
         return {
-            'content': csv_content,
-            'filename': filename,
-            'content_type': 'text/csv'
+            "content": csv_content,
+            "filename": filename,
+            "content_type": "text/csv",
         }
 
     except Exception as e:
@@ -81,17 +81,17 @@ def create_text_file(
     """
     try:
         # Ensure filename has .txt extension
-        if not filename.endswith('.txt'):
+        if not filename.endswith(".txt"):
             filename = f"{filename}.txt"
 
-        text_content = content.encode('utf-8')
+        text_content = content.encode("utf-8")
 
         logger.info(f"Created text file: {filename}")
 
         return {
-            'content': text_content,
-            'filename': filename,
-            'content_type': 'text/plain'
+            "content": text_content,
+            "filename": filename,
+            "content_type": "text/plain",
         }
 
     except Exception as e:
@@ -115,18 +115,18 @@ def create_json_file(
     """
     try:
         # Convert to JSON with pretty printing
-        json_content = json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8')
+        json_content = json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8")
 
         # Ensure filename has .json extension
-        if not filename.endswith('.json'):
+        if not filename.endswith(".json"):
             filename = f"{filename}.json"
 
         logger.info(f"Created JSON file: {filename}")
 
         return {
-            'content': json_content,
-            'filename': filename,
-            'content_type': 'application/json'
+            "content": json_content,
+            "filename": filename,
+            "content_type": "application/json",
         }
 
     except Exception as e:

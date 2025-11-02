@@ -26,11 +26,11 @@ class DocumentManager:
 
     # Supported file types
     SUPPORTED_TYPES = {
-        '.pdf': 'PDF',
-        '.docx': 'DOCX',
-        '.doc': 'DOC',
-        '.txt': 'TXT',
-        '.csv': 'CSV',
+        ".pdf": "PDF",
+        ".docx": "DOCX",
+        ".doc": "DOC",
+        ".txt": "TXT",
+        ".csv": "CSV",
     }
 
     # Maximum file sizes (in bytes)
@@ -80,17 +80,17 @@ class DocumentManager:
                 enhanced_doc = doc.copy()
 
                 # Try to get file stats if it exists
-                if doc.get('source_type') == 'file':
-                    file_path = self.documents_path / doc['filename']
+                if doc.get("source_type") == "file":
+                    file_path = self.documents_path / doc["filename"]
                     if file_path.exists():
                         stats = file_path.stat()
-                        enhanced_doc['size_bytes'] = stats.st_size
-                        enhanced_doc['date_added'] = datetime.fromtimestamp(
+                        enhanced_doc["size_bytes"] = stats.st_size
+                        enhanced_doc["date_added"] = datetime.fromtimestamp(
                             stats.st_mtime
                         ).isoformat()
 
                 # Add estimated chunk count (would need KB query)
-                enhanced_doc['chunks'] = '?'  # Placeholder
+                enhanced_doc["chunks"] = "?"  # Placeholder
 
                 enhanced_docs.append(enhanced_doc)
 
@@ -101,11 +101,7 @@ class DocumentManager:
             logger.error(f"Error listing documents: {e}")
             raise
 
-    def delete_document(
-        self,
-        file_hash: str,
-        archive: bool = True
-    ) -> Dict[str, any]:
+    def delete_document(self, file_hash: str, archive: bool = True) -> Dict[str, any]:
         """
         Delete document from KB and optionally archive the file.
 
@@ -123,26 +119,29 @@ class DocumentManager:
         try:
             # Get document info before deletion
             docs = self.kb_manager.get_unique_documents()
-            doc = next((d for d in docs if d.get('file_hash') == file_hash), None)
+            doc = next((d for d in docs if d.get("file_hash") == file_hash), None)
 
             if not doc:
                 raise ValueError(f"Document not found with hash: {file_hash}")
 
-            filename = doc['filename']
-            source_type = doc.get('source_type', 'unknown')
+            filename = doc["filename"]
+            source_type = doc.get("source_type", "unknown")
 
             # Delete from KB
             chunks_removed = self.kb_manager.delete_document_by_hash(file_hash)
 
             # Handle file archival/deletion (only for file sources)
             archived = False
-            if source_type == 'file':
+            if source_type == "file":
                 file_path = self.documents_path / filename
 
                 if file_path.exists():
                     if archive:
                         # Move to archive
-                        archive_file = self.archive_path / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                        archive_file = (
+                            self.archive_path
+                            / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                        )
                         shutil.move(str(file_path), str(archive_file))
                         archived = True
                         logger.info(f"Archived file: {filename} -> {archive_file.name}")
@@ -168,9 +167,7 @@ class DocumentManager:
             raise
 
     def bulk_delete(
-        self,
-        file_hashes: List[str],
-        archive: bool = True
+        self, file_hashes: List[str], archive: bool = True
     ) -> Dict[str, any]:
         """
         Delete multiple documents in bulk.
@@ -194,12 +191,14 @@ class DocumentManager:
             try:
                 result = self.delete_document(file_hash, archive=archive)
                 deleted.append(result)
-                total_chunks += result['chunks_removed']
+                total_chunks += result["chunks_removed"]
             except Exception as e:
-                failed.append({
-                    "file_hash": file_hash,
-                    "error": str(e),
-                })
+                failed.append(
+                    {
+                        "file_hash": file_hash,
+                        "error": str(e),
+                    }
+                )
                 logger.error(f"Failed to delete {file_hash}: {e}")
 
         logger.info(
@@ -215,10 +214,7 @@ class DocumentManager:
         }
 
     def upload_document(
-        self,
-        filename: str,
-        content: bytes,
-        process: bool = True
+        self, filename: str, content: bytes, process: bool = True
     ) -> Dict[str, any]:
         """
         Upload and process a new document.
@@ -259,14 +255,14 @@ class DocumentManager:
         file_path = self.documents_path / safe_filename
         if file_path.exists():
             # Add timestamp to avoid overwriting
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            name_parts = safe_filename.rsplit('.', 1)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            name_parts = safe_filename.rsplit(".", 1)
             safe_filename = f"{name_parts[0]}_{timestamp}.{name_parts[1]}"
             file_path = self.documents_path / safe_filename
 
         try:
             # Save file
-            with open(file_path, 'wb') as f:
+            with open(file_path, "wb") as f:
                 f.write(content)
 
             logger.info(f"Saved uploaded file: {safe_filename} ({len(content)} bytes)")
@@ -279,18 +275,22 @@ class DocumentManager:
                     nodes = self.document_processor.process_document(
                         file_path,
                         source_type="manual",
-                        extra_metadata={"uploaded_via": "admin_interface"}
+                        extra_metadata={"uploaded_via": "admin_interface"},
                     )
 
                     # Add chunks to knowledge base
                     if nodes:
                         self.kb_manager.add_documents(nodes)
                         chunks_added = len(nodes)
-                        logger.info(f"Processed document into KB: {safe_filename} ({chunks_added} chunks)")
+                        logger.info(
+                            f"Processed document into KB: {safe_filename} ({chunks_added} chunks)"
+                        )
 
                         # Generate and save document description
                         try:
-                            from src.document_processing.description_generator import description_generator
+                            from src.document_processing.description_generator import (
+                                description_generator,
+                            )
 
                             # Calculate relative path from project root
                             relative_path = str(file_path.relative_to(self.base_path))
@@ -300,12 +300,14 @@ class DocumentManager:
                                 filename=safe_filename,
                                 chunks=nodes,
                                 file_size=len(content),
-                                file_type=file_ext.lstrip('.'),
+                                file_type=file_ext.lstrip("."),
                             )
                             logger.info(f"Generated description for: {safe_filename}")
                         except Exception as e:
                             # Don't fail the upload if description generation fails
-                            logger.error(f"Error generating description: {e}", exc_info=True)
+                            logger.error(
+                                f"Error generating description: {e}", exc_info=True
+                            )
                     else:
                         logger.warning(f"No chunks extracted from {safe_filename}")
                 except Exception as e:
@@ -369,12 +371,16 @@ class DocumentManager:
             total_size = 0
 
             for doc in docs:
-                file_type = doc.get('file_type', 'unknown')
+                file_type = doc.get("file_type", "unknown")
                 type_counts[file_type] = type_counts.get(file_type, 0) + 1
-                total_size += doc.get('size_bytes', 0)
+                total_size += doc.get("size_bytes", 0)
 
             # Count archived files
-            archived_count = len(list(self.archive_path.glob('*'))) if self.archive_path.exists() else 0
+            archived_count = (
+                len(list(self.archive_path.glob("*")))
+                if self.archive_path.exists()
+                else 0
+            )
 
             return {
                 "total_documents": len(docs),

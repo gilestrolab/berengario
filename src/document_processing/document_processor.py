@@ -165,7 +165,7 @@ class DocumentProcessor:
             df = pd.read_csv(file_path)
 
             # Check if the file likely has no real headers (too many unnamed columns)
-            unnamed_cols = [col for col in df.columns if 'Unnamed' in str(col)]
+            unnamed_cols = [col for col in df.columns if "Unnamed" in str(col)]
             if len(unnamed_cols) > len(df.columns) / 2:
                 # Re-read without treating first row as header
                 df = pd.read_csv(file_path, header=None)
@@ -200,7 +200,11 @@ class DocumentProcessor:
                 # Format as simple rows (for CSVs without headers)
                 for idx, row in df.iterrows():
                     # Skip rows with only empty/zero values
-                    row_values = [str(val) for val in row if pd.notna(val) and str(val).strip() and str(val) != '0']
+                    row_values = [
+                        str(val)
+                        for val in row
+                        if pd.notna(val) and str(val).strip() and str(val) != "0"
+                    ]
 
                     if not row_values:
                         lines.append("")  # Preserve spacing for term breaks
@@ -209,15 +213,23 @@ class DocumentProcessor:
                     # Check if first column looks like a section header (contains month/term)
                     first_val = str(row[0]).strip() if pd.notna(row[0]) else ""
 
-                    if len(row_values) == 1 or 'term' in first_val.lower():
+                    if len(row_values) == 1 or "term" in first_val.lower():
                         # Section header
                         lines.append(first_val)
                         lines.append("")
                     else:
                         # Regular data row - format as "Date: Event [Notes]"
                         date_col = first_val
-                        event_col = str(row[1]).strip() if len(row) > 1 and pd.notna(row[1]) else ""
-                        notes_col = str(row[2]).strip() if len(row) > 2 and pd.notna(row[2]) else ""
+                        event_col = (
+                            str(row[1]).strip()
+                            if len(row) > 1 and pd.notna(row[1])
+                            else ""
+                        )
+                        notes_col = (
+                            str(row[2]).strip()
+                            if len(row) > 2 and pd.notna(row[2])
+                            else ""
+                        )
 
                         if event_col:
                             line = f"Date: {date_col} - Event: {event_col}"

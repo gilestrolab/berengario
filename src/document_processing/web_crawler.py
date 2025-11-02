@@ -46,7 +46,9 @@ class WebCrawler:
             delay: Delay between requests in seconds (default from settings).
         """
         self.timeout = timeout if timeout is not None else settings.crawl_timeout
-        max_size = max_size_mb if max_size_mb is not None else settings.crawl_max_size_mb
+        max_size = (
+            max_size_mb if max_size_mb is not None else settings.crawl_max_size_mb
+        )
         self.max_size_bytes = max_size * 1024 * 1024
         self.user_agent = user_agent
         self.delay = delay if delay is not None else settings.crawl_delay
@@ -54,7 +56,9 @@ class WebCrawler:
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": self.user_agent})
 
-        logger.info(f"WebCrawler initialized (timeout={self.timeout}s, max_size={max_size}MB)")
+        logger.info(
+            f"WebCrawler initialized (timeout={self.timeout}s, max_size={max_size}MB)"
+        )
 
     def normalize_url(self, url: str) -> str:
         """
@@ -86,7 +90,9 @@ class WebCrawler:
             if parsed.query:
                 params = parse_qs(parsed.query, keep_blank_values=False)
                 # Remove common tracking parameters
-                tracking_params = {k for k in params if k.startswith(("utm_", "ref_", "fbclid"))}
+                tracking_params = {
+                    k for k in params if k.startswith(("utm_", "ref_", "fbclid"))
+                }
                 for param in tracking_params:
                     del params[param]
                 # Sort remaining parameters
@@ -341,13 +347,15 @@ class WebCrawler:
                     continue
 
                 # Store result
-                results.append({
-                    "url": current_url,
-                    "normalized_url": normalized,
-                    "url_hash": self.get_url_hash(current_url),
-                    "content": content,
-                    "depth": depth,
-                })
+                results.append(
+                    {
+                        "url": current_url,
+                        "normalized_url": normalized,
+                        "url_hash": self.get_url_hash(current_url),
+                        "content": content,
+                        "depth": depth,
+                    }
+                )
 
                 logger.info(f"Successfully crawled {current_url} (depth={depth})")
 
@@ -372,6 +380,8 @@ class WebCrawler:
                 logger.error(f"Unexpected error crawling {current_url}: {e}")
                 continue
 
-        logger.info(f"Crawling complete: {len(results)} pages crawled, {len(visited)} URLs visited")
+        logger.info(
+            f"Crawling complete: {len(results)} pages crawled, {len(visited)} URLs visited"
+        )
 
         return results

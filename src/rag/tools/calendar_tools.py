@@ -45,30 +45,32 @@ def _create_calendar_event_impl(
             end_dt = date_parser.parse(end_date)
         except Exception as e:
             logger.error(f"Failed to parse dates: {e}")
-            raise ValueError(f"Invalid date format. Please use ISO format (YYYY-MM-DD) or clear date strings. Error: {e}")
+            raise ValueError(
+                f"Invalid date format. Please use ISO format (YYYY-MM-DD) or clear date strings. Error: {e}"
+            )
 
         # Create calendar
         cal = Calendar()
-        cal.add('prodid', '-//RAGInbox Calendar//EN')
-        cal.add('version', '2.0')
+        cal.add("prodid", "-//RAGInbox Calendar//EN")
+        cal.add("version", "2.0")
 
         # Create event
         event = ICalEvent()
-        event.add('summary', title)
-        event.add('dtstart', start_dt.date() if all_day else start_dt)
-        event.add('dtend', end_dt.date() if all_day else end_dt)
+        event.add("summary", title)
+        event.add("dtstart", start_dt.date() if all_day else start_dt)
+        event.add("dtend", end_dt.date() if all_day else end_dt)
 
         if description:
-            event.add('description', description)
+            event.add("description", description)
 
         if location:
-            event.add('location', location)
+            event.add("location", location)
 
         # Add timestamp
-        event.add('dtstamp', datetime.now())
+        event.add("dtstamp", datetime.now())
 
         # Generate UID
-        event.add('uid', f"{datetime.now().timestamp()}@raginbox")
+        event.add("uid", f"{datetime.now().timestamp()}@raginbox")
 
         # Add event to calendar
         cal.add_component(event)
@@ -77,16 +79,18 @@ def _create_calendar_event_impl(
         ics_content = cal.to_ical()
 
         # Create safe filename from title
-        safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
-        safe_title = safe_title.replace(' ', '_')[:50]  # Limit length
+        safe_title = "".join(
+            c for c in title if c.isalnum() or c in (" ", "-", "_")
+        ).strip()
+        safe_title = safe_title.replace(" ", "_")[:50]  # Limit length
         filename = f"{safe_title}.ics" if safe_title else "event.ics"
 
         logger.info(f"Created calendar event: {title}")
 
         return {
-            'content': ics_content,
-            'filename': filename,
-            'content_type': 'text/calendar'
+            "content": ics_content,
+            "filename": filename,
+            "content_type": "text/calendar",
         }
 
     except Exception as e:
@@ -142,50 +146,57 @@ def create_calendar_from_data(
     try:
         # Create calendar
         cal = Calendar()
-        cal.add('prodid', '-//RAGInbox Calendar//EN')
-        cal.add('version', '2.0')
-        cal.add('x-wr-calname', calendar_name)
+        cal.add("prodid", "-//RAGInbox Calendar//EN")
+        cal.add("version", "2.0")
+        cal.add("x-wr-calname", calendar_name)
 
         # Add each event
         for event_data in events:
             try:
-                start_dt = date_parser.parse(event_data['start_date'])
-                end_dt = date_parser.parse(event_data['end_date'])
+                start_dt = date_parser.parse(event_data["start_date"])
+                end_dt = date_parser.parse(event_data["end_date"])
 
                 event = ICalEvent()
-                event.add('summary', event_data['title'])
-                event.add('dtstart', start_dt)
-                event.add('dtend', end_dt)
+                event.add("summary", event_data["title"])
+                event.add("dtstart", start_dt)
+                event.add("dtend", end_dt)
 
-                if 'description' in event_data:
-                    event.add('description', event_data['description'])
+                if "description" in event_data:
+                    event.add("description", event_data["description"])
 
-                if 'location' in event_data:
-                    event.add('location', event_data['location'])
+                if "location" in event_data:
+                    event.add("location", event_data["location"])
 
-                event.add('dtstamp', datetime.now())
-                event.add('uid', f"{datetime.now().timestamp()}_{event_data['title']}@raginbox")
+                event.add("dtstamp", datetime.now())
+                event.add(
+                    "uid",
+                    f"{datetime.now().timestamp()}_{event_data['title']}@raginbox",
+                )
 
                 cal.add_component(event)
 
             except Exception as e:
-                logger.warning(f"Skipped event {event_data.get('title', 'unknown')}: {e}")
+                logger.warning(
+                    f"Skipped event {event_data.get('title', 'unknown')}: {e}"
+                )
                 continue
 
         # Generate .ics file content
         ics_content = cal.to_ical()
 
         # Create filename
-        safe_name = "".join(c for c in calendar_name if c.isalnum() or c in (' ', '-', '_')).strip()
-        safe_name = safe_name.replace(' ', '_')[:50]
+        safe_name = "".join(
+            c for c in calendar_name if c.isalnum() or c in (" ", "-", "_")
+        ).strip()
+        safe_name = safe_name.replace(" ", "_")[:50]
         filename = f"{safe_name}.ics" if safe_name else "calendar.ics"
 
         logger.info(f"Created calendar with {len(events)} events")
 
         return {
-            'content': ics_content,
-            'filename': filename,
-            'content_type': 'text/calendar'
+            "content": ics_content,
+            "filename": filename,
+            "content_type": "text/calendar",
         }
 
     except Exception as e:

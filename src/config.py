@@ -28,16 +28,12 @@ class Settings(BaseSettings):
     )
 
     # Instance Configuration (customizable per deployment)
-    instance_name: str = Field(
-        default="RAGInbox", description="Name of this instance"
-    )
+    instance_name: str = Field(default="RAGInbox", description="Name of this instance")
     instance_description: str = Field(
         default="AI-powered Knowledge Base Assistant",
         description="Description of this instance",
     )
-    organization: str = Field(
-        default="", description="Organization name (optional)"
-    )
+    organization: str = Field(default="", description="Organization name (optional)")
     web_base_url: str = Field(
         default="http://localhost:8000",
         description="Base URL for web interface (used in email links)",
@@ -64,14 +60,18 @@ class Settings(BaseSettings):
     )
 
     # Email Configuration - Inbox (IMAP)
-    imap_server: str = Field(default="imap.gmail.com", description="IMAP server address")
+    imap_server: str = Field(
+        default="imap.gmail.com", description="IMAP server address"
+    )
     imap_port: int = Field(default=993, description="IMAP server port")
     imap_user: str = Field(..., description="IMAP username/email")
     imap_password: str = Field(..., description="IMAP password")
     imap_use_ssl: bool = Field(default=True, description="Use SSL for IMAP")
 
     # Email Configuration - Sending (SMTP)
-    smtp_server: str = Field(default="smtp.gmail.com", description="SMTP server address")
+    smtp_server: str = Field(
+        default="smtp.gmail.com", description="SMTP server address"
+    )
     smtp_port: int = Field(default=587, description="SMTP server port")
     smtp_user: str = Field(..., description="SMTP username/email")
     smtp_password: str = Field(..., description="SMTP password")
@@ -180,9 +180,7 @@ class Settings(BaseSettings):
     # RAG Configuration
     chunk_size: int = Field(default=1024, description="Document chunk size")
     chunk_overlap: int = Field(default=200, description="Chunk overlap size")
-    top_k_retrieval: int = Field(
-        default=5, description="Number of chunks to retrieve"
-    )
+    top_k_retrieval: int = Field(default=5, description="Number of chunks to retrieve")
     similarity_threshold: float = Field(
         default=0.7, description="Minimum similarity score for retrieval"
     )

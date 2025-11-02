@@ -8,7 +8,17 @@ processing statistics. Supports both SQLite and MariaDB/MySQL backends.
 from datetime import datetime, date
 from typing import Optional
 
-from sqlalchemy import Column, String, Integer, DateTime, Text, Date, Index, ForeignKey, Enum
+from sqlalchemy import (
+    Column,
+    String,
+    Integer,
+    DateTime,
+    Text,
+    Date,
+    Index,
+    ForeignKey,
+    Enum,
+)
 from sqlalchemy.orm import declarative_base, relationship
 import enum
 
@@ -101,7 +111,9 @@ class ProcessedMessage(Base):
             "message_id": self.message_id,
             "sender": self.sender,
             "subject": self.subject,
-            "processed_at": self.processed_at.isoformat() if self.processed_at else None,
+            "processed_at": (
+                self.processed_at.isoformat() if self.processed_at else None
+            ),
             "status": self.status,
             "error_message": self.error_message,
             "attachment_count": self.attachment_count,
@@ -183,18 +195,22 @@ class ProcessingStats(Base):
             "attachments_processed": self.attachments_processed,
             "chunks_created": self.chunks_created,
             "errors_count": self.errors_count,
-            "last_updated": self.last_updated.isoformat() if self.last_updated else None,
+            "last_updated": (
+                self.last_updated.isoformat() if self.last_updated else None
+            ),
         }
 
 
 class ChannelType(enum.Enum):
     """Enum for conversation channel types."""
+
     EMAIL = "email"
     WEBCHAT = "webchat"
 
 
 class MessageType(enum.Enum):
     """Enum for message types in conversations."""
+
     QUERY = "query"  # User message
     REPLY = "reply"  # Assistant response
 
@@ -235,7 +251,11 @@ class Conversation(Base):
     last_message_at = Column(DateTime, nullable=False)
 
     # Relationship to messages
-    messages = relationship("ConversationMessage", back_populates="conversation", cascade="all, delete-orphan")
+    messages = relationship(
+        "ConversationMessage",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+    )
 
     # Composite indexes for common queries
     __table_args__ = (
@@ -277,9 +297,15 @@ class Conversation(Base):
             "id": self.id,
             "thread_id": self.thread_id,
             "sender": self.sender,
-            "channel": self.channel.value if isinstance(self.channel, ChannelType) else self.channel,
+            "channel": (
+                self.channel.value
+                if isinstance(self.channel, ChannelType)
+                else self.channel
+            ),
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "last_message_at": self.last_message_at.isoformat() if self.last_message_at else None,
+            "last_message_at": (
+                self.last_message_at.isoformat() if self.last_message_at else None
+            ),
             "message_count": len(self.messages) if self.messages else 0,
         }
 
@@ -310,7 +336,12 @@ class ConversationMessage(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # Foreign key to conversation
-    conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    conversation_id = Column(
+        Integer,
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     # Message metadata
     message_type = Column(Enum(MessageType), nullable=False)
@@ -371,7 +402,11 @@ class ConversationMessage(Base):
         return {
             "id": self.id,
             "conversation_id": self.conversation_id,
-            "message_type": self.message_type.value if isinstance(self.message_type, MessageType) else self.message_type,
+            "message_type": (
+                self.message_type.value
+                if isinstance(self.message_type, MessageType)
+                else self.message_type
+            ),
             "content": self.content,
             "sender": self.sender,
             "subject": self.subject,

@@ -197,9 +197,7 @@ class TestDocumentProcessor:
 
         extra_metadata = {"author": "Test User", "department": "DoLS"}
 
-        nodes = processor.process_document(
-            test_file, extra_metadata=extra_metadata
-        )
+        nodes = processor.process_document(test_file, extra_metadata=extra_metadata)
 
         assert len(nodes) > 0
         first_node = nodes[0]

@@ -14,7 +14,12 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 
 from src.email.db_manager import db_manager
-from src.email.db_models import Conversation, ConversationMessage, ChannelType, MessageType
+from src.email.db_models import (
+    Conversation,
+    ConversationMessage,
+    ChannelType,
+    MessageType,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -305,7 +310,11 @@ class ConversationManager:
         for msg in messages:
             role = "User" if msg["message_type"] == MessageType.QUERY else "Assistant"
             # Truncate long messages for context
-            content = msg["content"][:500] + "..." if len(msg["content"]) > 500 else msg["content"]
+            content = (
+                msg["content"][:500] + "..."
+                if len(msg["content"]) > 500
+                else msg["content"]
+            )
             context_lines.append(f"{role}: {content}")
 
         context = "\n".join(context_lines)
@@ -349,7 +358,9 @@ class ConversationManager:
             logger.info(f"Set rating {rating} for message {message_id}")
             return True
 
-    def get_conversation_stats(self, sender: str, channel: ChannelType) -> Dict[str, Any]:
+    def get_conversation_stats(
+        self, sender: str, channel: ChannelType
+    ) -> Dict[str, Any]:
         """
         Get statistics for a user's conversations.
 

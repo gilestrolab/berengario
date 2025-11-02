@@ -234,7 +234,9 @@ class TestEmailParser:
 
     def test_init_with_custom_target(self, mock_settings, mock_validator):
         """Test initializing with custom target address."""
-        parser = EmailParser(target_address="custom@example.com", validator=mock_validator)
+        parser = EmailParser(
+            target_address="custom@example.com", validator=mock_validator
+        )
 
         assert parser.target_address == "custom@example.com"
 

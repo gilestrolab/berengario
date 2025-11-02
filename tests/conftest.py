@@ -38,9 +38,14 @@ def mock_openai_api():
 
     This prevents actual API calls during testing.
     """
-    with patch("openai.OpenAI"), patch(
-        "llama_index.embeddings.openai.OpenAIEmbedding", return_value=MockEmbedding()
-    ), patch("llama_index.llms.openai.OpenAI"):
+    with (
+        patch("openai.OpenAI"),
+        patch(
+            "llama_index.embeddings.openai.OpenAIEmbedding",
+            return_value=MockEmbedding(),
+        ),
+        patch("llama_index.llms.openai.OpenAI"),
+    ):
         yield
 
 

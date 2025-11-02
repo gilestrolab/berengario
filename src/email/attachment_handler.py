@@ -78,16 +78,19 @@ SUPPORTED_MIME_TYPES = {
 
 class AttachmentError(Exception):
     """Base exception for attachment handling errors."""
+
     pass
 
 
 class FileSizeError(AttachmentError):
     """Exception raised when file size exceeds limit."""
+
     pass
 
 
 class FileTypeError(AttachmentError):
     """Exception raised when file type is not supported."""
+
     pass
 
 
@@ -246,11 +249,15 @@ class AttachmentHandler:
             logger.debug(f"No attachments in message {message_id}")
             return attachments
 
-        logger.info(f"Processing {len(message.attachments)} attachments from {message_id}")
+        logger.info(
+            f"Processing {len(message.attachments)} attachments from {message_id}"
+        )
 
         # Create message-specific subdirectory
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_msg_id = message_id.replace("<", "").replace(">", "").replace("/", "_")[:50]
+        safe_msg_id = (
+            message_id.replace("<", "").replace(">", "").replace("/", "_")[:50]
+        )
         msg_dir = self.temp_dir / f"{timestamp}_{safe_msg_id}"
         msg_dir.mkdir(parents=True, exist_ok=True)
 
@@ -363,7 +370,9 @@ class AttachmentHandler:
         for attachment in attachments:
             try:
                 if not attachment.filepath.exists():
-                    logger.warning(f"Attachment file not found for archival: {attachment.filepath}")
+                    logger.warning(
+                        f"Attachment file not found for archival: {attachment.filepath}"
+                    )
                     continue
 
                 # Determine destination filename
@@ -374,13 +383,16 @@ class AttachmentHandler:
                 if dest_path.exists():
                     # Check if files are identical (same hash)
                     import hashlib
-                    with open(attachment.filepath, 'rb') as f1:
+
+                    with open(attachment.filepath, "rb") as f1:
                         hash1 = hashlib.sha256(f1.read()).hexdigest()
-                    with open(dest_path, 'rb') as f2:
+                    with open(dest_path, "rb") as f2:
                         hash2 = hashlib.sha256(f2.read()).hexdigest()
 
                     if hash1 == hash2:
-                        logger.info(f"Identical file already exists in documents: {dest_filename}")
+                        logger.info(
+                            f"Identical file already exists in documents: {dest_filename}"
+                        )
                         archived += 1
                         continue
 
@@ -390,17 +402,23 @@ class AttachmentHandler:
                     suffix = dest_path.suffix
                     dest_path = documents_path / f"{stem}_{timestamp}{suffix}"
 
-                    logger.info(f"File exists with different content, archiving as: {dest_path.name}")
+                    logger.info(
+                        f"File exists with different content, archiving as: {dest_path.name}"
+                    )
 
                 # Copy file to documents folder
                 shutil.copy2(attachment.filepath, dest_path)
                 archived += 1
-                logger.info(f"Archived attachment: {attachment.filename} -> {dest_path}")
+                logger.info(
+                    f"Archived attachment: {attachment.filename} -> {dest_path}"
+                )
 
             except Exception as e:
                 logger.error(f"Error archiving attachment {attachment.filepath}: {e}")
 
-        logger.info(f"Archived {archived}/{len(attachments)} attachments to {documents_path}")
+        logger.info(
+            f"Archived {archived}/{len(attachments)} attachments to {documents_path}"
+        )
         return archived
 
     def cleanup_attachments(self, attachments: List[AttachmentInfo]) -> int:

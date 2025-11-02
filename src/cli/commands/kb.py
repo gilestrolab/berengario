@@ -60,16 +60,16 @@ def list_documents():
         # Create table
         table = create_table(
             f"Documents ({len(documents)} total)",
-            ["Filename", "Hash (short)", "Chunks", "Source", "Type"]
+            ["Filename", "Hash (short)", "Chunks", "Source", "Type"],
         )
 
         # Add rows
         for doc in documents:
-            filename = doc.get('filename', 'Unknown')
-            file_hash = doc.get('file_hash', '')
-            chunks = str(doc.get('chunks', '?'))
-            source_type = doc.get('source_type', 'unknown')
-            file_type = doc.get('file_type', '?')
+            filename = doc.get("filename", "Unknown")
+            file_hash = doc.get("file_hash", "")
+            chunks = str(doc.get("chunks", "?"))
+            source_type = doc.get("source_type", "unknown")
+            file_type = doc.get("file_type", "?")
 
             # Shorten hash for display
             short_hash = file_hash[:12] + "..." if len(file_hash) > 12 else file_hash
@@ -103,9 +103,9 @@ def show_stats():
         total_chunks = 0
 
         for doc in documents:
-            source = doc.get('source_type', 'unknown')
-            file_type = doc.get('file_type', 'unknown')
-            chunks = doc.get('chunks', 0)
+            source = doc.get("source_type", "unknown")
+            file_type = doc.get("file_type", "unknown")
+            chunks = doc.get("chunks", 0)
 
             by_source[source] = by_source.get(source, 0) + 1
             by_type[file_type] = by_type.get(file_type, 0) + 1
@@ -133,7 +133,9 @@ def show_stats():
         kb_path = settings.chroma_db_path
         if kb_path.exists():
             # Calculate directory size
-            total_size = sum(f.stat().st_size for f in kb_path.rglob('*') if f.is_file())
+            total_size = sum(
+                f.stat().st_size for f in kb_path.rglob("*") if f.is_file()
+            )
             console.print()
             print_key_value("Storage Path", str(kb_path))
             print_key_value("Storage Size", format_bytes(total_size))
@@ -163,9 +165,10 @@ def reingest_documents():
             raise typer.Exit(1)
 
         # Find all supported files
-        supported_extensions = {'.pdf', '.docx', '.txt', '.csv'}
+        supported_extensions = {".pdf", ".docx", ".txt", ".csv"}
         files = [
-            f for f in documents_path.rglob('*')
+            f
+            for f in documents_path.rglob("*")
             if f.is_file() and f.suffix.lower() in supported_extensions
         ]
 
@@ -186,8 +189,7 @@ def reingest_documents():
 
         with create_progress() as progress:
             task = progress.add_task(
-                f"Processing {len(files)} documents...",
-                total=len(files)
+                f"Processing {len(files)} documents...", total=len(files)
             )
 
             for file_path in files:
@@ -238,14 +240,16 @@ def delete_document(
     try:
         # Get document info first
         documents = kb_manager.get_unique_documents()
-        doc = next((d for d in documents if d.get('file_hash', '').startswith(hash)), None)
+        doc = next(
+            (d for d in documents if d.get("file_hash", "").startswith(hash)), None
+        )
 
         if not doc:
             print_error(f"Document not found with hash: {hash}")
             raise typer.Exit(1)
 
-        filename = doc.get('filename', 'Unknown')
-        full_hash = doc.get('file_hash', hash)
+        filename = doc.get("filename", "Unknown")
+        full_hash = doc.get("file_hash", hash)
 
         # Confirm deletion
         if not force:
@@ -281,7 +285,9 @@ def clear_knowledge_base(
 
         # Confirm deletion
         if not force:
-            print_warning(f"This will delete ALL {doc_count} documents from the knowledge base!")
+            print_warning(
+                f"This will delete ALL {doc_count} documents from the knowledge base!"
+            )
             if not confirm_destructive("clear", "the entire knowledge base"):
                 return
 
@@ -292,6 +298,7 @@ def clear_knowledge_base(
 
     except Exception as e:
         handle_error(e, "clearing knowledge base")
+
 
 @app.command("regenerate-descriptions")
 def regenerate_descriptions(
@@ -317,10 +324,14 @@ def regenerate_descriptions(
         # Confirm operation
         if not force:
             console.print()
-            print_warning(f"This will regenerate descriptions for {len(documents)} documents using LLM.")
+            print_warning(
+                f"This will regenerate descriptions for {len(documents)} documents using LLM."
+            )
             print_warning("This may take several minutes and will incur LLM API costs.")
             console.print()
-            if not confirm_destructive("regenerate descriptions for", f"{len(documents)} documents"):
+            if not confirm_destructive(
+                "regenerate descriptions for", f"{len(documents)} documents"
+            ):
                 return
 
         # Initialize description generator
@@ -334,7 +345,7 @@ def regenerate_descriptions(
         with create_progress() as progress:
             task = progress.add_task(
                 f"Regenerating descriptions for {len(documents)} documents...",
-                total=len(documents)
+                total=len(documents),
             )
 
             for doc in documents:
@@ -392,7 +403,9 @@ def regenerate_descriptions(
 @app.command("query")
 def query_kb(
     query: str = typer.Argument(..., help="Question to ask the knowledge base"),
-    show_sources: bool = typer.Option(True, "--sources/--no-sources", help="Show source documents"),
+    show_sources: bool = typer.Option(
+        True, "--sources/--no-sources", help="Show source documents"
+    ),
     top_k: int = typer.Option(5, "--top-k", "-k", help="Number of sources to retrieve"),
 ):
     """
@@ -414,9 +427,7 @@ def query_kb(
         # Process query
         with console.status("[bold cyan]Searching knowledge base...", spinner="dots"):
             result = handler.process_query(
-                query_text=query,
-                user_email="cli@localhost",
-                context={"top_k": top_k}
+                query_text=query, user_email="cli@localhost", context={"top_k": top_k}
             )
 
         if not result["success"]:

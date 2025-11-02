@@ -54,7 +54,9 @@ class DatabaseManager:
             ValueError: If database type is not supported.
         """
         url = settings.get_database_url()
-        logger.debug(f"Creating database engine: {url.split('@')[-1]}")  # Don't log password
+        logger.debug(
+            f"Creating database engine: {url.split('@')[-1]}"
+        )  # Don't log password
 
         if settings.db_type == "sqlite":
             # SQLite configuration
@@ -66,7 +68,9 @@ class DatabaseManager:
                 connect_args={"check_same_thread": False},
                 echo=settings.debug,
                 # Use StaticPool for in-memory databases (testing)
-                poolclass=StaticPool if str(settings.sqlite_db_path) == ":memory:" else None,
+                poolclass=(
+                    StaticPool if str(settings.sqlite_db_path) == ":memory:" else None
+                ),
             )
         elif settings.db_type in ("mariadb", "mysql"):
             # MariaDB/MySQL configuration
@@ -158,10 +162,12 @@ class DatabaseManager:
         }
 
         if settings.db_type in ("mariadb", "mysql"):
-            info.update({
-                "pool_size": self.engine.pool.size(),
-                "pool_timeout": self.engine.pool.timeout,
-            })
+            info.update(
+                {
+                    "pool_size": self.engine.pool.size(),
+                    "pool_timeout": self.engine.pool.timeout,
+                }
+            )
 
         return info
 

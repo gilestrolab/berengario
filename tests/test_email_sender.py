@@ -133,7 +133,9 @@ class TestEmailSender:
     def test_send_reply_auth_failure(self, mock_smtp, sender):
         """Test handling of authentication failure."""
         mock_instance = MagicMock()
-        mock_instance.login.side_effect = smtplib.SMTPAuthenticationError(535, b"Authentication failed")
+        mock_instance.login.side_effect = smtplib.SMTPAuthenticationError(
+            535, b"Authentication failed"
+        )
         mock_smtp.return_value = mock_instance
 
         result = sender.send_reply(
@@ -356,13 +358,13 @@ class TestFormatResponseEmail:
         assert "</html>" in html
 
         # Check CSS classes
-        assert "class=\"response\"" in html
-        assert "class=\"sources\"" in html
-        assert "class=\"footer\"" in html
+        assert 'class="response"' in html
+        assert 'class="sources"' in html
+        assert 'class="footer"' in html
 
     def test_format_with_special_characters(self):
         """Test formatting with special characters in response."""
-        response_text = "Answer with <special> & \"quoted\" text"
+        response_text = 'Answer with <special> & "quoted" text'
         sources = []
         instance_name = "TestBot"
         original_subject = "Question"
@@ -374,7 +376,7 @@ class TestFormatResponseEmail:
         # Plain text should have original characters
         assert "<special>" in plain
         assert "&" in plain
-        assert "\"quoted\"" in plain
+        assert '"quoted"' in plain
 
         # HTML should preserve the text (MIMEText handles escaping)
         assert "special" in html
@@ -516,7 +518,9 @@ class TestLoadCustomFooter:
         assert "If you have follow-up questions" in html
 
     @patch("src.email.email_sender.settings")
-    @patch("builtins.open", new_callable=mock_open, read_data="Custom footer text\nLine 2")
+    @patch(
+        "builtins.open", new_callable=mock_open, read_data="Custom footer text\nLine 2"
+    )
     def test_load_custom_footer_success(self, mock_file, mock_settings):
         """Test successfully loading custom footer from file."""
         mock_settings.email_custom_footer_file = Path("/tmp/footer.txt")
@@ -574,7 +578,11 @@ class TestLoadCustomFooter:
         assert "If you have follow-up questions" in plain
 
     @patch("src.email.email_sender.settings")
-    @patch("builtins.open", new_callable=mock_open, read_data="Footer with special chars: <>&\"'")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data="Footer with special chars: <>&\"'",
+    )
     def test_load_custom_footer_special_characters(self, mock_file, mock_settings):
         """Test footer with special HTML characters."""
         mock_settings.email_custom_footer_file = Path("/tmp/footer.txt")

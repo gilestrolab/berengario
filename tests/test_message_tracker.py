@@ -17,8 +17,10 @@ from src.email.db_models import ProcessedMessage, ProcessingStats
 def test_tracker():
     """Create a test message tracker with in-memory SQLite."""
     # Override settings to use in-memory SQLite
-    with patch("src.email.db_manager.settings") as mock_settings, \
-         patch("src.email.message_tracker.db_manager") as mock_db_manager:
+    with (
+        patch("src.email.db_manager.settings") as mock_settings,
+        patch("src.email.message_tracker.db_manager") as mock_db_manager,
+    ):
 
         mock_settings.db_type = "sqlite"
         mock_settings.sqlite_db_path = ":memory:"

@@ -56,28 +56,28 @@ class ToolExecutor:
                 error_msg = f"Tool {function_name} not found"
                 logger.error(error_msg)
                 return {
-                    'success': False,
-                    'error': error_msg,
-                    'is_attachment': False,
+                    "success": False,
+                    "error": error_msg,
+                    "is_attachment": False,
                 }
 
             # Execute tool
             result = tool.execute(**arguments)
 
             return {
-                'success': True,
-                'result': result,
-                'error': None,
-                'is_attachment': tool.returns_attachment,
+                "success": True,
+                "result": result,
+                "error": None,
+                "is_attachment": tool.returns_attachment,
             }
 
         except Exception as e:
             error_msg = f"Tool execution failed: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return {
-                'success': False,
-                'error': error_msg,
-                'is_attachment': False,
+                "success": False,
+                "error": error_msg,
+                "is_attachment": False,
             }
 
     def execute_function_calls(
@@ -103,16 +103,16 @@ class ToolExecutor:
         error_count = 0
 
         for call in function_calls:
-            function_name = call.get('name')
-            arguments = call.get('arguments', {})
+            function_name = call.get("name")
+            arguments = call.get("arguments", {})
 
             result = self.execute_function_call(function_name, arguments)
             results.append(result)
 
-            if result['success']:
+            if result["success"]:
                 success_count += 1
-                if result['is_attachment'] and result['result']:
-                    attachments.append(result['result'])
+                if result["is_attachment"] and result["result"]:
+                    attachments.append(result["result"])
             else:
                 error_count += 1
 
@@ -122,10 +122,10 @@ class ToolExecutor:
         )
 
         return {
-            'results': results,
-            'attachments': attachments,
-            'success_count': success_count,
-            'error_count': error_count,
+            "results": results,
+            "attachments": attachments,
+            "success_count": success_count,
+            "error_count": error_count,
         }
 
     def get_tool_descriptions(self) -> str:

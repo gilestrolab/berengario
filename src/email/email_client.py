@@ -21,16 +21,19 @@ logger = logging.getLogger(__name__)
 
 class EmailClientError(Exception):
     """Base exception for email client errors."""
+
     pass
 
 
 class EmailConnectionError(EmailClientError):
     """Exception raised for connection errors."""
+
     pass
 
 
 class EmailAuthenticationError(EmailClientError):
     """Exception raised for authentication errors."""
+
     pass
 
 
@@ -108,7 +111,9 @@ class EmailClient:
                 self._mailbox = MailBox(self.server, self.port, timeout=timeout)
             else:
                 # Unencrypted connection - use STARTTLS if on standard port 143
-                self._mailbox = MailBoxUnencrypted(self.server, self.port, timeout=timeout)
+                self._mailbox = MailBoxUnencrypted(
+                    self.server, self.port, timeout=timeout
+                )
                 if self.port == 143:
                     # Upgrade to TLS using STARTTLS
                     logger.debug("Upgrading connection with STARTTLS")
@@ -182,7 +187,9 @@ class EmailClient:
             True if reconnection successful, False otherwise.
         """
         if self._reconnect_attempts >= self._max_reconnect_attempts:
-            logger.error(f"Max reconnection attempts ({self._max_reconnect_attempts}) reached")
+            logger.error(
+                f"Max reconnection attempts ({self._max_reconnect_attempts}) reached"
+            )
             return False
 
         self._reconnect_attempts += 1
@@ -217,9 +224,13 @@ class EmailClient:
         logger.warning("Connection lost, attempting to reconnect")
 
         if not self.reconnect():
-            raise EmailConnectionError("Unable to establish connection after reconnection attempts")
+            raise EmailConnectionError(
+                "Unable to establish connection after reconnection attempts"
+            )
 
-    def fetch_unread(self, folder: str = "INBOX", limit: Optional[int] = None) -> List[MailMessage]:
+    def fetch_unread(
+        self, folder: str = "INBOX", limit: Optional[int] = None
+    ) -> List[MailMessage]:
         """
         Fetch unread messages from specified folder.
 
@@ -242,7 +253,9 @@ class EmailClient:
             self._mailbox.folder.set(folder)
 
             # Fetch unread messages
-            messages = list(self._mailbox.fetch(criteria="UNSEEN", limit=limit, mark_seen=False))
+            messages = list(
+                self._mailbox.fetch(criteria="UNSEEN", limit=limit, mark_seen=False)
+            )
 
             logger.info(f"Found {len(messages)} unread messages")
             return messages
@@ -266,7 +279,7 @@ class EmailClient:
 
         try:
             logger.debug(f"Marking message {message_uid} as seen")
-            self._mailbox.flag(message_uid, ['\\Seen'], True)
+            self._mailbox.flag(message_uid, ["\\Seen"], True)
             return True
 
         except Exception as e:
@@ -287,7 +300,7 @@ class EmailClient:
 
         try:
             logger.debug(f"Marking message {message_uid} as unseen")
-            self._mailbox.flag(message_uid, ['\\Seen'], False)
+            self._mailbox.flag(message_uid, ["\\Seen"], False)
             return True
 
         except Exception as e:

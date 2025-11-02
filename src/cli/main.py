@@ -18,7 +18,7 @@ from src.config import settings
 # Setup logging
 logging.basicConfig(
     level=logging.WARNING,  # Only show warnings and errors by default
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,9 @@ console = Console()
 
 @app.callback()
 def main(
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Enable verbose output"
+    ),
     debug: bool = typer.Option(False, "--debug", help="Enable debug logging"),
 ):
     """

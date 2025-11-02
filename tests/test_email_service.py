@@ -191,6 +191,7 @@ class TestEmailServiceMainLoop:
     @patch("time.sleep")
     def test_start_performs_initial_check(self, mock_sleep, service, mock_processor):
         """Test that start() performs an initial inbox check."""
+
         # Stop immediately after first sleep
         def stop_after_first(*args):
             service.running = False
@@ -223,7 +224,9 @@ class TestEmailServiceMainLoop:
         assert mock_processor.process_all_unread.call_count >= 2
 
     @patch("time.sleep")
-    def test_start_handles_keyboard_interrupt(self, mock_sleep, service, mock_processor):
+    def test_start_handles_keyboard_interrupt(
+        self, mock_sleep, service, mock_processor
+    ):
         """Test graceful shutdown on KeyboardInterrupt."""
         mock_processor.process_all_unread.return_value = []
         mock_sleep.side_effect = KeyboardInterrupt()
@@ -315,9 +318,7 @@ class TestEmailServiceIntegration:
         assert mock_processor.process_all_unread.call_count >= 2
 
     @patch("time.sleep")
-    def test_exponential_backoff_on_repeated_failures(
-        self, mock_sleep, mock_processor
-    ):
+    def test_exponential_backoff_on_repeated_failures(self, mock_sleep, mock_processor):
         """Test that failures trigger exponential backoff."""
         service = EmailService(processor=mock_processor, check_interval=10)
         mock_processor.process_all_unread.side_effect = Exception("Network error")

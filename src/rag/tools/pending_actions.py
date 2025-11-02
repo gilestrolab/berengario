@@ -29,6 +29,7 @@ class PendingAction:
         expires_at: ISO timestamp when action expires
         confirmed: Whether action has been confirmed
     """
+
     action_id: str
     action_type: str  # add_teach, remove_teach, add_query, remove_query
     email_to_modify: str
@@ -71,7 +72,7 @@ class PendingActionManager:
             List of PendingAction objects
         """
         try:
-            with open(self.storage_path, 'r') as f:
+            with open(self.storage_path, "r") as f:
                 data = json.load(f)
                 return [PendingAction(**item) for item in data]
         except Exception as e:
@@ -86,7 +87,7 @@ class PendingActionManager:
             actions: List of PendingAction objects to save
         """
         try:
-            with open(self.storage_path, 'w') as f:
+            with open(self.storage_path, "w") as f:
                 json.dump([asdict(action) for action in actions], f, indent=2)
         except Exception as e:
             logger.error(f"Error saving pending actions: {e}")

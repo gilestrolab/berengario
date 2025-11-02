@@ -45,6 +45,7 @@ def create_backup():
         print_header("Creating Backup")
 
         from src.api.admin.backup_manager import BackupManager
+
         backup_manager = BackupManager()
 
         # Create backup
@@ -80,6 +81,7 @@ def list_backups():
         print_header("Available Backups")
 
         from src.api.admin.backup_manager import BackupManager
+
         backup_manager = BackupManager()
 
         backups = backup_manager.list_backups()
@@ -90,18 +92,17 @@ def list_backups():
 
         # Create table
         table = create_table(
-            f"Backups ({len(backups)} total)",
-            ["Filename", "Size", "Created"]
+            f"Backups ({len(backups)} total)", ["Filename", "Size", "Created"]
         )
 
         # Sort by creation time (newest first)
-        backups.sort(key=lambda b: b['created'], reverse=True)
+        backups.sort(key=lambda b: b["created"], reverse=True)
 
         for backup in backups:
             table.add_row(
-                backup['filename'],
-                format_bytes(backup['size_bytes']),
-                backup['created']
+                backup["filename"],
+                format_bytes(backup["size_bytes"]),
+                backup["created"],
             )
 
         console.print(table)
@@ -123,11 +124,12 @@ def delete_backup(
     """
     try:
         from src.api.admin.backup_manager import BackupManager
+
         backup_manager = BackupManager()
 
         # Check if backup exists
         backups = backup_manager.list_backups()
-        backup = next((b for b in backups if b['filename'] == filename), None)
+        backup = next((b for b in backups if b["filename"] == filename), None)
 
         if not backup:
             print_error(f"Backup not found: {filename}")
@@ -149,8 +151,12 @@ def delete_backup(
 
 @app.command("cleanup")
 def cleanup_backups(
-    keep: int = typer.Option(5, "--keep", "-k", help="Number of recent backups to keep"),
-    days: int = typer.Option(7, "--days", "-d", help="Delete backups older than N days"),
+    keep: int = typer.Option(
+        5, "--keep", "-k", help="Number of recent backups to keep"
+    ),
+    days: int = typer.Option(
+        7, "--days", "-d", help="Delete backups older than N days"
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
 ):
     """
@@ -162,6 +168,7 @@ def cleanup_backups(
         print_header("Backup Cleanup")
 
         from src.api.admin.backup_manager import BackupManager
+
         backup_manager = BackupManager()
 
         backups = backup_manager.list_backups()
@@ -171,7 +178,7 @@ def cleanup_backups(
             return
 
         # Sort by creation time (newest first)
-        backups.sort(key=lambda b: b['created'], reverse=True)
+        backups.sort(key=lambda b: b["created"], reverse=True)
 
         # Determine which to delete
         cutoff_date = datetime.now() - timedelta(days=days)
@@ -183,14 +190,16 @@ def cleanup_backups(
                 continue
 
             # Delete if older than cutoff
-            created_dt = datetime.fromisoformat(backup['created'])
+            created_dt = datetime.fromisoformat(backup["created"])
             if created_dt < cutoff_date:
                 to_delete.append(backup)
 
         if not to_delete:
             print_info("No backups match cleanup criteria")
             print_key_value("Total Backups", str(len(backups)))
-            print_key_value("Retention", f"Keep {keep} most recent, delete older than {days} days")
+            print_key_value(
+                "Retention", f"Keep {keep} most recent, delete older than {days} days"
+            )
             return
 
         # Show what will be deleted
@@ -209,7 +218,7 @@ def cleanup_backups(
         deleted_count = 0
         for backup in to_delete:
             try:
-                backup_manager.delete_backup(backup['filename'])
+                backup_manager.delete_backup(backup["filename"])
                 deleted_count += 1
             except Exception as e:
                 logger.error(f"Failed to delete {backup['filename']}: {e}")

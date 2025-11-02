@@ -55,7 +55,9 @@ class WhitelistValidator:
         self.parent_validators = parent_validators or []
 
         if not self.enabled:
-            logger.warning("Email whitelist validation is DISABLED - all senders allowed!")
+            logger.warning(
+                "Email whitelist validation is DISABLED - all senders allowed!"
+            )
             return
 
         # Load from inline whitelist
@@ -73,7 +75,9 @@ class WhitelistValidator:
                 f"{len(self.domain_entries)} domains"
             )
         else:
-            logger.warning("Whitelist is enabled but empty - no emails will be allowed!")
+            logger.warning(
+                "Whitelist is enabled but empty - no emails will be allowed!"
+            )
 
     def _load_from_string(self, whitelist_str: str) -> None:
         """
@@ -131,7 +135,9 @@ class WhitelistValidator:
                         self.whitelist_entries.add(line.lower())
                         logger.debug(f"Line {line_num}: Added email {line}")
                     else:
-                        logger.warning(f"Line {line_num}: Invalid entry (skipped): {line}")
+                        logger.warning(
+                            f"Line {line_num}: Invalid entry (skipped): {line}"
+                        )
 
         except Exception as e:
             logger.error(f"Error loading whitelist file: {e}")
@@ -173,7 +179,9 @@ class WhitelistValidator:
         if "@" in email_lower:
             domain = "@" + email_lower.split("@")[1]
             if domain in self.domain_entries:
-                logger.debug(f"Email allowed (domain match): {email_address} via {domain}")
+                logger.debug(
+                    f"Email allowed (domain match): {email_address} via {domain}"
+                )
                 return True
 
         # Not in whitelist

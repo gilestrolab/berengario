@@ -133,9 +133,9 @@ class MessageTracker:
         today = date.today()
 
         # Get or create today's stats record
-        stats = session.query(ProcessingStats).filter(
-            ProcessingStats.date == today
-        ).first()
+        stats = (
+            session.query(ProcessingStats).filter(ProcessingStats.date == today).first()
+        )
 
         if stats is None:
             # Create new stats record for today
@@ -257,8 +257,7 @@ class MessageTracker:
                 ),
                 "status_counts": status_counts,
                 "top_senders": [
-                    {"sender": sender, "count": count}
-                    for sender, count in top_senders
+                    {"sender": sender, "count": count} for sender, count in top_senders
                 ],
                 "daily_stats": [s.to_dict() for s in daily_stats],
             }

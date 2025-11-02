@@ -26,7 +26,11 @@ from src.email.email_parser import EmailMessage, EmailParser
 from src.email.email_sender import EmailSender, format_response_email
 from src.email.message_tracker import MessageTracker
 from src.email.whitelist_validator import WhitelistValidator
-from src.email.conversation_manager import conversation_manager, ChannelType, MessageType
+from src.email.conversation_manager import (
+    conversation_manager,
+    ChannelType,
+    MessageType,
+)
 from src.rag.tools.pending_actions import get_pending_action_manager
 
 # Lazy imports to avoid circular dependency
@@ -120,6 +124,7 @@ class EmailProcessor:
         # Lazy import to avoid circular dependency
         if query_handler is None:
             from src.rag.query_handler import QueryHandler
+
             query_handler = QueryHandler()
         self.query_handler = query_handler
 
@@ -149,10 +154,15 @@ class EmailProcessor:
             whitelist=settings.email_query_whitelist,
             whitelist_file=settings.email_query_whitelist_file,
             enabled=settings.email_query_whitelist_enabled,
-            parent_validators=[self.admin_validator, self.teach_validator],  # Admins and teachers can query
+            parent_validators=[
+                self.admin_validator,
+                self.teach_validator,
+            ],  # Admins and teachers can query
         )
 
-        logger.info("EmailProcessor initialized with hierarchical whitelists (admin > teacher > querier)")
+        logger.info(
+            "EmailProcessor initialized with hierarchical whitelists (admin > teacher > querier)"
+        )
 
     def process_message(
         self, mail_message: MailMessage, mark_seen: bool = True
@@ -251,7 +261,9 @@ class EmailProcessor:
                 result = self._process_for_kb(email, mail_message)
             else:
                 # Should not happen, but handle gracefully
-                logger.warning(f"Message {message_id} doesn't match any processing criteria")
+                logger.warning(
+                    f"Message {message_id} doesn't match any processing criteria"
+                )
                 result = ProcessingResult(
                     message_id=message_id,
                     success=True,
@@ -271,7 +283,7 @@ class EmailProcessor:
             try:
                 email_addr = "unknown"
                 subject = ""
-                if 'email' in locals():
+                if "email" in locals():
                     email_addr = email.sender.email
                     subject = email.subject
 
@@ -335,12 +347,13 @@ class EmailProcessor:
                     try:
                         # Save email body to temporary text file
                         import tempfile
+
                         temp_file = tempfile.NamedTemporaryFile(
-                            mode='w',
-                            suffix='.txt',
-                            prefix=f'email_{message_id}_',
+                            mode="w",
+                            suffix=".txt",
+                            prefix=f"email_{message_id}_",
                             delete=False,
-                            dir=str(settings.email_temp_dir)
+                            dir=str(settings.email_temp_dir),
                         )
                         temp_file.write(body_text)
                         temp_file.close()
@@ -377,11 +390,23 @@ class EmailProcessor:
                         from pathlib import Path
 
                         # Create descriptive filename
-                        date_str = email.date.strftime("%Y-%m-%d") if email.date else "unknown-date"
-                        sender_name = email.sender.email.split('@')[0]  # Get name part of email
-                        subject_clean = email.subject[:50] if email.subject else "No Subject"
+                        date_str = (
+                            email.date.strftime("%Y-%m-%d")
+                            if email.date
+                            else "unknown-date"
+                        )
+                        sender_name = email.sender.email.split("@")[
+                            0
+                        ]  # Get name part of email
+                        subject_clean = (
+                            email.subject[:50] if email.subject else "No Subject"
+                        )
                         # Remove invalid filename characters
-                        subject_clean = "".join(c for c in subject_clean if c.isalnum() or c in (' ', '-', '_')).strip()
+                        subject_clean = "".join(
+                            c
+                            for c in subject_clean
+                            if c.isalnum() or c in (" ", "-", "_")
+                        ).strip()
                         descriptive_filename = f"Email from {sender_name} on {date_str} - {subject_clean}.txt"
 
                         nodes = self.doc_processor.process_document(
@@ -459,7 +484,9 @@ class EmailProcessor:
             for attachment in attachments:
                 try:
                     # Compute file hash and get file modification time
-                    file_hash = self.doc_processor.compute_file_hash(attachment.filepath)
+                    file_hash = self.doc_processor.compute_file_hash(
+                        attachment.filepath
+                    )
                     file_stat = attachment.filepath.stat()
                     file_mtime = file_stat.st_mtime
 
@@ -472,7 +499,9 @@ class EmailProcessor:
                         continue
 
                     # Check if document with same filename but different content exists
-                    existing_doc = self.kb_manager.get_document_by_filename(attachment.filename)
+                    existing_doc = self.kb_manager.get_document_by_filename(
+                        attachment.filename
+                    )
                     if existing_doc:
                         existing_hash = existing_doc.get("file_hash")
                         existing_mtime = existing_doc.get("file_mtime", 0)
@@ -484,10 +513,14 @@ class EmailProcessor:
                                 f"Replacing older version of {attachment.filename} "
                                 f"(old: {existing_hash[:8]}..., new: {file_hash[:8]}...)"
                             )
-                            chunks_deleted = self.kb_manager.delete_document_by_filename(
-                                attachment.filename
+                            chunks_deleted = (
+                                self.kb_manager.delete_document_by_filename(
+                                    attachment.filename
+                                )
                             )
-                            logger.info(f"Deleted {chunks_deleted} chunks from old version")
+                            logger.info(
+                                f"Deleted {chunks_deleted} chunks from old version"
+                            )
                         else:
                             # New version is older, skip
                             logger.info(
@@ -548,7 +581,9 @@ class EmailProcessor:
 
             # Send acknowledgment email to the contributor
             if chunks_created > 0 or duplicates_skipped > 0:
-                self._send_kb_acknowledgment(email, attachments_processed, chunks_created, duplicates_skipped)
+                self._send_kb_acknowledgment(
+                    email, attachments_processed, chunks_created, duplicates_skipped
+                )
 
             return ProcessingResult(
                 message_id=message_id,
@@ -581,7 +616,9 @@ class EmailProcessor:
         finally:
             # Archive attachments to permanent documents folder before cleanup
             if attachments:
-                logger.info(f"Archiving {len(attachments)} attachments to documents folder")
+                logger.info(
+                    f"Archiving {len(attachments)} attachments to documents folder"
+                )
                 self.attachment_handler.archive_attachments(attachments)
                 # Cleanup temp files after archival
                 self.attachment_handler.cleanup_attachments(attachments)
@@ -656,8 +693,12 @@ class EmailProcessor:
                 # Search for confirmation token in subject + body
                 search_text = f"{email.subject or ''} {query_text}".upper()
                 if "CONFIRM" in search_text:
-                    logger.info(f"Detected confirmation request from admin {email.sender.email}")
-                    return self._handle_confirmation(email, message_id, query_text, email.subject or "")
+                    logger.info(
+                        f"Detected confirmation request from admin {email.sender.email}"
+                    )
+                    return self._handle_confirmation(
+                        email, message_id, query_text, email.subject or ""
+                    )
 
             # Process query through RAG engine with conversation context
             logger.debug(f"Querying RAG engine for message {message_id}")
@@ -675,7 +716,9 @@ class EmailProcessor:
             )
 
             if not result["success"]:
-                logger.error(f"RAG query failed for {message_id}: {result.get('error')}")
+                logger.error(
+                    f"RAG query failed for {message_id}: {result.get('error')}"
+                )
                 self.message_tracker.mark_processed(
                     message_id=message_id,
                     sender=email.sender.email,
@@ -701,7 +744,9 @@ class EmailProcessor:
             # Check if tool already sent an email (e.g., confirmation email)
             skip_reply = result.get("metadata", {}).get("skip_email_reply", False)
             if skip_reply:
-                logger.info(f"Skipping automatic email reply - tool already sent email to {email.sender.email}")
+                logger.info(
+                    f"Skipping automatic email reply - tool already sent email to {email.sender.email}"
+                )
                 # Mark as processed successfully
                 self.message_tracker.mark_processed(
                     message_id=message_id,
@@ -797,7 +842,7 @@ class EmailProcessor:
         email: EmailMessage,
         attachments_processed: int,
         chunks_created: int,
-        duplicates_skipped: int = 0
+        duplicates_skipped: int = 0,
     ) -> None:
         """
         Send acknowledgment email after successful KB ingestion.
@@ -865,13 +910,11 @@ The following material has been successfully processed:
             logger.info(f"Sent KB acknowledgment to {email.sender.email}")
 
         except Exception as e:
-            logger.error(f"Failed to send KB acknowledgment to {email.sender.email}: {e}")
+            logger.error(
+                f"Failed to send KB acknowledgment to {email.sender.email}: {e}"
+            )
 
-    def _send_rejection_email(
-        self,
-        email: EmailMessage,
-        rejection_type: str
-    ) -> None:
+    def _send_rejection_email(self, email: EmailMessage, rejection_type: str) -> None:
         """
         Send rejection email to non-whitelisted sender.
 
@@ -933,7 +976,9 @@ If you believe you should have access, please contact the administrator at {sett
                 in_reply_to=email.message_id,
             )
 
-            logger.info(f"Sent {rejection_type} rejection email to {email.sender.email}")
+            logger.info(
+                f"Sent {rejection_type} rejection email to {email.sender.email}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to send rejection email to {email.sender.email}: {e}")
@@ -1024,7 +1069,10 @@ If you believe you should have access, please contact the administrator at {sett
             ProcessingResult with confirmation processing outcome
         """
         # Lazy import to avoid circular dependency
-        from src.rag.tools.whitelist_tools import _add_to_whitelist_file, _remove_from_whitelist_file
+        from src.rag.tools.whitelist_tools import (
+            _add_to_whitelist_file,
+            _remove_from_whitelist_file,
+        )
 
         try:
             # Extract confirmation token from anywhere in subject or body
@@ -1035,20 +1083,28 @@ If you believe you should have access, please contact the administrator at {sett
             combined_text = f"{subject} {query_text}"
 
             # Look for "CONFIRM <token>" pattern (case-insensitive)
-            match = re.search(r'CONFIRM\s+([A-Za-z0-9_-]{20,})', combined_text, re.IGNORECASE)
+            match = re.search(
+                r"CONFIRM\s+([A-Za-z0-9_-]{20,})", combined_text, re.IGNORECASE
+            )
             if match:
                 action_id = match.group(1)
             else:
                 # Look for any token-like string (base64url format, 20+ chars)
-                match = re.search(r'\b([A-Za-z0-9_-]{20,})\b', combined_text)
+                match = re.search(r"\b([A-Za-z0-9_-]{20,})\b", combined_text)
                 if match:
                     action_id = match.group(1)
                 else:
                     error_msg = "Could not find confirmation token in email. Please reply to the confirmation email or include the full token."
-                    logger.warning(f"No confirmation token found in email from {email.sender.email}")
+                    logger.warning(
+                        f"No confirmation token found in email from {email.sender.email}"
+                    )
 
                     # Send error reply
-                    subject_reply = f"Re: {email.subject}" if email.subject else "Confirmation Error"
+                    subject_reply = (
+                        f"Re: {email.subject}"
+                        if email.subject
+                        else "Confirmation Error"
+                    )
                     self.email_sender.send_reply(
                         to_address=email.sender.email,
                         subject=subject_reply,
@@ -1075,7 +1131,9 @@ If you believe you should have access, please contact the administrator at {sett
                         action="confirmation",
                     )
 
-            logger.info(f"Processing confirmation for action {action_id} from {email.sender.email}")
+            logger.info(
+                f"Processing confirmation for action {action_id} from {email.sender.email}"
+            )
 
             # Get pending action
             pending_mgr = get_pending_action_manager()
@@ -1086,7 +1144,9 @@ If you believe you should have access, please contact the administrator at {sett
                 logger.warning(error_msg)
 
                 # Send error reply
-                subject = f"Re: {email.subject}" if email.subject else "Confirmation Error"
+                subject = (
+                    f"Re: {email.subject}" if email.subject else "Confirmation Error"
+                )
                 self.email_sender.send_reply(
                     to_address=email.sender.email,
                     subject=subject,
@@ -1121,7 +1181,9 @@ If you believe you should have access, please contact the administrator at {sett
                 )
                 logger.warning(error_msg)
 
-                subject = f"Re: {email.subject}" if email.subject else "Confirmation Error"
+                subject = (
+                    f"Re: {email.subject}" if email.subject else "Confirmation Error"
+                )
                 self.email_sender.send_reply(
                     to_address=email.sender.email,
                     subject=subject,
@@ -1155,24 +1217,24 @@ If you believe you should have access, please contact the administrator at {sett
 
             try:
                 # Execute based on action type
-                if action.action_type == 'add_teach':
+                if action.action_type == "add_teach":
                     whitelist_file = Path(settings.email_teach_whitelist_file)
                     whitelist_file.parent.mkdir(parents=True, exist_ok=True)
                     _add_to_whitelist_file(whitelist_file, action.email_to_modify)
                     result_msg = f"Successfully added '{action.email_to_modify}' to the teach whitelist."
 
-                elif action.action_type == 'remove_teach':
+                elif action.action_type == "remove_teach":
                     whitelist_file = Path(settings.email_teach_whitelist_file)
                     _remove_from_whitelist_file(whitelist_file, action.email_to_modify)
                     result_msg = f"Successfully removed '{action.email_to_modify}' from the teach whitelist."
 
-                elif action.action_type == 'add_query':
+                elif action.action_type == "add_query":
                     whitelist_file = Path(settings.email_query_whitelist_file)
                     whitelist_file.parent.mkdir(parents=True, exist_ok=True)
                     _add_to_whitelist_file(whitelist_file, action.email_to_modify)
                     result_msg = f"Successfully added '{action.email_to_modify}' to the query whitelist."
 
-                elif action.action_type == 'remove_query':
+                elif action.action_type == "remove_query":
                     whitelist_file = Path(settings.email_query_whitelist_file)
                     _remove_from_whitelist_file(whitelist_file, action.email_to_modify)
                     result_msg = f"Successfully removed '{action.email_to_modify}' from the query whitelist."
@@ -1186,7 +1248,9 @@ If you believe you should have access, please contact the administrator at {sett
                 logger.info(f"Confirmed action executed successfully: {result_msg}")
 
                 # Send success confirmation
-                subject = f"Re: {email.subject}" if email.subject else "Action Confirmed"
+                subject = (
+                    f"Re: {email.subject}" if email.subject else "Action Confirmed"
+                )
                 self.email_sender.send_reply(
                     to_address=email.sender.email,
                     subject=subject,

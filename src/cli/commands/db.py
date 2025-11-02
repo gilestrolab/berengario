@@ -78,9 +78,9 @@ def test_connection():
             info = db_manager.get_engine_info()
 
             console.print()
-            print_key_value("Database Type", info['db_type'])
-            print_key_value("Database URL", info['url'])
-            print_key_value("Driver", info['driver'])
+            print_key_value("Database Type", info["db_type"])
+            print_key_value("Database URL", info["url"])
+            print_key_value("Driver", info["driver"])
 
         else:
             print_error("Database connection failed")
@@ -103,9 +103,9 @@ def show_info():
         # Get engine info
         info = db_manager.get_engine_info()
 
-        print_key_value("Database Type", info['db_type'])
-        print_key_value("Database URL", info['url'])
-        print_key_value("Driver", info['driver'])
+        print_key_value("Database Type", info["db_type"])
+        print_key_value("Database URL", info["url"])
+        print_key_value("Driver", info["driver"])
 
         console.print()
         console.print("  [bold cyan]Configuration:[/bold cyan]")
@@ -126,7 +126,9 @@ def show_info():
 
 @app.command("stats")
 def show_stats(
-    days: int = typer.Option(7, "--days", "-d", help="Number of days to show stats for"),
+    days: int = typer.Option(
+        7, "--days", "-d", help="Number of days to show stats for"
+    ),
 ):
     """
     Show database statistics.
@@ -141,12 +143,12 @@ def show_stats(
 
         # Overall stats
         console.print("  [bold cyan]Overall Statistics:[/bold cyan]")
-        print_key_value("Total Messages", str(stats['total_processed']))
-        print_key_value("Successful", str(stats['successful']))
-        print_key_value("Errors", str(stats['errors']))
+        print_key_value("Total Messages", str(stats["total_processed"]))
+        print_key_value("Successful", str(stats["successful"]))
+        print_key_value("Errors", str(stats["errors"]))
 
-        if stats['total_processed'] > 0:
-            success_rate = (stats['successful'] / stats['total_processed']) * 100
+        if stats["total_processed"] > 0:
+            success_rate = (stats["successful"] / stats["total_processed"]) * 100
             print_key_value("Success Rate", f"{success_rate:.1f}%")
 
         # Recent activity (last N days)
@@ -157,6 +159,7 @@ def show_stats(
         cutoff_date = datetime.now() - timedelta(days=days)
         with db_manager.get_session() as session:
             from src.email.db_models import ProcessingStats
+
             recent_stats = (
                 session.query(ProcessingStats)
                 .filter(ProcessingStats.date >= cutoff_date.date())
@@ -167,7 +170,7 @@ def show_stats(
         if recent_stats:
             table = create_table(
                 f"Daily Activity ({len(recent_stats)} days)",
-                ["Date", "Processed", "Successful", "Errors"]
+                ["Date", "Processed", "Successful", "Errors"],
             )
 
             for day_stat in recent_stats:
@@ -192,13 +195,17 @@ def show_stats(
             total_conversations = session.query(Conversation).count()
             total_messages = session.query(ConversationMessage).count()
 
-            email_conversations = session.query(Conversation).filter(
-                Conversation.channel == 'email'
-            ).count()
+            email_conversations = (
+                session.query(Conversation)
+                .filter(Conversation.channel == "email")
+                .count()
+            )
 
-            webchat_conversations = session.query(Conversation).filter(
-                Conversation.channel == 'webchat'
-            ).count()
+            webchat_conversations = (
+                session.query(Conversation)
+                .filter(Conversation.channel == "webchat")
+                .count()
+            )
 
             print_key_value("Total Conversations", str(total_conversations))
             print_key_value("Total Messages", str(total_messages))

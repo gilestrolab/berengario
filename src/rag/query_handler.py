@@ -73,7 +73,7 @@ class QueryHandler:
 
             # Set tool context for admin-only tools
             set_tool_context(
-                user_email=user_email or 'unknown',
+                user_email=user_email or "unknown",
                 is_admin=is_admin,
                 is_email_request=is_email_request,
             )

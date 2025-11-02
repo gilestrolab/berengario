@@ -20,8 +20,7 @@ EXAMPLE_QUESTIONS_FILE = Path("data/config/example_questions.json")
 
 
 def generate_example_questions(
-    rag_engine: Optional[RAGEngine] = None,
-    count: int = 15
+    rag_engine: Optional[RAGEngine] = None, count: int = 15
 ) -> List[str]:
     """
     Generate example questions based on the knowledge base content.
@@ -129,10 +128,12 @@ def save_example_questions(questions: List[str]) -> None:
             "count": len(questions),
         }
 
-        with open(EXAMPLE_QUESTIONS_FILE, 'w', encoding='utf-8') as f:
+        with open(EXAMPLE_QUESTIONS_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-        logger.info(f"Saved {len(questions)} example questions to {EXAMPLE_QUESTIONS_FILE}")
+        logger.info(
+            f"Saved {len(questions)} example questions to {EXAMPLE_QUESTIONS_FILE}"
+        )
 
     except Exception as e:
         logger.error(f"Error saving example questions: {e}")
@@ -155,10 +156,12 @@ def load_example_questions() -> Dict:
     """
     try:
         if not EXAMPLE_QUESTIONS_FILE.exists():
-            logger.warning(f"Example questions file not found: {EXAMPLE_QUESTIONS_FILE}")
+            logger.warning(
+                f"Example questions file not found: {EXAMPLE_QUESTIONS_FILE}"
+            )
             raise FileNotFoundError("Example questions not generated yet")
 
-        with open(EXAMPLE_QUESTIONS_FILE, 'r', encoding='utf-8') as f:
+        with open(EXAMPLE_QUESTIONS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         logger.info(f"Loaded {data.get('count', 0)} example questions")
@@ -172,8 +175,7 @@ def load_example_questions() -> Dict:
 
 
 def generate_and_save_example_questions(
-    rag_engine: Optional[RAGEngine] = None,
-    count: int = 15
+    rag_engine: Optional[RAGEngine] = None, count: int = 15
 ) -> Dict:
     """
     Generate and save example questions in one operation.
@@ -202,7 +204,7 @@ def generate_and_save_example_questions(
 
     # Save with timestamp
     EXAMPLE_QUESTIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(EXAMPLE_QUESTIONS_FILE, 'w', encoding='utf-8') as f:
+    with open(EXAMPLE_QUESTIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
     logger.info(f"Generated and saved {len(questions)} example questions")

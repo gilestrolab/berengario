@@ -20,7 +20,12 @@ from src.rag.tools import get_registry, ToolExecutor
 logger = logging.getLogger(__name__)
 
 
-def get_system_prompt(instance_name: str, instance_description: str, organization: str = "", include_tools: bool = False) -> str:
+def get_system_prompt(
+    instance_name: str,
+    instance_description: str,
+    organization: str = "",
+    include_tools: bool = False,
+) -> str:
     """
     Generate system prompt based on instance configuration.
 
@@ -65,11 +70,13 @@ Guidelines:
     # Append custom prompt from file if specified
     if settings.rag_custom_prompt_file and settings.rag_custom_prompt_file.exists():
         try:
-            with open(settings.rag_custom_prompt_file, 'r', encoding='utf-8') as f:
+            with open(settings.rag_custom_prompt_file, "r", encoding="utf-8") as f:
                 custom_prompt = f.read().strip()
             if custom_prompt:
                 base_prompt += f"\n\n{custom_prompt}"
-                logger.info(f"Appended custom prompt from {settings.rag_custom_prompt_file}")
+                logger.info(
+                    f"Appended custom prompt from {settings.rag_custom_prompt_file}"
+                )
         except Exception as e:
             logger.warning(f"Failed to load custom prompt file: {e}")
 
@@ -129,7 +136,9 @@ class RAGEngine:
                 "HTTP-Referer": "https://github.com/imperial-dols/dols-gpt",
             },
             # Additional model parameters to override in API calls
-            additional_kwargs={"model": self.llm_model},  # Pass actual model in API calls
+            additional_kwargs={
+                "model": self.llm_model
+            },  # Pass actual model in API calls
         )
 
         # Initialize tool system for function calling
@@ -171,7 +180,9 @@ class RAGEngine:
 
         logger.info(f"RAGEngine initialized with model {self.llm_model}")
 
-    def _check_for_function_calls(self, query_text: str, conversation_history: Optional[str] = None) -> Dict[str, Any]:
+    def _check_for_function_calls(
+        self, query_text: str, conversation_history: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Check if the query requires any function calls.
 
@@ -209,7 +220,9 @@ class RAGEngine:
                 messages=messages,
                 tools=[{"type": "function", "function": tool} for tool in self.tools],
                 tool_choice="auto",
-                extra_headers={"HTTP-Referer": "https://github.com/imperial-dols/dols-gpt"},
+                extra_headers={
+                    "HTTP-Referer": "https://github.com/imperial-dols/dols-gpt"
+                },
             )
 
             message = response.choices[0].message
@@ -224,29 +237,54 @@ class RAGEngine:
                     response_lower = message.content.lower()
 
                     # Check if query is about user/whitelist management
-                    admin_query_keywords = ["whitelist", "add to", "remove from", "list of users", "grant access", "revoke access"]
-                    is_admin_query = any(keyword in query_lower for keyword in admin_query_keywords)
+                    admin_query_keywords = [
+                        "whitelist",
+                        "add to",
+                        "remove from",
+                        "list of users",
+                        "grant access",
+                        "revoke access",
+                    ]
+                    is_admin_query = any(
+                        keyword in query_lower for keyword in admin_query_keywords
+                    )
 
                     # Check if response suggests administrative action or clarification
-                    admin_response_keywords = ["confirmation required", "please specify", "which whitelist", "clarification", "ambiguous"]
-                    is_admin_response = any(keyword in response_lower for keyword in admin_response_keywords)
+                    admin_response_keywords = [
+                        "confirmation required",
+                        "please specify",
+                        "which whitelist",
+                        "clarification",
+                        "ambiguous",
+                    ]
+                    is_admin_response = any(
+                        keyword in response_lower for keyword in admin_response_keywords
+                    )
 
                     if is_admin_query or is_admin_response:
-                        logger.info("Administrative query/response detected - using direct LLM response without sources")
+                        logger.info(
+                            "Administrative query/response detected - using direct LLM response without sources"
+                        )
                         return {
                             "has_tool_calls": True,  # Treat as tool-related (no sources)
                             "tool_response": message.content,
                             "attachments": [],
                         }
 
-                return {"has_tool_calls": False, "tool_response": None, "attachments": []}
+                return {
+                    "has_tool_calls": False,
+                    "tool_response": None,
+                    "attachments": [],
+                }
 
             # Execute function calls
             function_calls = []
             for tool_call in message.tool_calls:
                 function_name = tool_call.function.name
                 arguments = json.loads(tool_call.function.arguments)
-                function_calls.append({"name": function_name, "arguments": arguments, "id": tool_call.id})
+                function_calls.append(
+                    {"name": function_name, "arguments": arguments, "id": tool_call.id}
+                )
                 logger.info(f"Function call requested: {function_name}")
 
             # Execute all function calls
@@ -259,33 +297,43 @@ class RAGEngine:
             )
 
             # Pass tool results back to LLM to generate final response
-            messages.append({
-                "role": "assistant",
-                "content": message.content,
-                "tool_calls": message.tool_calls,
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": message.content,
+                    "tool_calls": message.tool_calls,
+                }
+            )
 
             # Add tool responses and check if any tool sent an email
             email_already_sent = False
             for i, call in enumerate(function_calls):
-                result = execution_result['results'][i]
+                result = execution_result["results"][i]
                 # Check if this tool already sent an email (e.g., confirmation email)
-                if result.get('success') and result.get('result', {}).get('email_sent'):
+                if result.get("success") and result.get("result", {}).get("email_sent"):
                     email_already_sent = True
-                    logger.info(f"Tool {call['name']} already sent email - will skip automatic reply")
+                    logger.info(
+                        f"Tool {call['name']} already sent email - will skip automatic reply"
+                    )
 
-                tool_response_content = json.dumps(result.get('result', result.get('error', 'Unknown error')))
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": call["id"],
-                    "content": tool_response_content,
-                })
+                tool_response_content = json.dumps(
+                    result.get("result", result.get("error", "Unknown error"))
+                )
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": call["id"],
+                        "content": tool_response_content,
+                    }
+                )
 
             # Get final response from LLM based on tool results
             final_response = self.openai_client.chat.completions.create(
                 model=self.llm_model,
                 messages=messages,
-                extra_headers={"HTTP-Referer": "https://github.com/imperial-dols/dols-gpt"},
+                extra_headers={
+                    "HTTP-Referer": "https://github.com/imperial-dols/dols-gpt"
+                },
             )
 
             tool_response_text = final_response.choices[0].message.content
@@ -332,12 +380,16 @@ class RAGEngine:
 
         try:
             # Check for function calls and generate attachments
-            function_result = self._check_for_function_calls(query_text, conversation_history)
+            function_result = self._check_for_function_calls(
+                query_text, conversation_history
+            )
             attachments = function_result.get("attachments", [])
 
             # If tools were called, use the tool response instead of RAG query
             if function_result.get("has_tool_calls"):
-                response_text = function_result.get("tool_response", "Tool executed successfully.")
+                response_text = function_result.get(
+                    "tool_response", "Tool executed successfully."
+                )
                 sources = []
                 logger.info("Using tool response instead of RAG query")
             else:
@@ -348,7 +400,9 @@ class RAGEngine:
                 # Build query with conversation history if available
                 full_query = query_text
                 if conversation_history:
-                    full_query = f"{conversation_history}\n\nCurrent query: {query_text}"
+                    full_query = (
+                        f"{conversation_history}\n\nCurrent query: {query_text}"
+                    )
                     logger.debug("Added conversation history to RAG query")
 
                 # Execute query
@@ -364,9 +418,11 @@ class RAGEngine:
                         source_info = {
                             "filename": node.metadata.get("filename", "Unknown"),
                             "score": node.score,
-                            "text_preview": node.text[:200] + "..."
-                            if len(node.text) > 200
-                            else node.text,
+                            "text_preview": (
+                                node.text[:200] + "..."
+                                if len(node.text) > 200
+                                else node.text
+                            ),
                             "source_type": node.metadata.get("source_type", "Unknown"),
                             # Additional metadata for emails
                             "sender": node.metadata.get("sender"),
@@ -377,7 +433,9 @@ class RAGEngine:
 
                     # Deduplicate sources by filename/subject, keeping highest score
                     # Use filename for files, subject for emails
-                    logger.info(f"Before deduplication: {len(all_sources)} source nodes")
+                    logger.info(
+                        f"Before deduplication: {len(all_sources)} source nodes"
+                    )
                     seen = {}
                     for source in all_sources:
                         # Create unique key based on source type
@@ -393,8 +451,12 @@ class RAGEngine:
                             seen[key] = source
 
                     # Convert back to list, sorted by score (highest first)
-                    sources = sorted(seen.values(), key=lambda x: x["score"], reverse=True)
-                    logger.info(f"After deduplication: {len(sources)} unique sources from {len(seen)} unique keys")
+                    sources = sorted(
+                        seen.values(), key=lambda x: x["score"], reverse=True
+                    )
+                    logger.info(
+                        f"After deduplication: {len(sources)} unique sources from {len(seen)} unique keys"
+                    )
 
             result = {
                 "response": response_text,

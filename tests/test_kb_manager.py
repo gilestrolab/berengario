@@ -27,7 +27,10 @@ class TestKnowledgeBaseManager:
     @pytest.fixture
     def kb_manager(self, temp_db_path):
         """Create a KnowledgeBaseManager instance for testing."""
-        with patch("src.document_processing.kb_manager.OpenAIEmbedding", return_value=MockEmbedding()):
+        with patch(
+            "src.document_processing.kb_manager.OpenAIEmbedding",
+            return_value=MockEmbedding(),
+        ):
             manager = KnowledgeBaseManager(
                 db_path=temp_db_path, collection_name="test_collection"
             )
@@ -40,7 +43,10 @@ class TestKnowledgeBaseManager:
         Args:
             temp_db_path: Temporary DB path fixture.
         """
-        with patch("src.document_processing.kb_manager.OpenAIEmbedding", return_value=MockEmbedding()):
+        with patch(
+            "src.document_processing.kb_manager.OpenAIEmbedding",
+            return_value=MockEmbedding(),
+        ):
             manager = KnowledgeBaseManager(
                 db_path=temp_db_path, collection_name="test_kb"
             )

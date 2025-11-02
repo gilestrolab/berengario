@@ -47,7 +47,7 @@ def test_archive_single_attachment(attachment_handler, temp_dirs):
         filepath=test_file,
         size=12,
         mime_type="application/pdf",
-        extension=".pdf"
+        extension=".pdf",
     )
 
     # Archive the attachment
@@ -76,7 +76,7 @@ def test_archive_identical_file_not_duplicated(attachment_handler, temp_dirs):
         filepath=new_file,
         size=len(test_content),
         mime_type="application/pdf",
-        extension=".pdf"
+        extension=".pdf",
     )
 
     # Archive the attachment
@@ -107,7 +107,7 @@ def test_archive_different_file_gets_timestamp(attachment_handler, temp_dirs):
         filepath=new_file,
         size=11,
         mime_type="application/pdf",
-        extension=".pdf"
+        extension=".pdf",
     )
 
     # Archive the attachment
@@ -144,7 +144,7 @@ def test_archive_multiple_attachments(attachment_handler, temp_dirs):
             filepath=test_file,
             size=9,
             mime_type="application/pdf",
-            extension=".pdf"
+            extension=".pdf",
         )
         attachments.append(attachment)
 
@@ -168,7 +168,7 @@ def test_archive_missing_file_skipped(attachment_handler, temp_dirs):
         filepath=temp_dir / "missing.pdf",
         size=100,
         mime_type="application/pdf",
-        extension=".pdf"
+        extension=".pdf",
     )
 
     # Archive should skip missing file
@@ -196,7 +196,7 @@ def test_archive_creates_docs_folder(attachment_handler, temp_dirs):
         filepath=test_file,
         size=4,
         mime_type="application/pdf",
-        extension=".pdf"
+        extension=".pdf",
     )
 
     # Archive should create the directory

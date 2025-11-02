@@ -97,9 +97,7 @@ class TestGetSystemPrompt:
 
     @patch("src.rag.rag_engine.settings")
     @patch("builtins.open", side_effect=PermissionError("No permission"))
-    def test_system_prompt_custom_file_permission_error(
-        self, mock_file, mock_settings
-    ):
+    def test_system_prompt_custom_file_permission_error(self, mock_file, mock_settings):
         """Test handling of permission error when reading custom prompt."""
         mock_settings.rag_custom_prompt_file = Path("/tmp/prompt.txt")
 

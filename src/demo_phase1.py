@@ -122,8 +122,7 @@ def query_kb(query_handler: QueryHandler, query_text: str) -> None:
             logger.info(f"Sources ({len(result['sources'])}):")
             for i, source in enumerate(result["sources"], 1):
                 logger.info(
-                    f"  {i}. {source['filename']} "
-                    f"(score: {source['score']:.2f})"
+                    f"  {i}. {source['filename']} " f"(score: {source['score']:.2f})"
                 )
     else:
         logger.error(f"Query failed: {result['error']}")

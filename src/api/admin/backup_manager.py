@@ -23,7 +23,9 @@ class BackupManager:
     Creates zip archives of the data directory and provides download links.
     """
 
-    def __init__(self, data_dir: Optional[Path] = None, backup_dir: Optional[Path] = None):
+    def __init__(
+        self, data_dir: Optional[Path] = None, backup_dir: Optional[Path] = None
+    ):
         """
         Initialize the Backup Manager.
 
@@ -37,7 +39,9 @@ class BackupManager:
         # Ensure backup directory exists
         self.backup_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"BackupManager initialized: data={self.data_dir}, backups={self.backup_dir}")
+        logger.info(
+            f"BackupManager initialized: data={self.data_dir}, backups={self.backup_dir}"
+        )
 
     def _get_backup_filename(self) -> str:
         """
@@ -48,7 +52,9 @@ class BackupManager:
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         # Convert instance name to safe filename (lowercase, replace spaces with underscores)
-        instance_name = settings.instance_name.lower().replace(" ", "_").replace("-", "_")
+        instance_name = (
+            settings.instance_name.lower().replace(" ", "_").replace("-", "_")
+        )
         return f"{instance_name}_backup_{timestamp}.zip"
 
     async def create_backup(self, exclude_backups: bool = True) -> Path:
@@ -73,13 +79,12 @@ class BackupManager:
             # Run the zip operation in a thread pool to avoid blocking
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(
-                None,
-                self._create_zip_archive,
-                backup_path,
-                exclude_backups
+                None, self._create_zip_archive, backup_path, exclude_backups
             )
 
-            logger.info(f"Backup created successfully: {backup_path} ({backup_path.stat().st_size / (1024*1024):.2f} MB)")
+            logger.info(
+                f"Backup created successfully: {backup_path} ({backup_path.stat().st_size / (1024*1024):.2f} MB)"
+            )
             return backup_path
 
         except Exception as e:
@@ -99,9 +104,9 @@ class BackupManager:
         """
         try:
             # Create zip file
-            with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            with zipfile.ZipFile(backup_path, "w", zipfile.ZIP_DEFLATED) as zipf:
                 # Walk through the data directory
-                for item in self.data_dir.rglob('*'):
+                for item in self.data_dir.rglob("*"):
                     # Skip if it's the backup file itself
                     if item == backup_path:
                         continue
@@ -116,7 +121,7 @@ class BackupManager:
                             pass  # Not in backups directory, include it
 
                     # Skip hidden files and temp files
-                    if item.name.startswith('.') or item.name.endswith('.tmp'):
+                    if item.name.startswith(".") or item.name.endswith(".tmp"):
                         continue
 
                     # Add file or directory to zip
@@ -158,12 +163,14 @@ class BackupManager:
             backups = []
             for backup_file in sorted(self.backup_dir.glob("*.zip"), reverse=True):
                 stat = backup_file.stat()
-                backups.append({
-                    "filename": backup_file.name,
-                    "size_bytes": stat.st_size,
-                    "size_mb": round(stat.st_size / (1024 * 1024), 2),
-                    "created": datetime.fromtimestamp(stat.st_ctime).isoformat(),
-                })
+                backups.append(
+                    {
+                        "filename": backup_file.name,
+                        "size_bytes": stat.st_size,
+                        "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                        "created": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+                    }
+                )
             return backups
         except Exception as e:
             logger.error(f"Error listing backups: {e}")
@@ -188,7 +195,7 @@ class BackupManager:
             backups = sorted(
                 self.backup_dir.glob("*.zip"),
                 key=lambda p: p.stat().st_mtime,
-                reverse=True
+                reverse=True,
             )
 
             for i, backup_file in enumerate(backups):

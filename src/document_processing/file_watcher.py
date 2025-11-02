@@ -111,19 +111,13 @@ class DocumentEventHandler(FileSystemEventHandler):
 
             # Check if already in KB (same hash = no actual content change)
             if self.kb_manager.document_exists(file_hash):
-                logger.info(
-                    f"File {file_path.name} hash unchanged, skipping update"
-                )
+                logger.info(f"File {file_path.name} hash unchanged, skipping update")
                 return
 
             # Delete old version from KB
-            deleted_count = self.kb_manager.delete_document_by_filename(
-                file_path.name
-            )
+            deleted_count = self.kb_manager.delete_document_by_filename(file_path.name)
             if deleted_count > 0:
-                logger.info(
-                    f"Removed {deleted_count} old chunks for {file_path.name}"
-                )
+                logger.info(f"Removed {deleted_count} old chunks for {file_path.name}")
 
             # Process updated document
             nodes = self.document_processor.process_document(
@@ -159,18 +153,14 @@ class DocumentEventHandler(FileSystemEventHandler):
 
         try:
             # Remove from knowledge base
-            deleted_count = self.kb_manager.delete_document_by_filename(
-                file_path.name
-            )
+            deleted_count = self.kb_manager.delete_document_by_filename(file_path.name)
             if deleted_count > 0:
                 logger.info(
                     f"Removed {file_path.name} from knowledge base "
                     f"({deleted_count} chunks)"
                 )
             else:
-                logger.warning(
-                    f"File {file_path.name} not found in knowledge base"
-                )
+                logger.warning(f"File {file_path.name} not found in knowledge base")
         except Exception as e:
             logger.error(f"Failed to remove deleted file {file_path.name}: {e}")
 
