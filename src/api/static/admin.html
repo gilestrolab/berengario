@@ -156,23 +156,78 @@
         }
 
         .documents-list {
+            margin-top: 2rem;
+        }
+
+        .document-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
             background: var(--bg-secondary, #f8f9fa);
             border: 1px solid var(--border, #ddd);
             border-radius: 4px;
-            padding: 1rem;
-            max-height: 70vh;
-            overflow-y: auto;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+
+        .section-header:hover {
+            background: #e9ecef;
+        }
+
+        .section-header .toggle-icon {
+            font-weight: bold;
+            color: var(--text-secondary, #666);
+            font-size: 1.2rem;
+            line-height: 1;
+            transition: transform 0.2s;
+        }
+
+        .section-header.collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+
+        .section-header .title {
+            font-weight: 600;
+            color: var(--text-primary, #333);
+            flex: 1;
+        }
+
+        .section-header .count {
+            font-size: 0.875rem;
+            color: var(--text-secondary, #666);
+            background: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+        }
+
+        .section-content {
+            margin-top: 0.5rem;
+        }
+
+        .section-content.collapsed {
+            display: none;
         }
 
         .document-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem;
-            margin-bottom: 1rem;
+            padding: 0.5rem 1rem;
+            margin-bottom: 0.5rem;
             background: white;
             border: 1px solid var(--border, #ddd);
             border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .document-item:hover {
+            background: var(--bg-secondary, #f8f9fa);
         }
 
         .document-item:last-child {
@@ -181,16 +236,21 @@
 
         .document-info {
             flex: 1;
+            min-width: 0;
         }
 
         .document-info .filename {
             font-weight: 500;
             color: var(--text-primary, #333);
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.15rem;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .document-info .metadata {
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             color: var(--text-secondary, #666);
         }
 
@@ -200,13 +260,13 @@
         }
 
         .document-actions button {
-            padding: 0.5rem 1rem;
+            padding: 0.4rem 0.8rem;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             transition: background 0.3s;
-            font-size: 0.875rem;
+            font-size: 0.8rem;
         }
 
         .document-actions .btn-download {
@@ -692,7 +752,6 @@
                     </div>
                 </div>
 
-                <h3 style="margin-top: 2rem;">Knowledge Base Documents</h3>
                 <div class="documents-list" id="documents-list">
                     <div class="loading">Loading...</div>
                 </div>

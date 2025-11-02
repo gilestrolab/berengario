@@ -315,7 +315,43 @@ class AdminPanel {
             return;
         }
 
-        container.innerHTML = this.documents.map(doc => {
+        // Separate documents from emails
+        const fileDocuments = this.documents.filter(doc => doc.source_type !== 'email');
+        const emailDocuments = this.documents.filter(doc => doc.source_type === 'email');
+
+        let html = '';
+
+        // Render file documents section
+        if (fileDocuments.length > 0) {
+            html += this.renderDocumentSection(
+                'files',
+                'Documents',
+                fileDocuments,
+                false  // Start expanded
+            );
+        }
+
+        // Render email documents section
+        if (emailDocuments.length > 0) {
+            html += this.renderDocumentSection(
+                'emails',
+                'Emails',
+                emailDocuments,
+                false  // Start expanded
+            );
+        }
+
+        container.innerHTML = html;
+
+        // Setup toggle listeners
+        this.setupSectionToggles();
+    }
+
+    renderDocumentSection(id, title, documents, collapsed) {
+        const collapsedClass = collapsed ? 'collapsed' : '';
+        const contentClass = collapsed ? 'collapsed' : '';
+
+        const itemsHtml = documents.map(doc => {
             // Determine which buttons to show based on source type
             const canDownload = ['manual', 'file'].includes(doc.source_type);
             const canView = doc.source_type === 'email';
@@ -354,11 +390,10 @@ class AdminPanel {
             return `
                 <div class="document-item">
                     <div class="document-info">
-                        <div class="filename">${this.escapeHtml(displayName)}</div>
+                        <div class="filename" title="${this.escapeHtml(displayName)}">${this.escapeHtml(displayName)}</div>
                         <div class="metadata">
                             Type: ${this.escapeHtml(doc.file_type || 'unknown')} |
-                            Source: ${this.escapeHtml(doc.source_type || 'unknown')} |
-                            Hash: ${this.escapeHtml(doc.file_hash.substring(0, 16))}...
+                            Hash: ${this.escapeHtml(doc.file_hash.substring(0, 12))}...
                             ${description ? `| Chunks: ${description.chunk_count}` : ''}
                         </div>
                         ${descriptionHtml}
@@ -373,6 +408,33 @@ class AdminPanel {
                 </div>
             `;
         }).join('');
+
+        return `
+            <div class="document-section">
+                <div class="section-header ${collapsedClass}" data-section="${id}">
+                    <span class="toggle-icon">▼</span>
+                    <span class="title">${title}</span>
+                    <span class="count">${documents.length}</span>
+                </div>
+                <div class="section-content ${contentClass}" data-section="${id}">
+                    ${itemsHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    setupSectionToggles() {
+        document.querySelectorAll('.section-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const sectionId = header.getAttribute('data-section');
+                const content = document.querySelector(`.section-content[data-section="${sectionId}"]`);
+
+                if (content) {
+                    header.classList.toggle('collapsed');
+                    content.classList.toggle('collapsed');
+                }
+            });
+        });
     }
 
     renderDocumentsError(message) {
