@@ -364,45 +364,27 @@ class AdminPanel {
             const hasDescription = description && description.description;
 
             const downloadButton = canDownload ? `
-                <button class="btn-download" onclick="adminPanel.downloadDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')">
-                    Download
+                <button class="btn-download" onclick="adminPanel.downloadDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')" title="Download">
+                    ⬇
                 </button>
             ` : '';
 
             const viewButton = canView ? `
-                <button class="btn-view" onclick="adminPanel.viewDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(displayName)}')">
-                    View
+                <button class="btn-view" onclick="adminPanel.viewDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(displayName)}')" title="View">
+                    👁
                 </button>
-            ` : '';
-
-            const descriptionHtml = hasDescription ? `
-                <div class="document-description">
-                    <button class="description-toggle" onclick="adminPanel.toggleDescription(this)">
-                        <span class="toggle-icon">▶</span>
-                        <span class="toggle-text">Show Description</span>
-                    </button>
-                    <div class="description-content" style="display: none;">
-                        ${this.escapeHtml(description.description)}
-                    </div>
-                </div>
             ` : '';
 
             return `
                 <div class="document-item">
                     <div class="document-info">
                         <div class="filename" title="${this.escapeHtml(displayName)}">${this.escapeHtml(displayName)}</div>
-                        <div class="metadata">
-                            Type: ${this.escapeHtml(doc.file_type || 'unknown')} |
-                            Hash: ${this.escapeHtml(doc.file_hash.substring(0, 12))}...
-                            ${description ? `| Chunks: ${description.chunk_count}` : ''}
-                        </div>
-                        ${descriptionHtml}
                     </div>
                     <div class="document-actions">
                         ${viewButton}
                         ${downloadButton}
-                        <button class="btn-delete" onclick="adminPanel.deleteDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(displayName)}')">
-                            Delete
+                        <button class="btn-delete" onclick="adminPanel.deleteDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(displayName)}')" title="Delete">
+                            🗑
                         </button>
                     </div>
                 </div>
