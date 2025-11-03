@@ -114,7 +114,6 @@ class EmailProcessor:
             admin_validator: Whitelist validator for admin access
         """
         self.email_client = email_client or EmailClient()
-        self.parser = parser or EmailParser()
         self.attachment_handler = attachment_handler or AttachmentHandler()
         self.doc_processor = doc_processor or DocumentProcessor()
         self.kb_manager = kb_manager or KnowledgeBaseManager()
@@ -159,6 +158,11 @@ class EmailProcessor:
                 self.teach_validator,
             ],  # Admins and teachers can query
         )
+
+        # Initialize parser with teach validator for whitelist checking
+        # The parser uses the teach validator to set is_whitelisted field,
+        # which is used by should_process_for_kb() to determine KB ingestion eligibility
+        self.parser = parser or EmailParser(validator=self.teach_validator)
 
         logger.info(
             "EmailProcessor initialized with hierarchical whitelists (admin > teacher > querier)"
