@@ -115,6 +115,15 @@ class VerifyPage {
                 }),
             });
 
+            // Check response status first
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                this.showError(errorData.message || `Server error: ${response.status}`);
+                this.otpInput.value = '';
+                this.otpInput.focus();
+                return;
+            }
+
             const data = await response.json();
 
             if (data.success) {
@@ -124,10 +133,12 @@ class VerifyPage {
                 // Show success message
                 this.showSuccess(data.message);
 
+                // Important: Wait for success message to render before redirect
+                // This prevents NS_BINDING_ABORTED in Firefox
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
                 // Redirect to chat
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 1500);
+                window.location.href = '/';
             } else {
                 this.showError(data.message || 'Invalid code');
                 this.otpInput.value = '';
@@ -135,6 +146,11 @@ class VerifyPage {
             }
         } catch (error) {
             console.error('Error verifying OTP:', error);
+            // Check if it's a network abort (which might be normal during redirect)
+            if (error.name === 'AbortError') {
+                console.log('Request aborted - this is expected during redirect');
+                return;
+            }
             this.showError('Network error. Please check your connection and try again.');
         } finally {
             this.setLoading(false);

@@ -22,6 +22,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr
@@ -521,6 +522,34 @@ app = FastAPI(
     description=settings.instance_description,
     version="1.0.0",
 )
+
+# Configure CORS to allow reverse proxy access
+# This is essential for WebSocket/Socket.IO connections through reverse proxies
+# Note: When allow_credentials=True, allow_origins cannot be ["*"]
+# We must specify exact origins or use allow_origin_regex
+if settings.allowed_origins == "*":
+    # For development: allow all origins with regex
+    logger.warning(
+        "CORS configured with wildcard (*). This is insecure for production. "
+        "Set ALLOWED_ORIGINS to specific domains."
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex="https?://.*",  # Allow any origin (dev only)
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    # Production: specific origins only
+    allowed_origins = [origin.strip() for origin in settings.allowed_origins.split(",")]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 session_manager = SessionManager(session_timeout=settings.web_session_timeout)
 query_handler = QueryHandler()

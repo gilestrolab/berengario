@@ -38,6 +38,10 @@ class Settings(BaseSettings):
         default="http://localhost:8000",
         description="Base URL for web interface (used in email links)",
     )
+    allowed_origins: str = Field(
+        default="*",
+        description="Comma-separated list of allowed CORS origins (* for all, or specific domains)",
+    )
 
     # OpenAI Configuration (for embeddings via Naga.ac)
     openai_api_key: str = Field(..., description="OpenAI API key (or Naga.ac)")

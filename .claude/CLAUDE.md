@@ -63,6 +63,20 @@ Users can be in one whitelist, both whitelists, or neither. Configure in:
 
 ## Common Development Tasks
 
+### Development Workflow
+
+**Docker-First Development** (Recommended):
+1. Make code changes in `src/` or `tests/` directories
+2. Changes are immediately available in the running container (volume-mapped)
+3. Run tests in Docker: `docker exec raginbox-web pytest tests/ -v`
+4. No need to rebuild container unless dependencies change in `pyproject.toml`
+5. Pre-commit hook automatically runs Black, Ruff, and pytest before each commit
+
+**When to rebuild Docker images:**
+- After modifying `pyproject.toml` (new dependencies)
+- After changing `Dockerfile`
+- Otherwise, code changes are live-reloaded via volume mounts
+
 ### Running the System
 
 ```bash
@@ -116,20 +130,69 @@ See `docs/CLI.md` for complete CLI documentation.
 
 ### Testing
 
-- **Always test code in the Docker container**, not with local `.venv`
-- The `src/` directory is volume-mapped to the container, so code changes are immediately available
-- Use `docker exec` to run tests and commands inside the container
-- Container name: `raginbox-web`
-
-### Code Quality
+**CRITICAL: Always test code in the Docker container**, not with local `.venv`:
 
 ```bash
-# Format code
-source .venv/bin/activate && black src/ tests/
+# Start Docker services first
+docker-compose up -d
 
-# Lint code
-source .venv/bin/activate && ruff check src/ tests/
+# Run all tests in container
+docker exec raginbox-web pytest tests/ -v
+
+# Run specific test file
+docker exec raginbox-web pytest tests/test_email_parser.py -v
+
+# Run specific test function
+docker exec raginbox-web pytest tests/test_email_parser.py::test_function_name -v
+
+# Run with coverage report
+docker exec raginbox-web pytest tests/ -v --cov=src --cov-report=term-missing
+
+# Run tests matching a pattern
+docker exec raginbox-web pytest tests/ -v -k "email"
 ```
+
+**Why Docker for testing?**
+- The `src/` and `tests/` directories are volume-mapped to the container
+- Code changes are immediately available without rebuilding
+- Ensures consistent test environment with all dependencies
+- Container name: `raginbox-web`
+
+### Code Quality & Pre-commit Hook
+
+RAGInbox includes a pre-commit hook that automatically runs before each commit:
+
+1. **Black** - Code formatting
+2. **Ruff** - Linting
+3. **Pytest** - Full test suite in Docker
+
+**Manual commands:**
+```bash
+# Format code (required before committing)
+black src/ tests/
+
+# Fix auto-fixable linting issues
+ruff check src/ tests/ --fix
+
+# Check without fixing
+ruff check src/ tests/
+```
+
+**Pre-commit workflow:**
+```bash
+# The hook runs automatically on commit
+git commit -m "your message"
+
+# If checks fail, fix and re-commit
+black src/ tests/
+ruff check src/ tests/ --fix
+docker exec raginbox-web pytest tests/
+
+# Only in emergencies (causes CI failures)
+git commit --no-verify -m "bypass hook"
+```
+
+See `docs/PRE_COMMIT_HOOK.md` for troubleshooting.
 
 ### Docker Deployment
 
@@ -138,13 +201,40 @@ source .venv/bin/activate && ruff check src/ tests/
 docker-compose up -d
 
 # View logs
-docker-compose logs -f raginbox
+docker-compose logs -f raginbox-web
+docker-compose logs -f raginbox-email
 
 # Stop services
 docker-compose down
 
+# Rebuild after dependency changes
+docker-compose build
+docker-compose up -d
+
 # Pull latest published image from GitHub Container Registry
 docker pull ghcr.io/gilestrolab/raginbox:latest
+```
+
+### Debugging in Docker
+
+```bash
+# Access Python REPL in container
+docker exec -it raginbox-web python
+
+# Access bash shell in container
+docker exec -it raginbox-web bash
+
+# Check container logs with timestamps
+docker-compose logs -f --timestamps raginbox-web
+
+# Inspect container environment variables
+docker exec raginbox-web env | grep -E "(DB_|EMAIL_|IMAP_|SMTP_)"
+
+# Check database connection
+docker exec raginbox-web raginbox-cli db test
+
+# View knowledge base contents
+docker exec raginbox-web raginbox-cli kb list
 ```
 
 ## Important Implementation Details
@@ -308,6 +398,57 @@ The EmailClient supports both SSL (port 993) and STARTTLS (port 143). Set `IMAP_
 - Port 993: Direct SSL connection (`IMAP_USE_SSL=true`)
 - Port 143: STARTTLS upgrade (`IMAP_USE_SSL=false`)
 
+## Common Pitfalls & Troubleshooting
+
+### Testing Issues
+
+**Problem**: Tests fail locally but need to run in Docker
+**Solution**: Always use `docker exec raginbox-web pytest tests/` - local `.venv` may have missing dependencies
+
+**Problem**: Container not running when trying to test
+**Solution**: `docker-compose up -d` first, then run tests
+
+**Problem**: Tests pass in container but fail in CI
+**Solution**: Ensure you've committed all required files and that `.dockerignore` isn't excluding necessary files
+
+### Development Issues
+
+**Problem**: Code changes not reflected in container
+**Solution**: Check volume mounts in `docker-compose.yml` - `src/` and `tests/` should be mounted
+
+**Problem**: New dependency not available in container
+**Solution**: After modifying `pyproject.toml`, rebuild: `docker-compose build && docker-compose up -d`
+
+**Problem**: Permission errors with data directory
+**Solution**: Check Docker volume permissions - may need to adjust ownership
+
+### Database Issues
+
+**Problem**: "Table doesn't exist" errors
+**Solution**: Initialize database: `docker exec raginbox-web raginbox-cli db init`
+
+**Problem**: Connection errors with MariaDB
+**Solution**: Check `docker-compose logs mariadb` and ensure healthcheck passes before services start
+
+### Email Processing Issues
+
+**Problem**: Emails not being processed
+**Solution**:
+1. Check whitelist files exist and contain valid entries
+2. Verify IMAP credentials with `accessories/test_email_connection.py`
+3. Check logs: `docker-compose logs -f raginbox-email`
+
+**Problem**: Can't send email replies
+**Solution**: Verify SMTP settings - most providers require app-specific passwords or OAuth2
+
+### Pre-commit Hook Issues
+
+**Problem**: Pre-commit hook not running
+**Solution**: `chmod +x .git/hooks/pre-commit`
+
+**Problem**: Hook fails but changes are needed urgently
+**Solution**: Use `git commit --no-verify` (will likely fail CI - fix before pushing)
+
 ## Module Organization
 
 Each email component follows a consistent pattern:
@@ -326,15 +467,13 @@ RAG tools follow similar organization:
 
 ## Project Status
 
-**Current Phase**: Phase 3 completed (Email query handler with automated replies)
+**Current Phase**: All core phases completed - production ready
 
 **Completed**:
 - ✅ Phase 1: Core RAG with document processing
 - ✅ Phase 2: Email inbox integration (IMAP, parsing, attachments, tracking)
 - ✅ Phase 3: Email query handler (SMTP, RAG-powered replies, HTML formatting)
+- ✅ Phase 4: Web frontend with chat interface, OTP authentication, admin panel
 - ✅ Phase 5: Docker deployment and CI/CD
 
-**In Progress**:
-- 🔨 Phase 4: Web frontend with chat interface
-
-**Test Status**: 246 of 252 tests passing
+**Test Coverage**: Run `docker exec raginbox-web pytest tests/ -v` to verify current test status
