@@ -2,6 +2,8 @@
 Unit tests for email parser.
 
 Tests email parsing, whitelist integration, and HTML conversion.
+
+This module tests the EmailParser class functionality.
 """
 
 from datetime import datetime
