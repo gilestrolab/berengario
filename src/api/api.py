@@ -25,6 +25,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, EmailStr
 
 from src.api.admin.audit_logger import AdminAuditLogger
@@ -585,6 +586,31 @@ static_dir = Path(__file__).parent / "static"
 static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+# Setup templates (using same directory as static for HTML templates)
+templates = Jinja2Templates(directory=str(static_dir))
+
+
+# Version information
+def get_version() -> str:
+    """Get version string combining package version and git commit."""
+    import subprocess
+
+    base_version = "0.1.0"  # From pyproject.toml
+    try:
+        # Get git commit hash
+        git_hash = (
+            subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"],
+                stderr=subprocess.DEVNULL,
+                cwd=Path(__file__).parent.parent.parent,
+            )
+            .decode()
+            .strip()
+        )
+        return f"{base_version}+{git_hash}"
+    except Exception:
+        return base_version
+
 
 # Helper functions
 def get_session_id(request: Request) -> Optional[str]:
@@ -960,16 +986,25 @@ async def auth_status(request: Request):
 
 # Protected Endpoints (require authentication)
 @app.get("/")
-async def root():
+async def root(request: Request):
     """Serve main web interface."""
     index_file = static_dir / "index.html"
     if index_file.exists():
-        return FileResponse(index_file)
+        return templates.TemplateResponse(
+            "index.html",
+            {
+                "request": request,
+                "instance_name": settings.instance_name,
+                "instance_description": settings.instance_description,
+                "organization": settings.organization or "",
+                "version": get_version(),
+            },
+        )
     return {"message": f"Welcome to {settings.instance_name} API", "docs": "/docs"}
 
 
 @app.get("/admin")
-async def admin_panel():
+async def admin_panel(request: Request):
     """
     Serve admin panel interface.
 
@@ -978,7 +1013,14 @@ async def admin_panel():
     """
     admin_file = static_dir / "admin.html"
     if admin_file.exists():
-        return FileResponse(admin_file)
+        return templates.TemplateResponse(
+            "admin.html",
+            {
+                "request": request,
+                "instance_name": settings.instance_name,
+                "version": get_version(),
+            },
+        )
     raise HTTPException(status_code=404, detail="Admin panel not found")
 
 

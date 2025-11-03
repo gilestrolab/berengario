@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RAGInbox - Chat Interface</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{{ instance_name }} - Chat Interface</title>
+
+    <!-- Open Graph meta tags for social media sharing -->
+    <meta property="og:title" content="{{ instance_name }} - Chat Interface">
+    <meta property="og:description" content="{{ instance_description }}">
+    <meta property="og:type" content="website">
+    <meta name="description" content="{{ instance_description }}">
+
+    <link rel="stylesheet" href="/static/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -13,9 +21,7 @@
             <div class="sidebar-header">
                 <h3>Conversations</h3>
                 <button class="btn-icon" id="new-conversation-btn" title="New conversation">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 5v14M5 12h14"/>
-                    </svg>
+                    <i class="fas fa-plus"></i>
                 </button>
             </div>
 
@@ -30,13 +36,6 @@
                 </div>
             </div>
         </aside>
-
-        <!-- Mobile sidebar toggle -->
-        <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sidebar">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M3 12h18M3 6h18M3 18h18"/>
-            </svg>
-        </button>
 
         <!-- Main Content -->
         <div class="main-content">
@@ -61,21 +60,14 @@
                     </div>
                     <div class="header-actions">
                         <span class="user-email" id="user-email" title="Logged in as"></span>
-                        <button class="btn-icon" id="admin-btn" title="Admin Panel" style="display: none;">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
-                                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
-                            </svg>
+                        <button class="btn-icon sidebar-toggle" id="sidebar-toggle" title="Toggle sidebar">
+                            <i class="fas fa-bars"></i>
                         </button>
-                        <button class="btn-icon" id="clear-btn" title="Clear conversation">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                            </svg>
+                        <button class="btn-icon" id="admin-btn" title="Admin Panel" style="display: none;">
+                            <i class="fas fa-gear"></i>
                         </button>
                         <button class="btn-icon" id="logout-btn" title="Logout">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
-                            </svg>
+                            <i class="fas fa-right-from-bracket"></i>
                         </button>
                     </div>
                 </div>
@@ -86,7 +78,9 @@
         <main class="messages-container" id="messages-container">
             <div class="messages" id="messages">
                 <div class="welcome-message">
-                    <div class="welcome-icon">💬</div>
+                    <div class="welcome-icon">
+                        <i class="fas fa-comments"></i>
+                    </div>
                     <h2 id="welcome-title">Welcome to RAGInbox</h2>
                     <p id="welcome-description">Ask me anything about the knowledge base documents.</p>
                     <p class="welcome-hint">Your conversation history will be saved during this session.</p>
@@ -114,9 +108,7 @@
                     rows="1"
                 ></textarea>
                 <button id="send-btn" class="send-btn" title="Send message (Enter)">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
-                    </svg>
+                    <i class="fas fa-paper-plane"></i>
                 </button>
             </div>
             <div class="input-hint">
@@ -128,6 +120,13 @@
 
     <!-- Toast Notification -->
     <div class="toast" id="toast"></div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <div class="footer-content">
+            Powered by <a href="https://github.com/gilestrolab/raginbox" target="_blank" rel="noopener">RAGInbox</a> v{{ version }} • Created by <a href="mailto:giorgio@gilest.ro">Giorgio Gilestro</a>
+        </div>
+    </footer>
 
     <!-- Markdown parser -->
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>

@@ -506,10 +506,13 @@ class KnowledgeBaseManager:
         """
         k = top_k or settings.top_k_retrieval
 
+        # Use tree_summarize mode to avoid refinement-style responses
+        # This hierarchically combines chunks without iterative refinement
         query_engine = self.index.as_query_engine(
             similarity_top_k=k,
             embed_model=self.embed_model,
             llm=llm,
+            response_mode="tree_summarize",
         )
 
         return query_engine

@@ -383,7 +383,7 @@ class AdminPanel {
 
             const viewButton = canView ? `
                 <button class="btn-view" onclick="adminPanel.viewDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(displayName)}')" title="View">
-                    👁
+                    <i class="fas fa-eye"></i>
                 </button>
             ` : '';
 
@@ -400,7 +400,7 @@ class AdminPanel {
                         ${viewButton}
                         ${downloadButton}
                         <button class="btn-delete" onclick="adminPanel.deleteDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(displayName)}')" title="Delete">
-                            🗑
+                            <i class="fas fa-trash"></i>
                         </button>
                     </div>
                 </div>
@@ -553,7 +553,7 @@ class AdminPanel {
         // Disable button and show processing
         crawlBtn.disabled = true;
         crawlBtn.textContent = 'Crawling...';
-        statusDiv.innerHTML = '<div class="upload-file-processing">🔄 Crawling URL, please wait...</div>';
+        statusDiv.innerHTML = '<div class="upload-file-processing"><i class="fas fa-spinner fa-spin"></i> Crawling URL, please wait...</div>';
 
         try {
             const response = await fetch('/api/admin/crawl', {
@@ -576,7 +576,7 @@ class AdminPanel {
             // Success
             statusDiv.innerHTML = `
                 <div class="upload-file-success">
-                    ✓ Successfully crawled ${data.details.pages_crawled} page(s)<br>
+                    <i class="fas fa-check"></i> Successfully crawled ${data.details.pages_crawled} page(s)<br>
                     Added ${data.details.chunks_added} chunks to knowledge base
                 </div>
             `;
@@ -589,7 +589,7 @@ class AdminPanel {
 
         } catch (error) {
             console.error('Error crawling URL:', error);
-            statusDiv.innerHTML = `<div class="upload-file-error">✗ Error: ${this.escapeHtml(error.message)}</div>`;
+            statusDiv.innerHTML = `<div class="upload-file-error"><i class="fas fa-xmark"></i> Error: ${this.escapeHtml(error.message)}</div>`;
             this.showToast(error.message, 'error');
         } finally {
             // Re-enable button
@@ -637,7 +637,7 @@ class AdminPanel {
                     <div class="document-info">
                         <div class="filename-row">
                             <div class="filename" title="${this.escapeHtml(url.source_url)}">
-                                🌐 ${this.escapeHtml(displayUrl)}
+                                <i class="fas fa-globe"></i> ${this.escapeHtml(displayUrl)}
                             </div>
                         </div>
                         <div style="font-size: 0.75rem; color: var(--text-secondary, #999); margin-top: 0.25rem;">
@@ -646,10 +646,10 @@ class AdminPanel {
                     </div>
                     <div class="document-actions">
                         <button class="btn-view" onclick="window.open('${this.escapeHtml(url.source_url)}', '_blank')" title="Open URL">
-                            🔗
+                            <i class="fas fa-link"></i>
                         </button>
                         <button class="btn-delete" onclick="adminPanel.deleteCrawledUrl('${this.escapeHtml(url.url_hash)}', '${this.escapeHtml(url.source_url)}')" title="Delete">
-                            🗑
+                            <i class="fas fa-trash"></i>
                         </button>
                     </div>
                 </div>
@@ -716,7 +716,7 @@ class AdminPanel {
             return;
         }
 
-        if (!confirm(`⚠️ WARNING: This will delete ALL ${count} crawled URL(s) from the knowledge base.\n\nThis action cannot be undone.\n\nAre you sure you want to continue?`)) {
+        if (!confirm(`WARNING: This will delete ALL ${count} crawled URL(s) from the knowledge base.\n\nThis action cannot be undone.\n\nAre you sure you want to continue?`)) {
             return;
         }
 
@@ -1072,17 +1072,17 @@ class AdminPanel {
                     if (fileItem) {
                         if (response.ok) {
                             fileItem.className = 'upload-file-item upload-file-success';
-                            fileItem.textContent = `✓ ${file.name} - Successfully processed (${data.chunks_added || 0} chunks)`;
+                            fileItem.innerHTML = `<i class="fas fa-check"></i> ${file.name} - Successfully processed (${data.chunks_added || 0} chunks)`;
                         } else {
                             fileItem.className = 'upload-file-item upload-file-error';
-                            fileItem.textContent = `✗ ${file.name} - ${data.detail || 'Upload failed'}`;
+                            fileItem.innerHTML = `<i class="fas fa-xmark"></i> ${file.name} - ${data.detail || 'Upload failed'}`;
                         }
                     }
                 } catch (error) {
                     const fileItem = document.getElementById(`upload-file-${i}`);
                     if (fileItem) {
                         fileItem.className = 'upload-file-item upload-file-error';
-                        fileItem.textContent = `✗ ${file.name} - ${error.message}`;
+                        fileItem.innerHTML = `<i class="fas fa-xmark"></i> ${file.name} - ${error.message}`;
                     }
                 }
             }
@@ -1143,7 +1143,7 @@ class AdminPanel {
 
             this.showToast(data.message, 'success');
             if (statusSpan) {
-                statusSpan.textContent = '✓ Saved successfully';
+                statusSpan.innerHTML = '<i class="fas fa-check"></i> Saved successfully';
                 statusSpan.style.color = 'var(--success, #28a745)';
                 setTimeout(() => {
                     statusSpan.textContent = '';
@@ -1157,7 +1157,7 @@ class AdminPanel {
             console.error('Error saving custom prompt:', error);
             this.showToast(error.message, 'error');
             if (statusSpan) {
-                statusSpan.textContent = '✗ Save failed';
+                statusSpan.innerHTML = '<i class="fas fa-xmark"></i> Save failed';
                 statusSpan.style.color = 'var(--danger, #dc3545)';
             }
         } finally {
@@ -1199,7 +1199,7 @@ class AdminPanel {
             // Success
             this.showToast(data.message, 'success');
             if (statusSpan) {
-                statusSpan.textContent = `✓ Generated ${data.details.count} questions`;
+                statusSpan.innerHTML = `<i class="fas fa-check"></i> Generated ${data.details.count} questions`;
                 statusSpan.style.color = 'var(--success, #28a745)';
             }
 
@@ -1210,7 +1210,7 @@ class AdminPanel {
             console.error('Error generating example questions:', error);
             this.showToast(error.message, 'error');
             if (statusSpan) {
-                statusSpan.textContent = '✗ Generation failed';
+                statusSpan.innerHTML = '<i class="fas fa-xmark"></i> Generation failed';
                 statusSpan.style.color = 'var(--danger, #dc3545)';
             }
         } finally {

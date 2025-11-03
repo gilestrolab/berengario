@@ -2,8 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel - RAGInbox</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Admin Panel - {{ instance_name }}</title>
+
+    <!-- Open Graph meta tags for social media sharing -->
+    <meta property="og:title" content="Admin Panel - {{ instance_name }}">
+    <meta property="og:type" content="website">
+
+    <link rel="stylesheet" href="/static/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/static/style.css">
     <style>
         body {
@@ -1431,6 +1437,13 @@
             </div>
         </div>
     </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <div class="footer-content">
+            Powered by <a href="https://github.com/gilestrolab/raginbox" target="_blank" rel="noopener">RAGInbox</a> v{{ version }} • Created by <a href="mailto:giorgio@gilest.ro">Giorgio Gilestro</a>
+        </div>
+    </footer>
 
     <script src="/static/admin.js"></script>
 </body>

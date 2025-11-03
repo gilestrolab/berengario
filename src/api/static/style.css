@@ -48,6 +48,7 @@ body {
     height: 100vh;
     background: var(--surface);
     overflow: hidden;
+    padding-bottom: 2.5rem; /* Space for fixed app footer */
 }
 
 /* Legacy container class for compatibility */
@@ -176,6 +177,7 @@ body {
 .welcome-icon {
     font-size: 3rem;
     margin-bottom: 1rem;
+    color: var(--primary-color, #4a90e2);
 }
 
 .welcome-message h2 {
@@ -483,7 +485,10 @@ body {
 }
 
 .attachment-icon {
-    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    margin-right: 0.5rem;
+    font-size: 0.875rem;
 }
 
 /* Input Area */
@@ -491,6 +496,7 @@ body {
     background: var(--surface);
     border-top: 1px solid var(--border-color);
     padding: 1rem 1.5rem;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
     box-shadow: var(--shadow-sm);
 }
 
@@ -762,6 +768,7 @@ body {
     /* Input Area */
     .input-container {
         padding: 0.875rem 1rem;
+        padding-bottom: max(0.875rem, env(safe-area-inset-bottom));
     }
 
     .input-wrapper {
@@ -871,6 +878,7 @@ body {
     /* Input more compact */
     .input-container {
         padding: 0.75rem 0.875rem;
+        padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
     }
 
     .query-input {
@@ -951,6 +959,7 @@ body {
     /* Input very compact but still usable */
     .input-container {
         padding: 0.625rem;
+        padding-bottom: max(0.625rem, env(safe-area-inset-bottom));
     }
 
     .input-wrapper {
@@ -1036,6 +1045,7 @@ body {
 
     .input-container {
         padding: 0.5rem 1rem;
+        padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
     }
 
     .welcome-message {
@@ -1156,8 +1166,11 @@ body {
 }
 
 .conversation-channel {
-    font-size: 1.125rem;
+    display: inline-flex;
+    align-items: center;
     margin-right: 0.5rem;
+    font-size: 1rem;
+    color: var(--text-secondary, #666);
 }
 
 .conversation-title {
@@ -1270,22 +1283,6 @@ body {
 /* Sidebar Toggle Button (Mobile) */
 .sidebar-toggle {
     display: none;
-    position: fixed;
-    top: 1rem;
-    left: 1rem;
-    z-index: 100;
-    padding: 0.625rem;
-    background: var(--primary-color);
-    border: none;
-    border-radius: 0.5rem;
-    color: white;
-    cursor: pointer;
-    box-shadow: var(--shadow-md);
-    transition: var(--transition);
-}
-
-.sidebar-toggle:hover {
-    background: var(--primary-hover);
 }
 
 /* Conversation List Scrollbar */
@@ -1321,6 +1318,7 @@ body {
 
     .main-content {
         width: 100%;
+        padding-bottom: 2.25rem; /* Space for fixed app footer on mobile */
     }
 
     /* Overlay when sidebar is open */
@@ -1410,4 +1408,59 @@ body {
 .example-question-chip:active {
     transform: translateY(0);
     box-shadow: var(--shadow-sm);
+}
+
+/* ====================================
+   APP FOOTER
+   ==================================== */
+
+.app-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary, #f8f9fa);
+    border-top: 1px solid var(--border, #ddd);
+    padding: 0.5rem 1rem;
+    z-index: 100;
+    font-size: 0.75rem;
+    color: var(--text-secondary, #666);
+}
+
+.footer-content {
+    text-align: center;
+    line-height: 1.5;
+}
+
+.footer-content a {
+    color: var(--primary, #007bff);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.footer-content a:hover {
+    color: var(--primary-dark, #0056b3);
+    text-decoration: underline;
+}
+
+/* Adjust body padding to prevent content from being hidden behind footer */
+body {
+    padding-bottom: 0;
+}
+
+/* For admin page, adjust the container padding */
+.admin-container {
+    padding-bottom: 4rem;
+}
+
+/* Mobile responsive footer */
+@media (max-width: 640px) {
+    .app-footer {
+        font-size: 0.7rem;
+        padding: 0.4rem 0.75rem;
+    }
+
+    .admin-container {
+        padding-bottom: 3.5rem;
+    }
 }

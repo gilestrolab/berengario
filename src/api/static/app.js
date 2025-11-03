@@ -5,7 +5,6 @@ class ChatApp {
         this.messagesContainer = document.getElementById('messages');
         this.queryInput = document.getElementById('query-input');
         this.sendBtn = document.getElementById('send-btn');
-        this.clearBtn = document.getElementById('clear-btn');
         this.logoutBtn = document.getElementById('logout-btn');
         this.userEmailSpan = document.getElementById('user-email');
         this.toast = document.getElementById('toast');
@@ -140,9 +139,6 @@ class ChatApp {
             this.queryInput.style.height = 'auto';
             this.queryInput.style.height = this.queryInput.scrollHeight + 'px';
         });
-
-        // Clear chat button
-        this.clearBtn.addEventListener('click', () => this.clearSession());
 
         // Logout button
         this.logoutBtn.addEventListener('click', () => this.logout());
@@ -422,13 +418,17 @@ class ChatApp {
 
             // Choose icon based on file type
             if (attachment.filename.endsWith('.ics')) {
-                icon.textContent = '📅';
+                // Calendar icon
+                icon.innerHTML = '<i class="fas fa-calendar"></i>';
             } else if (attachment.filename.endsWith('.csv')) {
-                icon.textContent = '📊';
+                // Chart/spreadsheet icon
+                icon.innerHTML = '<i class="fas fa-chart-bar"></i>';
             } else if (attachment.filename.endsWith('.json')) {
-                icon.textContent = '📄';
+                // Document icon
+                icon.innerHTML = '<i class="fas fa-file-code"></i>';
             } else {
-                icon.textContent = '📎';
+                // Paperclip icon
+                icon.innerHTML = '<i class="fas fa-paperclip"></i>';
             }
 
             const filename = document.createElement('span');
@@ -462,7 +462,9 @@ class ChatApp {
 
                 this.messagesContainer.innerHTML = `
                     <div class="welcome-message">
-                        <div class="welcome-icon">💬</div>
+                        <div class="welcome-icon">
+                            <i class="fas fa-comments"></i>
+                        </div>
                         <h2 id="welcome-title">Welcome to ${instanceName}</h2>
                         <p id="welcome-description">${instanceDescription}</p>
                         <p class="welcome-hint">Your conversation history will be saved during this session.</p>
@@ -647,7 +649,9 @@ class ChatApp {
         }
 
         this.conversationsList.innerHTML = conversations.map(conv => {
-            const channelIcon = conv.channel === 'email' ? '📧' : '💬';
+            const channelIcon = conv.channel === 'email'
+                ? '<i class="fas fa-envelope"></i>'
+                : '<i class="fas fa-comment"></i>';
             const isActive = this.currentConversationId === conv.id;
             const preview = conv.preview || 'No messages yet';
             const messageCount = conv.message_count || 0;
@@ -666,17 +670,13 @@ class ChatApp {
                     <div class="conversation-preview">${preview}</div>
                     <div class="conversation-meta">
                         <span class="conversation-count">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-                            </svg>
+                            <i class="fas fa-comment"></i>
                             ${messageCount} message${messageCount !== 1 ? 's' : ''}
                         </span>
                     </div>
                     <div class="conversation-actions">
                         <button class="delete-conversation-btn" data-id="${conv.id}" title="Delete conversation">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                            </svg>
+                            <i class="fas fa-trash"></i>
                         </button>
                     </div>
                 </div>
@@ -815,7 +815,9 @@ class ChatApp {
         if (!welcomeMsg) {
             this.messagesContainer.innerHTML = `
                 <div class="welcome-message">
-                    <div class="welcome-icon">💬</div>
+                    <div class="welcome-icon">
+                        <i class="fas fa-comments"></i>
+                    </div>
                     <h2 id="welcome-title">Welcome to ${this.config?.instance_name || 'RAGInbox'}</h2>
                     <p id="welcome-description">${this.config?.instance_description || 'Ask me anything about the knowledge base documents.'}</p>
                     <p class="welcome-hint">Start a new conversation below.</p>
