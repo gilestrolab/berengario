@@ -1,5 +1,5 @@
 services:
-  # MariaDB Database
+  # MariaDB Database (shared by production and development)
   mariadb:
     image: mariadb:11.2
     container_name: raginbox-db
@@ -27,11 +27,50 @@ services:
     networks:
       - raginbox-network
 
+  # Development Container (for testing, linting, formatting)
+  raginbox-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev  # Use dev image with all testing tools
+    container_name: raginbox-dev
+    restart: unless-stopped
+    command: tail -f /dev/null  # Keep container alive for running commands
+
+    env_file:
+      - .env
+
+    environment:
+      DB_TYPE: mariadb
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_NAME: raginbox
+      DB_USER: raginbox
+      DB_PASSWORD: test_password
+
+    volumes:
+      - ./src:/app/src  # Mount src for live code changes
+      - ./tests:/app/tests  # Mount tests for development
+      - ./data/documents:/app/data/documents
+      - ./data/chroma_db:/app/data/chroma_db
+      - ./data/logs:/app/data/logs
+      - ./data/config:/app/data/config
+      - ./data/temp_attachments:/app/data/temp_attachments
+      - ./data/backups:/app/data/backups
+
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+    networks:
+      - raginbox-network
+
   # RAGInbox Email Service (depends on MariaDB)
   raginbox-email:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production  # Use production image (minimal size)
     container_name: raginbox-email
     restart: unless-stopped
     command: python run_email_service.py
@@ -86,6 +125,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production  # Use production image (minimal size)
     container_name: raginbox-web
     restart: unless-stopped
     command: python run_web_service.py
