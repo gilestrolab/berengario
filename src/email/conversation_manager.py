@@ -426,6 +426,209 @@ class ConversationManager:
             logger.info(f"Deleted conversation: {thread_id}")
             return True
 
+    def get_usage_analytics(
+        self,
+        days: Optional[int] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get comprehensive usage analytics for queries.
+
+        Args:
+            days: Number of days to look back (from today)
+            start_date: Explicit start date (overrides days)
+            end_date: Explicit end date (defaults to now)
+
+        Returns:
+            Dictionary with usage analytics including:
+            - overview: Total queries, unique users, avg queries/user
+            - daily_stats: Daily query counts
+            - user_activity: Per-user query counts and details
+            - channel_breakdown: Email vs webchat distribution
+        """
+        from datetime import timedelta
+
+        from sqlalchemy import func
+
+        with self.db_manager.get_session() as session:
+            # Determine date range
+            if start_date is None:
+                if days:
+                    start_date = datetime.utcnow() - timedelta(days=days)
+                else:
+                    # No filter, get all data
+                    start_date = datetime(1970, 1, 1)
+
+            if end_date is None:
+                end_date = datetime.utcnow()
+
+            # Base query for queries only (not replies)
+            base_query = session.query(ConversationMessage).filter(
+                ConversationMessage.message_type == MessageType.QUERY,
+                ConversationMessage.timestamp >= start_date,
+                ConversationMessage.timestamp <= end_date,
+            )
+
+            # Overview statistics
+            total_queries = base_query.count()
+
+            unique_users = (
+                session.query(func.count(func.distinct(ConversationMessage.sender)))
+                .join(Conversation)
+                .filter(
+                    ConversationMessage.message_type == MessageType.QUERY,
+                    ConversationMessage.timestamp >= start_date,
+                    ConversationMessage.timestamp <= end_date,
+                )
+                .scalar()
+                or 0
+            )
+
+            avg_queries_per_user = (
+                round(total_queries / unique_users, 2) if unique_users > 0 else 0
+            )
+
+            # Daily statistics
+            daily_stats = (
+                session.query(
+                    func.date(ConversationMessage.timestamp).label("date"),
+                    func.count(ConversationMessage.id).label("count"),
+                )
+                .filter(
+                    ConversationMessage.message_type == MessageType.QUERY,
+                    ConversationMessage.timestamp >= start_date,
+                    ConversationMessage.timestamp <= end_date,
+                )
+                .group_by(func.date(ConversationMessage.timestamp))
+                .order_by(func.date(ConversationMessage.timestamp))
+                .all()
+            )
+
+            daily_stats_list = [
+                {"date": str(stat.date), "count": stat.count} for stat in daily_stats
+            ]
+
+            # Per-user activity
+            user_stats = (
+                session.query(
+                    Conversation.sender,
+                    Conversation.channel,
+                    func.count(ConversationMessage.id).label("query_count"),
+                )
+                .join(ConversationMessage)
+                .filter(
+                    ConversationMessage.message_type == MessageType.QUERY,
+                    ConversationMessage.timestamp >= start_date,
+                    ConversationMessage.timestamp <= end_date,
+                )
+                .group_by(Conversation.sender, Conversation.channel)
+                .order_by(func.count(ConversationMessage.id).desc())
+                .all()
+            )
+
+            user_activity = [
+                {
+                    "sender": stat.sender,
+                    "channel": stat.channel.value,
+                    "query_count": stat.query_count,
+                }
+                for stat in user_stats
+            ]
+
+            # Channel breakdown
+            channel_stats = (
+                session.query(
+                    Conversation.channel,
+                    func.count(ConversationMessage.id).label("count"),
+                )
+                .join(ConversationMessage)
+                .filter(
+                    ConversationMessage.message_type == MessageType.QUERY,
+                    ConversationMessage.timestamp >= start_date,
+                    ConversationMessage.timestamp <= end_date,
+                )
+                .group_by(Conversation.channel)
+                .all()
+            )
+
+            channel_breakdown = {
+                stat.channel.value: stat.count for stat in channel_stats
+            }
+
+            analytics = {
+                "date_range": {
+                    "start": start_date.isoformat(),
+                    "end": end_date.isoformat(),
+                },
+                "overview": {
+                    "total_queries": total_queries,
+                    "unique_users": unique_users,
+                    "avg_queries_per_user": avg_queries_per_user,
+                },
+                "daily_stats": daily_stats_list,
+                "user_activity": user_activity,
+                "channel_breakdown": channel_breakdown,
+            }
+
+            logger.debug(
+                f"Usage analytics: {total_queries} queries from "
+                f"{unique_users} users ({start_date} to {end_date})"
+            )
+
+            return analytics
+
+    def get_user_queries(
+        self,
+        sender: str,
+        days: Optional[int] = None,
+        limit: Optional[int] = 100,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get detailed query list for a specific user.
+
+        Args:
+            sender: User identifier
+            days: Number of days to look back (None = all)
+            limit: Maximum number of queries to return
+
+        Returns:
+            List of query dictionaries with content, timestamp, subject.
+        """
+        from datetime import timedelta
+
+        with self.db_manager.get_session() as session:
+            query = (
+                session.query(ConversationMessage)
+                .join(Conversation)
+                .filter(
+                    Conversation.sender == sender,
+                    ConversationMessage.message_type == MessageType.QUERY,
+                )
+            )
+
+            if days:
+                start_date = datetime.utcnow() - timedelta(days=days)
+                query = query.filter(ConversationMessage.timestamp >= start_date)
+
+            query = query.order_by(ConversationMessage.timestamp.desc())
+
+            if limit:
+                query = query.limit(limit)
+
+            messages = query.all()
+
+            return [
+                {
+                    "id": msg.id,
+                    "content": msg.content,
+                    "timestamp": msg.timestamp.isoformat(),
+                    "subject": msg.subject,
+                    "channel": msg.conversation.channel.value,
+                }
+                for msg in messages
+            ]
+
 
 # Global conversation manager instance
 conversation_manager = ConversationManager()

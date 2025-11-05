@@ -728,6 +728,376 @@
         }
 
         /* ====================================
+           USAGE ANALYTICS STYLES
+           ==================================== */
+
+        .usage-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .time-range-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .time-range-btn {
+            padding: 0.5rem 1rem;
+            background: white;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.875rem;
+        }
+
+        .time-range-btn:hover {
+            border-color: var(--primary, #007bff);
+            color: var(--primary, #007bff);
+        }
+
+        .time-range-btn.active {
+            background: var(--primary, #007bff);
+            color: white;
+            border-color: var(--primary, #007bff);
+        }
+
+        .btn-refresh {
+            padding: 0.5rem 1rem;
+            background: white;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-refresh:hover {
+            background: var(--bg-secondary, #f8f9fa);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 8px;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .stat-icon {
+            font-size: 2rem;
+            color: var(--primary, #007bff);
+            opacity: 0.8;
+        }
+
+        .stat-content {
+            flex: 1;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary, #666);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: bold;
+            color: var(--text-primary, #333);
+        }
+
+        .chart-section {
+            background: white;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-section h3 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            color: var(--text-primary, #333);
+        }
+
+        .users-section {
+            background: white;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .users-section h3 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            color: var(--text-primary, #333);
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .users-table thead tr {
+            background: var(--bg-secondary, #f8f9fa);
+            border-bottom: 2px solid var(--border, #ddd);
+        }
+
+        .users-table th {
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary, #333);
+            font-size: 0.875rem;
+        }
+
+        .users-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border, #eee);
+        }
+
+        .users-table tbody tr:hover {
+            background: var(--bg-secondary, #f8f9fa);
+        }
+
+        .btn-view-queries {
+            padding: 0.375rem 0.75rem;
+            background: var(--primary, #007bff);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.3s;
+        }
+
+        .btn-view-queries:hover {
+            background: var(--primary-dark, #0056b3);
+        }
+
+        .topics-section {
+            background: white;
+            border: 1px solid var(--border, #ddd);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .topics-section h3 {
+            margin-top: 0;
+            color: var(--text-primary, #333);
+        }
+
+        .btn-analyze-topics {
+            padding: 0.5rem 1rem;
+            background: var(--primary, #007bff);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-analyze-topics:hover {
+            background: var(--primary-dark, #0056b3);
+        }
+
+        .btn-analyze-topics:disabled {
+            background: var(--text-secondary, #666);
+            cursor: not-allowed;
+        }
+
+        .topics-placeholder {
+            color: var(--text-secondary, #666);
+            font-style: italic;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .topic-card {
+            background: var(--bg-secondary, #f8f9fa);
+            border: 1px solid var(--border, #ddd);
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .topic-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .topic-name {
+            font-weight: 600;
+            color: var(--text-primary, #333);
+            font-size: 1rem;
+        }
+
+        .topic-stats {
+            font-size: 0.875rem;
+            color: var(--text-secondary, #666);
+        }
+
+        .topic-description {
+            color: var(--text-secondary, #666);
+            font-size: 0.875rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .topic-samples {
+            margin-top: 0.75rem;
+        }
+
+        .topic-samples-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary, #666);
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .sample-query {
+            background: white;
+            border-left: 3px solid var(--primary, #007bff);
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-primary, #333);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sample-query:hover {
+            background: var(--bg-hover, #e9ecef);
+        }
+
+        .sample-query.truncated {
+            position: relative;
+        }
+
+        .sample-query.truncated::after {
+            content: "... (click to expand)";
+            color: var(--primary, #007bff);
+            font-style: italic;
+            margin-left: 0.25rem;
+        }
+
+        .sample-query.expanded::after {
+            content: " (click to collapse)";
+        }
+
+        /* Badge styles */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 3px;
+            text-transform: uppercase;
+        }
+
+        .badge-email {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .badge-webchat {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            padding: 1rem;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border, #ddd);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: var(--text-primary, #333);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary, #666);
+            padding: 0;
+            width: 2rem;
+            height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: var(--bg-secondary, #f8f9fa);
+            color: var(--text-primary, #333);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        /* ====================================
            MOBILE RESPONSIVE STYLES
            ==================================== */
 
@@ -1197,6 +1567,7 @@
 
         <div class="tabs">
             <button class="tab active" data-tab="whitelists">Whitelists</button>
+            <button class="tab" data-tab="usage">Usage Analytics</button>
             <button class="tab" data-tab="documents">Documents</button>
             <button class="tab" data-tab="webcrawl">Web Crawling</button>
             <button class="tab" data-tab="backups">Backups</button>
@@ -1244,6 +1615,101 @@
                 </div>
                 <div class="whitelist-list" id="admins-list">
                     <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Usage Analytics Tab -->
+        <div id="usage-tab" class="tab-content">
+            <!-- Time Range Filter -->
+            <div class="usage-controls">
+                <div class="time-range-buttons">
+                    <button class="time-range-btn active" data-days="7">Last 7 Days</button>
+                    <button class="time-range-btn" data-days="30">Last 30 Days</button>
+                    <button class="time-range-btn" data-days="90">Last 90 Days</button>
+                    <button class="time-range-btn" data-days="all">All Time</button>
+                </div>
+                <button class="btn-refresh" onclick="usageAnalytics.refresh()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+
+            <!-- Overview Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Total Queries</div>
+                        <div class="stat-value" id="stat-total-queries">-</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Unique Users</div>
+                        <div class="stat-value" id="stat-unique-users">-</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Avg Queries/User</div>
+                        <div class="stat-value" id="stat-avg-queries">-</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-percentage"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-label">Email vs Webchat</div>
+                        <div class="stat-value" id="stat-channel-split">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Query Trends Chart -->
+            <div class="chart-section">
+                <h3>Query Trends Over Time</h3>
+                <canvas id="query-trends-chart" height="80"></canvas>
+            </div>
+
+            <!-- Top Users Table -->
+            <div class="users-section">
+                <h3>Top Users by Query Count</h3>
+                <div class="table-responsive">
+                    <table class="users-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Channel</th>
+                                <th>Query Count</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body">
+                            <tr><td colspan="4" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Topic Clustering Section -->
+            <div class="topics-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">Common Topics</h3>
+                    <button class="btn-analyze-topics" onclick="usageAnalytics.analyzeTopics()">
+                        <i class="fas fa-brain"></i> Analyze Topics
+                    </button>
+                </div>
+                <div id="topics-container">
+                    <p class="topics-placeholder">Click "Analyze Topics" to identify common themes in user queries using AI.</p>
                 </div>
             </div>
         </div>
@@ -1445,6 +1911,7 @@
         </div>
     </footer>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="/static/admin.js"></script>
 </body>
 </html>

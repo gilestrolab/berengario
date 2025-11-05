@@ -185,6 +185,32 @@ class DocumentListResponse(BaseModel):
     total_count: int
 
 
+class UsageAnalyticsResponse(BaseModel):
+    """Response model for usage analytics."""
+
+    date_range: Dict[str, str]
+    overview: Dict
+    daily_stats: List[Dict]
+    user_activity: List[Dict]
+    channel_breakdown: Dict[str, int]
+
+
+class UserQueriesResponse(BaseModel):
+    """Response model for user query details."""
+
+    sender: str
+    queries: List[Dict]
+    total_count: int
+
+
+class TopicClusteringResponse(BaseModel):
+    """Response model for topic clustering."""
+
+    topics: List[Dict]
+    total_queries: int
+    clustered_queries: int
+
+
 class DocumentDeleteRequest(BaseModel):
     """Request model for document deletion."""
 
@@ -2996,6 +3022,162 @@ async def get_config():
         "instance_description": settings.instance_description,
         "organization": settings.organization,
     }
+
+
+# Usage Analytics Endpoints
+@app.get("/api/admin/usage/analytics", response_model=UsageAnalyticsResponse)
+async def get_usage_analytics(
+    days: Optional[int] = None,
+    session: Session = Depends(require_admin),
+):
+    """
+    Get comprehensive usage analytics.
+
+    Requires admin privileges.
+
+    Args:
+        days: Number of days to look back (7, 30, 90, or None for all)
+        session: Admin session (injected by dependency)
+
+    Returns:
+        UsageAnalyticsResponse with comprehensive analytics
+
+    Raises:
+        HTTPException: If query fails
+    """
+    try:
+        logger.info(f"Admin {session.email} requested usage analytics (days={days})")
+
+        analytics = conversation_manager.get_usage_analytics(days=days)
+
+        return UsageAnalyticsResponse(**analytics)
+
+    except Exception as e:
+        logger.error(f"Error getting usage analytics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Error getting usage analytics: {str(e)}"
+        )
+
+
+@app.get("/api/admin/usage/user/{sender}", response_model=UserQueriesResponse)
+async def get_user_queries(
+    sender: str,
+    days: Optional[int] = None,
+    limit: Optional[int] = 100,
+    session: Session = Depends(require_admin),
+):
+    """
+    Get detailed query list for a specific user.
+
+    Requires admin privileges.
+
+    Args:
+        sender: User identifier (email)
+        days: Number of days to look back (None = all)
+        limit: Maximum number of queries to return
+        session: Admin session (injected by dependency)
+
+    Returns:
+        UserQueriesResponse with query details
+
+    Raises:
+        HTTPException: If query fails
+    """
+    try:
+        logger.info(
+            f"Admin {session.email} requested queries for user {sender} (days={days}, limit={limit})"
+        )
+
+        queries = conversation_manager.get_user_queries(
+            sender=sender, days=days, limit=limit
+        )
+
+        return UserQueriesResponse(
+            sender=sender, queries=queries, total_count=len(queries)
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting user queries: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Error getting user queries: {str(e)}"
+        )
+
+
+@app.post("/api/admin/usage/topics", response_model=TopicClusteringResponse)
+async def cluster_query_topics(
+    days: Optional[int] = 30,
+    session: Session = Depends(require_admin),
+):
+    """
+    Analyze and cluster query topics using LLM.
+
+    Requires admin privileges.
+
+    Args:
+        days: Number of days to analyze (default: 30)
+        session: Admin session (injected by dependency)
+
+    Returns:
+        TopicClusteringResponse with topic analysis
+
+    Raises:
+        HTTPException: If analysis fails
+    """
+    try:
+        logger.info(f"Admin {session.email} requested topic clustering (days={days})")
+
+        # Get all queries for the period
+        analytics = conversation_manager.get_usage_analytics(days=days)
+        total_queries = analytics["overview"]["total_queries"]
+
+        if total_queries == 0:
+            return TopicClusteringResponse(
+                topics=[],
+                total_queries=0,
+                clustered_queries=0,
+            )
+
+        # Get all query content
+        from src.email.db_manager import db_manager
+        from src.email.db_models import ConversationMessage
+
+        with db_manager.get_session() as db_session:
+            # Calculate start date
+            from datetime import timedelta
+
+            start_date = (
+                datetime.utcnow() - timedelta(days=days)
+                if days
+                else datetime(1970, 1, 1)
+            )
+
+            queries = (
+                db_session.query(ConversationMessage)
+                .filter(
+                    ConversationMessage.message_type == MessageType.QUERY,
+                    ConversationMessage.timestamp >= start_date,
+                )
+                .all()
+            )
+
+            query_texts = [q.content for q in queries]
+
+        # Use LLM to cluster topics
+        from src.rag.topic_clustering import cluster_topics
+
+        topics = cluster_topics(query_texts, query_handler.rag_engine)
+
+        return TopicClusteringResponse(
+            topics=topics,
+            total_queries=total_queries,
+            clustered_queries=len(query_texts),
+        )
+
+    except Exception as e:
+        logger.error(f"Error clustering topics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Error clustering topics: {str(e)}"
+        )
 
 
 # Example Questions Endpoints
