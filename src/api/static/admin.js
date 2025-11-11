@@ -380,7 +380,7 @@ class AdminPanel {
 
             // Info button - only show if description exists
             const infoButton = hasDescription ? `
-                <button class="btn-info" onclick="adminPanel.toggleDescriptionForDoc(this)" title="Show/hide description">ℹ️</button>
+                <button class="btn-info" title="Show/hide description">ℹ️</button>
             ` : '';
 
             const downloadButton = canDownload ? `
@@ -460,6 +460,15 @@ class AdminPanel {
                 }
             });
         });
+
+        // Setup event delegation for info button clicks
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('btn-info')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleDescriptionForDoc(e.target);
+            }
+        });
     }
 
     /**
@@ -524,7 +533,7 @@ class AdminPanel {
             const descriptionText = hasDescription ? this.escapeHtml(description.description) : '';
 
             const infoButton = hasDescription ? `
-                <button class="btn-info" onclick="adminPanel.toggleDescriptionForDoc(this)" title="Show/hide description">ℹ️</button>
+                <button class="btn-info" title="Show/hide description">ℹ️</button>
             ` : '';
 
             const downloadButton = canDownload ? `
@@ -1392,12 +1401,12 @@ class AdminPanel {
     }
 
     toggleDescriptionForDoc(button) {
-        // Find the document-info container
-        const documentInfo = button.closest('.document-info');
-        if (!documentInfo) return;
+        // Find the doc-filename container (table cell)
+        const docFilename = button.closest('.doc-filename');
+        if (!docFilename) return;
 
         // Find the description div
-        const descriptionDiv = documentInfo.querySelector('.document-description');
+        const descriptionDiv = docFilename.querySelector('.document-description');
         if (!descriptionDiv) return;
 
         // Toggle visibility
@@ -1897,3 +1906,8 @@ class FeedbackAnalytics {
 const adminPanel = new AdminPanel();
 const usageAnalytics = new UsageAnalytics();
 const feedbackAnalytics = new FeedbackAnalytics();
+
+// Expose to global scope for inline onclick handlers
+window.adminPanel = adminPanel;
+window.usageAnalytics = usageAnalytics;
+window.feedbackAnalytics = feedbackAnalytics;
