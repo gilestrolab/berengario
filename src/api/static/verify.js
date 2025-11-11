@@ -79,7 +79,9 @@ class VerifyPage {
         // Auto-submit when 6 digits entered
         this.otpInput.addEventListener('input', () => {
             if (this.otpInput.value.length === 6) {
-                this.form.dispatchEvent(new Event('submit'));
+                // Call handleSubmit directly with a mock event object
+                // This prevents the form from actually submitting and causing a page reload
+                this.handleSubmit({ preventDefault: () => {} });
             }
         });
     }
