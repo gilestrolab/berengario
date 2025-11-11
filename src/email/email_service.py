@@ -175,6 +175,12 @@ class EmailService:
                 if not self.running:
                     break
 
+                # Reload whitelists to pick up any changes made via admin interface
+                try:
+                    self.processor.reload_whitelists()
+                except Exception as e:
+                    logger.warning(f"Failed to reload whitelists: {e}")
+
                 # Process inbox
                 self._process_inbox()
 

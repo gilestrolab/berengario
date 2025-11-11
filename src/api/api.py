@@ -590,11 +590,24 @@ query_whitelist = WhitelistValidator(
     enabled=settings.email_query_whitelist_enabled,
 )
 
+teach_whitelist = WhitelistValidator(
+    whitelist_file=settings.email_teach_whitelist_file,
+    whitelist=settings.email_teach_whitelist,
+    enabled=settings.email_teach_whitelist_enabled,
+)
+
 admin_whitelist = WhitelistValidator(
     whitelist_file=settings.email_admin_whitelist_file,
     whitelist=settings.email_admin_whitelist,
     enabled=settings.email_admin_whitelist_enabled,
 )
+
+# Mapping of whitelist types to validators for dynamic reloading
+whitelist_validators = {
+    "queriers": query_whitelist,
+    "teachers": teach_whitelist,
+    "admins": admin_whitelist,
+}
 
 # Initialize admin managers
 kb_manager = KnowledgeBaseManager()
@@ -1772,6 +1785,11 @@ async def add_whitelist_entry(
     try:
         added = whitelist_manager.add_entry(whitelist_type, request.entry)
 
+        # Reload the corresponding validator to pick up changes
+        if whitelist_type in whitelist_validators:
+            whitelist_validators[whitelist_type].reload()
+            logger.debug(f"Reloaded {whitelist_type} whitelist validator")
+
         # Log the action
         audit_logger.log_whitelist_add(
             session.email,
@@ -1839,6 +1857,11 @@ async def remove_whitelist_entry(
     """
     try:
         removed = whitelist_manager.remove_entry(whitelist_type, request.entry)
+
+        # Reload the corresponding validator to pick up changes
+        if whitelist_type in whitelist_validators:
+            whitelist_validators[whitelist_type].reload()
+            logger.debug(f"Reloaded {whitelist_type} whitelist validator")
 
         # Log the action
         audit_logger.log_whitelist_remove(

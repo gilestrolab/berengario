@@ -168,6 +168,19 @@ class EmailProcessor:
             "EmailProcessor initialized with hierarchical whitelists (admin > teacher > querier)"
         )
 
+    def reload_whitelists(self) -> None:
+        """
+        Reload all whitelist validators from their source files.
+
+        This allows the email service to pick up changes made to whitelist files
+        (e.g., through the admin interface) without requiring a restart.
+        """
+        logger.info("Reloading all whitelist validators...")
+        self.admin_validator.reload()
+        self.teach_validator.reload()
+        self.query_validator.reload()
+        logger.info("All whitelist validators reloaded successfully")
+
     def process_message(
         self, mail_message: MailMessage, mark_seen: bool = True
     ) -> ProcessingResult:
@@ -370,6 +383,37 @@ class EmailProcessor:
                             logger.info(
                                 f"Email body content from {email.sender.email} already in KB (hash: {body_hash[:8]}...)"
                             )
+
+                            # Still persist email body for future reingestion (if not already saved)
+                            # Create descriptive filename
+                            date_str = (
+                                email.date.strftime("%Y-%m-%d")
+                                if email.date
+                                else "unknown-date"
+                            )
+                            sender_name = email.sender.email.split("@")[0]
+                            subject_clean = (
+                                email.subject[:50] if email.subject else "No Subject"
+                            )
+                            subject_clean = "".join(
+                                c
+                                for c in subject_clean
+                                if c.isalnum() or c in (" ", "-", "_")
+                            ).strip()
+                            descriptive_filename = f"Email from {sender_name} on {date_str} - {subject_clean}.txt"
+
+                            emails_dir = settings.documents_path / "emails"
+                            emails_dir.mkdir(parents=True, exist_ok=True)
+                            persistent_path = emails_dir / descriptive_filename
+
+                            if not persistent_path.exists():
+                                import shutil
+
+                                shutil.copy2(body_file_path, persistent_path)
+                                logger.info(
+                                    f"Saved duplicate email body to {persistent_path} for future reingestion"
+                                )
+
                             # Clean up temp file
                             body_file_path.unlink(missing_ok=True)
 
@@ -428,6 +472,18 @@ class EmailProcessor:
 
                         logger.info(
                             f"Successfully added email body to KB: {chunks_created} chunks created"
+                        )
+
+                        # Persist email body to data/documents/emails/ for future reingestion
+                        emails_dir = settings.documents_path / "emails"
+                        emails_dir.mkdir(parents=True, exist_ok=True)
+
+                        persistent_path = emails_dir / descriptive_filename
+                        import shutil
+
+                        shutil.copy2(Path(temp_file.name), persistent_path)
+                        logger.info(
+                            f"Saved email body to {persistent_path} for future reingestion"
                         )
 
                         # Clean up temp file
@@ -555,6 +611,30 @@ class EmailProcessor:
                         logger.info(
                             f"Added {attachment.filename} to KB: {len(nodes)} chunks"
                         )
+
+                        # Persist attachment to data/documents/attachments/ for future reingestion
+                        attachments_dir = settings.documents_path / "attachments"
+                        attachments_dir.mkdir(parents=True, exist_ok=True)
+
+                        persistent_path = attachments_dir / attachment.filename
+                        # If file already exists, append timestamp to avoid overwriting
+                        if persistent_path.exists():
+                            from datetime import datetime
+
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            stem = persistent_path.stem
+                            suffix = persistent_path.suffix
+                            persistent_path = (
+                                attachments_dir / f"{stem}_{timestamp}{suffix}"
+                            )
+
+                        import shutil
+
+                        shutil.copy2(attachment.filepath, persistent_path)
+                        logger.info(
+                            f"Saved attachment to {persistent_path} for future reingestion"
+                        )
+
                     else:
                         logger.warning(f"No chunks created from {attachment.filename}")
 
@@ -735,12 +815,32 @@ class EmailProcessor:
                     action="query",
                 )
 
-            # Format response email
+            # Prepare reply subject line
+            if not email.subject.lower().startswith("re:"):
+                reply_subject = f"Re: {email.subject}"
+            else:
+                reply_subject = email.subject
+
+            # Store assistant reply in conversation database first (to get message_id for feedback)
+            reply_message_id = conversation_manager.add_message(
+                thread_id=thread_id,
+                message_type=MessageType.REPLY,
+                content=result["response"],
+                sender=settings.email_target_address,
+                subject=reply_subject,
+                channel=ChannelType.EMAIL,
+            )
+            logger.debug(
+                f"Stored assistant reply in conversation {thread_id}, message_id={reply_message_id}"
+            )
+
+            # Format response email with feedback links
             subject, plain_text, html_body = format_response_email(
                 response_text=result["response"],
                 sources=result["sources"],
                 instance_name=settings.instance_name,
                 original_subject=email.subject,
+                message_id=reply_message_id,
             )
 
             # Check if tool already sent an email (e.g., confirmation email)
@@ -794,17 +894,6 @@ class EmailProcessor:
                     error="Failed to send reply email",
                     action="query",
                 )
-
-            # Store assistant reply in conversation database
-            conversation_manager.add_message(
-                thread_id=thread_id,
-                message_type=MessageType.REPLY,
-                content=result["response"],
-                sender=settings.email_target_address,
-                subject=subject,
-                channel=ChannelType.EMAIL,
-            )
-            logger.debug(f"Stored assistant reply in conversation {thread_id}")
 
             # Track successful processing
             self.message_tracker.mark_processed(

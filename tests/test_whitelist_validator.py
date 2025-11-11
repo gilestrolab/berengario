@@ -268,3 +268,87 @@ class TestWhitelistValidator:
             assert "@ic.ac.uk" in validator.domain_entries
         finally:
             temp_file.unlink()
+
+    def test_reload_from_file(self):
+        """Test reloading whitelist from file after modification."""
+        # Create temporary file with initial entries
+        with NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+            f.write("alice@example.com\n")
+            f.write("@imperial.ac.uk\n")
+            temp_file = Path(f.name)
+
+        try:
+            # Create validator with initial entries
+            validator = WhitelistValidator(whitelist_file=temp_file)
+
+            # Verify initial state
+            assert len(validator.whitelist_entries) == 1
+            assert len(validator.domain_entries) == 1
+            assert "alice@example.com" in validator.whitelist_entries
+            assert validator.is_allowed("alice@example.com") is True
+            assert validator.is_allowed("bob@example.com") is False
+
+            # Modify the file to add new entries
+            with open(temp_file, "w") as f:
+                f.write("alice@example.com\n")
+                f.write("bob@example.com\n")
+                f.write("@imperial.ac.uk\n")
+                f.write("@ic.ac.uk\n")
+
+            # Reload the validator
+            validator.reload()
+
+            # Verify new entries are loaded
+            assert len(validator.whitelist_entries) == 2
+            assert len(validator.domain_entries) == 2
+            assert "alice@example.com" in validator.whitelist_entries
+            assert "bob@example.com" in validator.whitelist_entries
+            assert "@imperial.ac.uk" in validator.domain_entries
+            assert "@ic.ac.uk" in validator.domain_entries
+            assert validator.is_allowed("bob@example.com") is True
+
+        finally:
+            temp_file.unlink()
+
+    def test_reload_with_inline_whitelist(self):
+        """Test reloading also respects inline whitelist."""
+        # Create temporary file
+        with NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+            f.write("alice@example.com\n")
+            temp_file = Path(f.name)
+
+        try:
+            # Create validator with both file and inline entries
+            validator = WhitelistValidator(
+                whitelist="bob@example.com", whitelist_file=temp_file
+            )
+
+            # Verify initial state
+            assert len(validator.whitelist_entries) == 2
+
+            # Modify the file
+            with open(temp_file, "w") as f:
+                f.write("alice@example.com\n")
+                f.write("charlie@example.com\n")
+
+            # Reload
+            validator.reload()
+
+            # Should have inline entry + file entries
+            assert len(validator.whitelist_entries) == 3
+            assert "bob@example.com" in validator.whitelist_entries  # From inline
+            assert "alice@example.com" in validator.whitelist_entries  # From file
+            assert "charlie@example.com" in validator.whitelist_entries  # From file
+
+        finally:
+            temp_file.unlink()
+
+    def test_reload_disabled(self):
+        """Test reload does nothing when disabled."""
+        validator = WhitelistValidator(enabled=False)
+
+        # Should not raise error
+        validator.reload()
+
+        assert len(validator.whitelist_entries) == 0
+        assert len(validator.domain_entries) == 0

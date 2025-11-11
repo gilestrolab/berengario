@@ -52,6 +52,10 @@ class WhitelistValidator:
         self.domain_entries: Set[str] = set()
         self.parent_validators = parent_validators or []
 
+        # Store initialization parameters for reload
+        self._whitelist_string = whitelist
+        self._whitelist_file = whitelist_file
+
         if not self.enabled:
             logger.warning(
                 "Email whitelist validation is DISABLED - all senders allowed!"
@@ -256,3 +260,32 @@ class WhitelistValidator:
 
         logger.warning(f"Entry not found in whitelist: {entry}")
         return False
+
+    def reload(self) -> None:
+        """
+        Reload whitelist from original sources (file and/or string).
+
+        This method clears current entries and reloads from the whitelist file
+        and/or inline whitelist string. Useful when whitelist files are modified
+        by admin interface and validators need to pick up changes without restart.
+        """
+        if not self.enabled:
+            logger.debug("Whitelist reload skipped (disabled)")
+            return
+
+        # Clear existing entries
+        self.whitelist_entries.clear()
+        self.domain_entries.clear()
+
+        # Reload from inline whitelist
+        if self._whitelist_string:
+            self._load_from_string(self._whitelist_string)
+
+        # Reload from file
+        if self._whitelist_file:
+            self._load_from_file(self._whitelist_file)
+
+        logger.info(
+            f"Whitelist reloaded: {len(self.whitelist_entries)} addresses, "
+            f"{len(self.domain_entries)} domains"
+        )
