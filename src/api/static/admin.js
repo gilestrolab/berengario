@@ -13,6 +13,7 @@ class AdminPanel {
         this.documents = [];
         this.crawledUrls = [];
         this.backups = [];
+        this.sortState = {}; // Track sort state per section
         this.init();
     }
 
@@ -357,7 +358,14 @@ class AdminPanel {
         const collapsedClass = collapsed ? 'collapsed' : '';
         const contentClass = collapsed ? 'collapsed' : '';
 
-        const itemsHtml = documents.map(doc => {
+        // Sort documents by age (newest first) by default
+        const sortedDocs = [...documents].sort((a, b) => {
+            const ageA = a.age_days ?? Infinity;
+            const ageB = b.age_days ?? Infinity;
+            return ageA - ageB;
+        });
+
+        const rowsHtml = sortedDocs.map(doc => {
             // Determine which buttons to show based on source type
             const canDownload = ['manual', 'file'].includes(doc.source_type);
             const canView = doc.source_type === 'email';
@@ -387,23 +395,27 @@ class AdminPanel {
                 </button>
             ` : '';
 
+            // Format age for display
+            const ageHtml = this.formatDocumentAge(doc.age_days, doc.date_added);
+
             return `
-                <div class="document-item">
-                    <div class="document-info">
-                        <div class="filename-row">
-                            <div class="filename" title="${this.escapeHtml(displayName)}">${this.escapeHtml(displayName)}</div>
+                <tr class="doc-row" data-age="${doc.age_days ?? ''}">
+                    <td class="doc-filename">
+                        <div class="filename-container">
+                            <span class="filename" title="${this.escapeHtml(displayName)}">${this.escapeHtml(displayName)}</span>
                             ${infoButton}
                         </div>
                         ${hasDescription ? `<div class="document-description">${descriptionText}</div>` : ''}
-                    </div>
-                    <div class="document-actions">
+                    </td>
+                    <td class="doc-age-cell">${ageHtml}</td>
+                    <td class="doc-actions">
                         ${viewButton}
                         ${downloadButton}
                         <button class="btn-delete" onclick="adminPanel.deleteDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(displayName)}')" title="Delete">
                             <i class="fas fa-trash"></i>
                         </button>
-                    </div>
-                </div>
+                    </td>
+                </tr>
             `;
         }).join('');
 
@@ -415,7 +427,22 @@ class AdminPanel {
                     <span class="count">${documents.length}</span>
                 </div>
                 <div class="section-content ${contentClass}" data-section="${id}">
-                    ${itemsHtml}
+                    <table class="documents-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort-key="filename" onclick="adminPanel.sortDocuments('${id}', 'filename')">
+                                    Document <span class="sort-indicator"></span>
+                                </th>
+                                <th class="sortable" data-sort-key="age" onclick="adminPanel.sortDocuments('${id}', 'age')">
+                                    Age <span class="sort-indicator"></span>
+                                </th>
+                                <th class="actions-header">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         `;
@@ -432,6 +459,121 @@ class AdminPanel {
                     content.classList.toggle('collapsed');
                 }
             });
+        });
+    }
+
+    /**
+     * Sort documents in a section by specified key
+     * @param {string} sectionId - Section identifier ('files' or 'emails')
+     * @param {string} sortKey - Sort key ('filename' or 'age')
+     */
+    sortDocuments(sectionId, sortKey) {
+        // Initialize sort state for this section if not exists
+        if (!this.sortState[sectionId]) {
+            this.sortState[sectionId] = { key: 'age', ascending: true };
+        }
+
+        const state = this.sortState[sectionId];
+
+        // Toggle direction if same key, otherwise reset to ascending
+        if (state.key === sortKey) {
+            state.ascending = !state.ascending;
+        } else {
+            state.key = sortKey;
+            state.ascending = true;
+        }
+
+        // Get documents for this section
+        const isFilesSection = sectionId === 'files';
+        const sectionDocs = this.documents.filter(doc =>
+            isFilesSection ? doc.source_type !== 'email' : doc.source_type === 'email'
+        );
+
+        // Sort documents
+        sectionDocs.sort((a, b) => {
+            let valA, valB;
+
+            if (sortKey === 'age') {
+                valA = a.age_days ?? Infinity;
+                valB = b.age_days ?? Infinity;
+            } else if (sortKey === 'filename') {
+                valA = this.getDisplayName(a).toLowerCase();
+                valB = this.getDisplayName(b).toLowerCase();
+            }
+
+            if (valA < valB) return state.ascending ? -1 : 1;
+            if (valA > valB) return state.ascending ? 1 : -1;
+            return 0;
+        });
+
+        // Re-render just this section
+        const sectionContainer = document.querySelector(`.section-content[data-section="${sectionId}"]`);
+        if (!sectionContainer) return;
+
+        const table = sectionContainer.querySelector('.documents-table tbody');
+        if (!table) return;
+
+        // Re-render rows
+        const rowsHtml = sectionDocs.map(doc => {
+            const canDownload = ['manual', 'file'].includes(doc.source_type);
+            const canView = doc.source_type === 'email';
+            const displayName = this.getDisplayName(doc);
+
+            const description = this.descriptions && this.descriptions[doc.filename];
+            const hasDescription = description && description.description;
+            const descriptionText = hasDescription ? this.escapeHtml(description.description) : '';
+
+            const infoButton = hasDescription ? `
+                <button class="btn-info" onclick="adminPanel.toggleDescriptionForDoc(this)" title="Show/hide description">ℹ️</button>
+            ` : '';
+
+            const downloadButton = canDownload ? `
+                <button class="btn-download" onclick="adminPanel.downloadDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')" title="Download">
+                    ⬇
+                </button>
+            ` : '';
+
+            const viewButton = canView ? `
+                <button class="btn-view" onclick="adminPanel.viewDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(displayName)}')" title="View">
+                    <i class="fas fa-eye"></i>
+                </button>
+            ` : '';
+
+            const ageHtml = this.formatDocumentAge(doc.age_days, doc.date_added);
+
+            return `
+                <tr class="doc-row" data-age="${doc.age_days ?? ''}">
+                    <td class="doc-filename">
+                        <div class="filename-container">
+                            <span class="filename" title="${this.escapeHtml(displayName)}">${this.escapeHtml(displayName)}</span>
+                            ${infoButton}
+                        </div>
+                        ${hasDescription ? `<div class="document-description">${descriptionText}</div>` : ''}
+                    </td>
+                    <td class="doc-age-cell">${ageHtml}</td>
+                    <td class="doc-actions">
+                        ${viewButton}
+                        ${downloadButton}
+                        <button class="btn-delete" onclick="adminPanel.deleteDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(displayName)}')" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        table.innerHTML = rowsHtml;
+
+        // Update sort indicators
+        sectionContainer.querySelectorAll('.sortable').forEach(th => {
+            const indicator = th.querySelector('.sort-indicator');
+            if (th.dataset.sortKey === sortKey) {
+                indicator.textContent = state.ascending ? '▲' : '▼';
+                th.classList.add('sorted');
+            } else {
+                indicator.textContent = '';
+                th.classList.remove('sorted');
+            }
         });
     }
 
@@ -1270,6 +1412,65 @@ class AdminPanel {
             button.classList.add('active');
             button.title = 'Hide description';
         }
+    }
+
+    /**
+     * Format document age with warning for old documents
+     * @param {number|null} ageDays - Age in days
+     * @param {string|null} dateAdded - ISO date string for tooltip
+     * @returns {string} Formatted HTML for age display
+     */
+    formatDocumentAge(ageDays, dateAdded) {
+        if (ageDays === null || ageDays === undefined) {
+            return '<span class="doc-age">Unknown</span>';
+        }
+
+        let ageText = '';
+        let warningIcon = '';
+        let ageClass = 'doc-age';
+
+        // Calculate human-readable age
+        if (ageDays < 7) {
+            ageText = ageDays === 1 ? '1 day old' : `${ageDays} days old`;
+        } else if (ageDays < 31) {
+            const weeks = Math.floor(ageDays / 7);
+            ageText = weeks === 1 ? '1 week old' : `${weeks} weeks old`;
+        } else if (ageDays < 365) {
+            const months = Math.floor(ageDays / 30);
+            ageText = months === 1 ? '1 month old' : `${months} months old`;
+        } else {
+            // Warning for documents older than 12 months
+            const years = Math.floor(ageDays / 365);
+            const months = Math.floor((ageDays % 365) / 30);
+
+            if (years === 1) {
+                ageText = months > 0 ? `1 year ${months} months old` : '1 year old';
+            } else {
+                ageText = months > 0 ? `${years} years ${months} months old` : `${years} years old`;
+            }
+
+            warningIcon = '⚠️ ';
+            ageClass += ' doc-age-warning';
+        }
+
+        // Format date for tooltip
+        let tooltipDate = '';
+        if (dateAdded) {
+            try {
+                const date = new Date(dateAdded);
+                tooltipDate = date.toLocaleString('en-GB', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (e) {
+                tooltipDate = dateAdded;
+            }
+        }
+
+        return `<span class="${ageClass}" title="Added: ${this.escapeHtml(tooltipDate)}">${warningIcon}${ageText}</span>`;
     }
 
     escapeHtml(text) {

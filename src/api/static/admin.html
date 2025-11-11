@@ -351,6 +351,152 @@
             color: var(--text-secondary, #666);
         }
 
+        /* Documents Table Styles */
+        .documents-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .documents-table thead {
+            background: var(--bg-secondary, #f8f9fa);
+            border-bottom: 2px solid var(--border, #e9ecef);
+        }
+
+        .documents-table th {
+            padding: 0.75rem 0.5rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary, #333);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .documents-table th.sortable {
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+
+        .documents-table th.sortable:hover {
+            background: var(--border, #e9ecef);
+        }
+
+        .documents-table th.sortable.sorted {
+            color: var(--primary, #007bff);
+        }
+
+        .documents-table .sort-indicator {
+            display: inline-block;
+            margin-left: 0.25rem;
+            font-size: 0.7rem;
+            color: var(--primary, #007bff);
+        }
+
+        .documents-table th.actions-header {
+            width: 100px;
+            text-align: center;
+        }
+
+        .documents-table tbody tr {
+            border-bottom: 1px solid var(--border, #e9ecef);
+            transition: background 0.15s;
+        }
+
+        .documents-table tbody tr:hover {
+            background: var(--bg-secondary, #f8f9fa);
+        }
+
+        .documents-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .documents-table td {
+            padding: 0.5rem 0.5rem;
+            vertical-align: top;
+        }
+
+        .doc-filename {
+            max-width: 500px;
+        }
+
+        .doc-filename .filename-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .doc-filename .filename {
+            font-weight: 500;
+            color: var(--text-primary, #333);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+        }
+
+        .doc-age-cell {
+            white-space: nowrap;
+            min-width: 150px;
+        }
+
+        .doc-age {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            background: var(--bg-secondary, #f8f9fa);
+            color: var(--text-secondary, #666);
+            font-size: 0.85rem;
+            cursor: help;
+        }
+
+        .doc-age-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffc107;
+            font-weight: 500;
+        }
+
+        .doc-actions {
+            display: flex;
+            gap: 0.25rem;
+            justify-content: center;
+        }
+
+        .doc-actions button {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            color: var(--text-secondary, #666);
+        }
+
+        .doc-actions button:hover {
+            background: var(--bg-secondary, #f8f9fa);
+            transform: scale(1.1);
+        }
+
+        .doc-actions .btn-view:hover {
+            color: var(--primary, #007bff);
+        }
+
+        .doc-actions .btn-download:hover {
+            color: var(--success, #28a745);
+        }
+
+        .doc-actions .btn-delete:hover {
+            color: var(--danger, #dc3545);
+        }
+
         .loading {
             text-align: center;
             padding: 2rem;

@@ -456,6 +456,8 @@ class KnowledgeBaseManager:
                         "sender": metadata.get("sender"),
                         "subject": metadata.get("subject"),
                         "date": metadata.get("date"),
+                        # Include timestamp for age tracking
+                        "file_mtime": metadata.get("file_mtime"),
                     }
 
             return list(unique_docs.values())

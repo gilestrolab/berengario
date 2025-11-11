@@ -74,20 +74,32 @@ class DocumentManager:
             # Get unique documents from KB
             documents = self.kb_manager.get_unique_documents()
 
-            # Enhance with filesystem metadata
+            # Enhance with filesystem metadata and age calculation
             enhanced_docs = []
             for doc in documents:
                 enhanced_doc = doc.copy()
 
-                # Try to get file stats if it exists
+                # Calculate age from file_mtime if available
+                file_mtime = doc.get("file_mtime")
+                if file_mtime:
+                    try:
+                        doc_datetime = datetime.fromtimestamp(file_mtime)
+                        enhanced_doc["date_added"] = doc_datetime.isoformat()
+                        enhanced_doc["age_days"] = (datetime.now() - doc_datetime).days
+                    except (ValueError, OSError) as e:
+                        logger.warning(
+                            f"Invalid timestamp for {doc.get('filename')}: {e}"
+                        )
+                        enhanced_doc["age_days"] = None
+                else:
+                    enhanced_doc["age_days"] = None
+
+                # Try to get file size if it exists on filesystem
                 if doc.get("source_type") == "file":
                     file_path = self.documents_path / doc["filename"]
                     if file_path.exists():
                         stats = file_path.stat()
                         enhanced_doc["size_bytes"] = stats.st_size
-                        enhanced_doc["date_added"] = datetime.fromtimestamp(
-                            stats.st_mtime
-                        ).isoformat()
 
                 # Add estimated chunk count (would need KB query)
                 enhanced_doc["chunks"] = "?"  # Placeholder
