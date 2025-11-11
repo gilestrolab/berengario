@@ -23,7 +23,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, EmailStr
@@ -1156,7 +1156,21 @@ async def submit_email_feedback(
 
 @app.get("/")
 async def root(request: Request):
-    """Serve main web interface."""
+    """
+    Serve main web interface.
+
+    Redirects to login page if user is not authenticated.
+    """
+    # Check authentication
+    session_id = get_session_id(request)
+    if not session_id:
+        return RedirectResponse(url="/static/login.html", status_code=303)
+
+    session = session_manager.get_session(session_id)
+    if not session or not session.is_authenticated():
+        return RedirectResponse(url="/static/login.html", status_code=303)
+
+    # User is authenticated, serve the chat interface
     index_file = static_dir / "index.html"
     if index_file.exists():
         return templates.TemplateResponse(
@@ -1177,9 +1191,24 @@ async def admin_panel(request: Request):
     """
     Serve admin panel interface.
 
-    Note: Authentication and admin privilege check is done client-side
-    via JavaScript after page load.
+    Requires authentication and admin privileges.
+    Redirects to login if not authenticated or to main page if not admin.
     """
+    # Check authentication
+    session_id = get_session_id(request)
+    if not session_id:
+        return RedirectResponse(url="/static/login.html", status_code=303)
+
+    session = session_manager.get_session(session_id)
+    if not session or not session.is_authenticated():
+        return RedirectResponse(url="/static/login.html", status_code=303)
+
+    # Check admin privileges
+    if not session.is_admin:
+        # Authenticated but not admin - redirect to main chat
+        return RedirectResponse(url="/", status_code=303)
+
+    # User is authenticated and admin, serve the admin panel
     admin_file = static_dir / "admin.html"
     if admin_file.exists():
         return templates.TemplateResponse(
