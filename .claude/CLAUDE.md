@@ -74,42 +74,49 @@ Users can be in one whitelist, both whitelists, or neither. Configure in:
 
 **Docker Containers:**
 
-RAGInbox uses a streamlined container setup with 4 containers:
+RAGInbox uses a streamlined container setup with 3 production containers + 1 optional dev container:
 
-- **Production Containers** (3):
+- **Production Containers** (3 - start automatically):
   - `raginbox-web`: Web interface (production image)
   - `raginbox-email`: Email service (production image)
   - `raginbox-db`: MariaDB database (shared by all services)
 
-- **Development Container** (1):
+- **Development Container** (1 - starts only when explicitly requested):
   - `raginbox-dev`: Testing and development tools (dev image)
     - Includes: pytest, black, ruff, coverage, gcc/g++
     - Used for: Running tests, linting, formatting
     - Shares the same database as production
+    - Does NOT run the email service (utility container only)
 
 **Development Workflow:**
 
 ```bash
-# Start all services (production + dev)
+# Start production services only (web, email, database)
 docker-compose up -d
 
-# Run tests
+# Start production services + dev container (when needed for testing)
+docker-compose --profile dev up -d
+
+# Run tests (will auto-start dev container if not running)
+docker-compose run --rm raginbox-dev pytest tests/ -v
+
+# Or if dev container is already running:
 docker exec raginbox-dev pytest tests/ -v
 
 # Run code formatting
-docker exec raginbox-dev black src/ tests/
+docker-compose run --rm raginbox-dev black src/ tests/
 
 # Run linting
-docker exec raginbox-dev ruff check src/ tests/ --fix
+docker-compose run --rm raginbox-dev ruff check src/ tests/ --fix
 
 # Run with coverage
-docker exec raginbox-dev pytest tests/ -v --cov=src --cov-report=term-missing
+docker-compose run --rm raginbox-dev pytest tests/ -v --cov=src --cov-report=term-missing
 
 # Access dev shell
-docker exec -it raginbox-dev bash
+docker-compose run --rm raginbox-dev bash
 
-# Stop all services
-docker-compose down
+# Stop all services (including dev if running)
+docker-compose --profile dev down
 ```
 
 **When to rebuild Docker images:**
@@ -173,23 +180,24 @@ See `docs/CLI.md` for complete CLI documentation.
 **CRITICAL: Always test code in the Docker container**, not with local `.venv`:
 
 ```bash
-# Start all Docker services first (includes dev container with pytest)
-docker-compose up -d
+# Method 1: Use docker-compose run (recommended - auto-starts/stops dev container)
+docker-compose run --rm raginbox-dev pytest tests/ -v
 
-# Run all tests in development container
+# Method 2: Start dev container persistently, then use docker exec
+docker-compose --profile dev up -d
 docker exec raginbox-dev pytest tests/ -v
 
 # Run specific test file
-docker exec raginbox-dev pytest tests/test_email_parser.py -v
+docker-compose run --rm raginbox-dev pytest tests/test_email_parser.py -v
 
 # Run specific test function
-docker exec raginbox-dev pytest tests/test_email_parser.py::test_function_name -v
+docker-compose run --rm raginbox-dev pytest tests/test_email_parser.py::test_function_name -v
 
 # Run with coverage report
-docker exec raginbox-dev pytest tests/ -v --cov=src --cov-report=term-missing
+docker-compose run --rm raginbox-dev pytest tests/ -v --cov=src --cov-report=term-missing
 
 # Run tests matching a pattern
-docker exec raginbox-dev pytest tests/ -v -k "email"
+docker-compose run --rm raginbox-dev pytest tests/ -v -k "email"
 ```
 
 **Why Docker for testing?**
@@ -212,13 +220,13 @@ RAGInbox includes a pre-commit hook that automatically runs before each commit:
 **Manual commands (using dev container):**
 ```bash
 # Format code (required before committing)
-docker exec raginbox-dev black src/ tests/
+docker-compose run --rm raginbox-dev black src/ tests/
 
 # Fix auto-fixable linting issues
-docker exec raginbox-dev ruff check src/ tests/ --fix
+docker-compose run --rm raginbox-dev ruff check src/ tests/ --fix
 
 # Check without fixing
-docker exec raginbox-dev ruff check src/ tests/
+docker-compose run --rm raginbox-dev ruff check src/ tests/
 
 # Or use local tools if installed
 black src/ tests/
@@ -231,9 +239,9 @@ ruff check src/ tests/ --fix
 git commit -m "your message"
 
 # If checks fail, fix and re-commit
-docker exec raginbox-dev black src/ tests/
-docker exec raginbox-dev ruff check src/ tests/ --fix
-docker exec raginbox-dev pytest tests/
+docker-compose run --rm raginbox-dev black src/ tests/
+docker-compose run --rm raginbox-dev ruff check src/ tests/ --fix
+docker-compose run --rm raginbox-dev pytest tests/
 
 # Only in emergencies (causes CI failures)
 git commit --no-verify -m "bypass hook"
@@ -244,16 +252,21 @@ See `docs/PRE_COMMIT_HOOK.md` for troubleshooting.
 ### Docker Deployment
 
 ```bash
-# Build and start all services (production + dev)
+# Build and start production services (web, email, database)
 docker-compose up -d
+
+# Build and start with dev container included
+docker-compose --profile dev up -d
 
 # View logs for specific services
 docker-compose logs -f raginbox-web
 docker-compose logs -f raginbox-email
-docker-compose logs -f raginbox-dev
 
-# Stop all services
+# Stop production services
 docker-compose down
+
+# Stop all services including dev
+docker-compose --profile dev down
 
 # Rebuild after dependency changes
 docker-compose build
@@ -278,29 +291,25 @@ docker build -t raginbox:dev --target dev .
 # Access Python REPL in containers
 docker exec -it raginbox-web python      # Production web
 docker exec -it raginbox-email python    # Production email
-docker exec -it raginbox-dev python      # Development
+docker-compose run --rm raginbox-dev python  # Development (on-demand)
 
 # Access bash shell in containers
 docker exec -it raginbox-web bash
 docker exec -it raginbox-email bash
-docker exec -it raginbox-dev bash
+docker-compose run --rm raginbox-dev bash  # Development (on-demand)
 
 # Check container logs with timestamps
 docker-compose logs -f --timestamps raginbox-web
 docker-compose logs -f --timestamps raginbox-email
-docker-compose logs -f --timestamps raginbox-dev
 
 # Inspect container environment variables
 docker exec raginbox-web env | grep -E "(DB_|EMAIL_|IMAP_|SMTP_)"
-docker exec raginbox-dev env | grep -E "(DB_|EMAIL_|IMAP_|SMTP_)"
 
-# Check database connection (from any container)
+# Check database connection
 docker exec raginbox-web raginbox-cli db test
-docker exec raginbox-dev raginbox-cli db test
 
 # View knowledge base contents
 docker exec raginbox-web raginbox-cli kb list
-docker exec raginbox-dev raginbox-cli kb list
 ```
 
 ## Important Implementation Details
@@ -469,10 +478,10 @@ The EmailClient supports both SSL (port 993) and STARTTLS (port 143). Set `IMAP_
 ### Testing Issues
 
 **Problem**: Tests fail locally but need to run in Docker
-**Solution**: Always use `docker exec raginbox-web pytest tests/` - local `.venv` may have missing dependencies
+**Solution**: Use `docker-compose run --rm raginbox-dev pytest tests/` - local `.venv` may have missing dependencies
 
-**Problem**: Container not running when trying to test
-**Solution**: `docker-compose up -d` first, then run tests
+**Problem**: Dev container not available for testing
+**Solution**: Use `docker-compose run --rm raginbox-dev` (auto-starts container) or `docker-compose --profile dev up -d` to start it persistently
 
 **Problem**: Tests pass in container but fail in CI
 **Solution**: Ensure you've committed all required files and that `.dockerignore` isn't excluding necessary files

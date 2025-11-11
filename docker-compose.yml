@@ -28,13 +28,15 @@ services:
       - raginbox-network
 
   # Development Container (for testing, linting, formatting)
+  # This container only starts when explicitly requested with: docker-compose --profile dev up
   raginbox-dev:
+    profiles: ["dev"]  # Don't start by default, only with --profile dev
     build:
       context: .
       dockerfile: Dockerfile
       target: dev  # Use dev image with all testing tools
     container_name: raginbox-dev
-    restart: unless-stopped
+    restart: "no"  # Don't auto-restart - this is a utility container
     command: tail -f /dev/null  # Keep container alive for running commands
 
     env_file:
