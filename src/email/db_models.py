@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import (
+    Boolean,
     Column,
     Date,
     DateTime,
@@ -506,4 +507,108 @@ class DocumentDescription(Base):
             "chunk_count": self.chunk_count,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class ResponseFeedback(Base):
+    """
+    Store user feedback on assistant responses.
+
+    This model tracks thumbs up/down feedback on replies with optional
+    comments for negative feedback. Used for quality monitoring and improvement.
+
+    Attributes:
+        id: Auto-increment primary key
+        message_id: Foreign key to ConversationMessage (reply only)
+        is_positive: True for thumbs up, False for thumbs down
+        comment: Optional text comment (typically for negative feedback)
+        submitted_at: When feedback was submitted
+        user_email: Email address or user ID who submitted feedback
+        channel: Which channel the feedback came from (email or webchat)
+        message: Relationship to ConversationMessage record
+    """
+
+    __tablename__ = "response_feedback"
+
+    # Primary key
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Foreign key to conversation message (the reply being rated)
+    message_id = Column(
+        Integer,
+        ForeignKey("conversation_messages.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # Feedback data
+    is_positive = Column(
+        Boolean, nullable=False
+    )  # True = thumbs up, False = thumbs down
+    comment = Column(
+        Text, nullable=True
+    )  # Optional comment, typically for negative feedback
+
+    # Metadata
+    submitted_at = Column(DateTime, nullable=False, index=True)
+    user_email = Column(String(255), nullable=False, index=True)
+    channel = Column(Enum(ChannelType), nullable=False)
+
+    # Relationship to message
+    message = relationship("ConversationMessage")
+
+    # Composite indexes for common queries
+    __table_args__ = (
+        Index("idx_message_feedback", "message_id"),
+        Index("idx_feedback_date", "submitted_at"),
+        Index("idx_feedback_user", "user_email"),
+        Index("idx_negative_feedback", "is_positive", "submitted_at"),
+    )
+
+    def __init__(
+        self,
+        message_id: int,
+        is_positive: bool,
+        user_email: str,
+        channel: ChannelType,
+        comment: Optional[str] = None,
+        submitted_at: Optional[datetime] = None,
+    ):
+        """Initialize ResponseFeedback with defaults."""
+        self.message_id = message_id
+        self.is_positive = is_positive
+        self.comment = comment
+        self.user_email = user_email
+        self.channel = channel
+        self.submitted_at = submitted_at or datetime.utcnow()
+
+    def __repr__(self) -> str:
+        """String representation of ResponseFeedback."""
+        feedback_type = "positive" if self.is_positive else "negative"
+        return (
+            f"<ResponseFeedback(id={self.id}, message_id={self.message_id}, "
+            f"type='{feedback_type}', channel='{self.channel.value}')>"
+        )
+
+    def to_dict(self) -> dict:
+        """
+        Convert model to dictionary.
+
+        Returns:
+            Dictionary representation of the model.
+        """
+        return {
+            "id": self.id,
+            "message_id": self.message_id,
+            "is_positive": self.is_positive,
+            "comment": self.comment,
+            "submitted_at": (
+                self.submitted_at.isoformat() if self.submitted_at else None
+            ),
+            "user_email": self.user_email,
+            "channel": (
+                self.channel.value
+                if isinstance(self.channel, ChannelType)
+                else self.channel
+            ),
         }

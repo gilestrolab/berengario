@@ -1568,6 +1568,7 @@
         <div class="tabs">
             <button class="tab active" data-tab="whitelists">Whitelists</button>
             <button class="tab" data-tab="usage">Usage Analytics</button>
+            <button class="tab" data-tab="feedback">Feedback</button>
             <button class="tab" data-tab="documents">Documents</button>
             <button class="tab" data-tab="webcrawl">Web Crawling</button>
             <button class="tab" data-tab="backups">Backups</button>
@@ -1710,6 +1711,73 @@
                 </div>
                 <div id="topics-container">
                     <p class="topics-placeholder">Click "Analyze Topics" to identify common themes in user queries using AI.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feedback Tab -->
+        <div id="feedback-tab" class="tab-content">
+            <!-- Time Range Filter -->
+            <div class="usage-controls">
+                <div class="time-range-buttons">
+                    <button class="feedback-time-btn active" data-days="7">Last 7 Days</button>
+                    <button class="feedback-time-btn" data-days="30">Last 30 Days</button>
+                    <button class="feedback-time-btn" data-days="90">Last 90 Days</button>
+                    <button class="feedback-time-btn" data-days="all">All Time</button>
+                </div>
+                <button class="btn-refresh" onclick="feedbackAnalytics.refresh()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+
+            <!-- Overview Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-comment-dots"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Total Feedback</h3>
+                        <p class="stat-value" id="feedback-total">-</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-thumbs-up"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Positive</h3>
+                        <p class="stat-value" id="feedback-positive">-</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-thumbs-down"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Negative</h3>
+                        <p class="stat-value" id="feedback-negative">-</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-percentage"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Positive Rate</h3>
+                        <p class="stat-value" id="feedback-rate">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Negative Responses List -->
+            <div class="section-card">
+                <h3>Negative Feedback Responses</h3>
+                <p style="margin-bottom: 1rem; color: var(--text-secondary, #666); font-size: 0.875rem;">
+                    Responses that received negative feedback requiring attention
+                </p>
+                <div id="negative-responses-list">
+                    <div class="loading">Loading...</div>
                 </div>
             </div>
         </div>

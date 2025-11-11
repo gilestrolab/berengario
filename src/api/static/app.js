@@ -265,7 +265,8 @@ class ChatApp {
                     data.response,
                     data.sources,
                     data.attachments,
-                    data.timestamp
+                    data.timestamp,
+                    data.message_id
                 );
                 this.sessionId = data.session_id;
 
@@ -298,7 +299,7 @@ class ChatApp {
         }
     }
 
-    displayMessage(role, content, sources = null, attachments = null, timestamp = null) {
+    displayMessage(role, content, sources = null, attachments = null, timestamp = null, messageId = null) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${role}-message`;
 
@@ -349,6 +350,12 @@ class ChatApp {
         if (attachments && attachments.length > 0) {
             const attachmentsDiv = this.createAttachmentsSection(attachments);
             contentDiv.appendChild(attachmentsDiv);
+        }
+
+        // Feedback buttons for assistant messages
+        if (role === 'assistant' && messageId) {
+            const feedbackDiv = this.createFeedbackSection(messageId);
+            contentDiv.appendChild(feedbackDiv);
         }
 
         messageDiv.appendChild(avatar);
@@ -440,6 +447,82 @@ class ChatApp {
         });
 
         return attachmentsDiv;
+    }
+
+    createFeedbackSection(messageId) {
+        const feedbackDiv = document.createElement('div');
+        feedbackDiv.className = 'message-feedback';
+        feedbackDiv.setAttribute('data-message-id', messageId);
+
+        const feedbackText = document.createElement('span');
+        feedbackText.className = 'feedback-text';
+        feedbackText.textContent = 'Was this helpful?';
+
+        const thumbsUpBtn = document.createElement('button');
+        thumbsUpBtn.className = 'feedback-btn feedback-thumbs-up';
+        thumbsUpBtn.innerHTML = '👍';
+        thumbsUpBtn.title = 'Yes, this was helpful';
+        thumbsUpBtn.onclick = () => this.submitFeedback(messageId, true, feedbackDiv);
+
+        const thumbsDownBtn = document.createElement('button');
+        thumbsDownBtn.className = 'feedback-btn feedback-thumbs-down';
+        thumbsDownBtn.innerHTML = '👎';
+        thumbsDownBtn.title = 'No, this was not helpful';
+        thumbsDownBtn.onclick = () => this.submitFeedback(messageId, false, feedbackDiv);
+
+        feedbackDiv.appendChild(feedbackText);
+        feedbackDiv.appendChild(thumbsUpBtn);
+        feedbackDiv.appendChild(thumbsDownBtn);
+
+        return feedbackDiv;
+    }
+
+    async submitFeedback(messageId, isPositive, feedbackDiv) {
+        try {
+            // Disable buttons immediately
+            const buttons = feedbackDiv.querySelectorAll('.feedback-btn');
+            buttons.forEach(btn => btn.disabled = true);
+
+            // If negative feedback, show comment field
+            let comment = null;
+            if (!isPositive) {
+                comment = prompt('Please tell us what went wrong (optional):');
+                // If user cancelled, re-enable buttons
+                if (comment === null) {
+                    buttons.forEach(btn => btn.disabled = false);
+                    return;
+                }
+            }
+
+            // Submit feedback
+            const response = await fetch('/api/feedback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    message_id: messageId,
+                    is_positive: isPositive,
+                    comment: comment,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Show thank you message
+                feedbackDiv.innerHTML = '<span class="feedback-thanks">Thank you for your feedback!</span>';
+            } else {
+                alert('Failed to submit feedback. Please try again.');
+                buttons.forEach(btn => btn.disabled = false);
+            }
+        } catch (error) {
+            console.error('Error submitting feedback:', error);
+            alert('Error submitting feedback. Please try again.');
+            const buttons = feedbackDiv.querySelectorAll('.feedback-btn');
+            buttons.forEach(btn => btn.disabled = false);
+        }
     }
 
     async clearSession() {

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Feedback - RAGInbox</title>
+    <link rel="stylesheet" href="/static/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/auth.css">
+    <style>
+        .feedback-options {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin: 2rem 0;
+        }
+
+        .feedback-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            border: 2px solid var(--border-color);
+            border-radius: 1rem;
+            cursor: pointer;
+            transition: var(--transition);
+            min-width: 140px;
+        }
+
+        .feedback-option:hover {
+            border-color: var(--primary-color);
+            background: var(--background);
+        }
+
+        .feedback-option.selected {
+            border-color: var(--primary-color);
+            background: var(--background);
+        }
+
+        .feedback-option.positive.selected {
+            border-color: #22c55e;
+            background: #dcfce7;
+        }
+
+        .feedback-option.negative.selected {
+            border-color: #ef4444;
+            background: #fee2e2;
+        }
+
+        .feedback-icon {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .feedback-label {
+            font-weight: 600;
+            font-size: 1.125rem;
+        }
+
+        .comment-section {
+            display: none;
+            margin-top: 1.5rem;
+        }
+
+        .comment-section.visible {
+            display: block;
+        }
+
+        .success-message {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .success-icon {
+            font-size: 4rem;
+            color: var(--success-color);
+            margin-bottom: 1rem;
+        }
+
+        .success-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .success-text {
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <div class="auth-card">
+            <!-- Header -->
+            <div class="auth-header">
+                <div class="auth-icon">
+                    <i class="fas fa-comment-dots"></i>
+                </div>
+                <h1 class="auth-title">Feedback</h1>
+                <p class="auth-subtitle">Help us improve our responses</p>
+            </div>
+
+            <!-- Feedback Form -->
+            <div id="feedback-form" class="auth-form">
+                <p style="text-align: center; color: var(--text-secondary); margin-bottom: 1rem;">
+                    Was this response helpful?
+                </p>
+
+                <div class="feedback-options">
+                    <div class="feedback-option positive" data-rating="positive">
+                        <div class="feedback-icon">👍</div>
+                        <div class="feedback-label">Yes</div>
+                    </div>
+                    <div class="feedback-option negative" data-rating="negative">
+                        <div class="feedback-icon">👎</div>
+                        <div class="feedback-label">No</div>
+                    </div>
+                </div>
+
+                <!-- Comment Section (shown for negative feedback) -->
+                <div id="comment-section" class="comment-section">
+                    <div class="form-group">
+                        <label for="comment" class="form-label">What went wrong? (optional)</label>
+                        <textarea
+                            id="comment"
+                            class="form-input"
+                            rows="4"
+                            placeholder="Tell us how we can improve..."
+                        ></textarea>
+                    </div>
+                </div>
+
+                <button type="submit" class="auth-button" id="submit-btn" style="display: none;">
+                    <span class="button-text">Submit Feedback</span>
+                    <span class="button-spinner" style="display: none;">
+                        <svg class="spinner" viewBox="0 0 24 24">
+                            <circle class="spinner-circle" cx="12" cy="12" r="10"></circle>
+                        </svg>
+                    </span>
+                </button>
+
+                <!-- Error Message -->
+                <div class="auth-message error" id="error-message" style="display: none;"></div>
+            </div>
+
+            <!-- Success Message (hidden initially) -->
+            <div id="success-message" class="success-message" style="display: none;">
+                <div class="success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="success-title">Thank you!</div>
+                <p class="success-text">Your feedback has been submitted successfully.</p>
+            </div>
+
+            <!-- Footer -->
+            <div class="auth-footer">
+                <p class="auth-footer-text" id="instance-name">
+                    Powered by RAGInbox
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/feedback.js"></script>
+</body>
+</html>

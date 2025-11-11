@@ -154,7 +154,7 @@ class ConversationManager:
         subject: Optional[str] = None,
         channel: ChannelType = ChannelType.EMAIL,
         timestamp: Optional[datetime] = None,
-    ) -> ConversationMessage:
+    ) -> int:
         """
         Add a message to a conversation.
 
@@ -168,7 +168,7 @@ class ConversationManager:
             timestamp: Message timestamp (defaults to now)
 
         Returns:
-            Created ConversationMessage object.
+            ID of the created message.
         """
         with self.db_manager.get_session() as session:
             # Get or create conversation within this session
@@ -218,12 +218,14 @@ class ConversationManager:
             session.commit()
             session.refresh(message)
 
+            message_id = message.id  # Extract ID before session closes
+
             logger.info(
                 f"Added message: conversation_id={conversation.id}, "
-                f"type={message_type.value}, order={message_count}"
+                f"type={message_type.value}, order={message_count}, message_id={message_id}"
             )
 
-            return message
+            return message_id
 
     def get_conversation_history(
         self,

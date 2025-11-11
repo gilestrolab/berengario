@@ -67,6 +67,22 @@ class QueryResponse(BaseModel):
     error: Optional[str] = None
     timestamp: str
     session_id: str
+    message_id: Optional[int] = None  # Database ID of reply message for feedback
+
+
+class FeedbackRequest(BaseModel):
+    """Request model for feedback submission."""
+
+    message_id: int
+    is_positive: bool
+    comment: Optional[str] = None
+
+
+class FeedbackResponse(BaseModel):
+    """Response model for feedback submission."""
+
+    success: bool
+    message: str
 
 
 class HistoryResponse(BaseModel):
@@ -201,6 +217,14 @@ class UserQueriesResponse(BaseModel):
     sender: str
     queries: List[Dict]
     total_count: int
+
+
+class FeedbackAnalyticsResponse(BaseModel):
+    """Response model for feedback analytics."""
+
+    date_range: Dict[str, str]
+    overview: Dict  # total_feedback, positive_count, negative_count, positive_rate
+    negative_responses: List[Dict]  # Low-rated responses with details
 
 
 class TopicClusteringResponse(BaseModel):
@@ -1024,6 +1048,112 @@ async def auth_status(request: Request):
 
 
 # Protected Endpoints (require authentication)
+@app.get("/feedback")
+async def feedback_page(request: Request):
+    """Serve feedback page for email link clicks."""
+    feedback_file = static_dir / "feedback.html"
+    if feedback_file.exists():
+        return FileResponse(feedback_file)
+    raise HTTPException(status_code=404, detail="Feedback page not found")
+
+
+@app.post("/api/feedback/email", response_model=FeedbackResponse)
+async def submit_email_feedback(
+    feedback: dict,
+):
+    """
+    Submit feedback from email link (no authentication required).
+
+    This endpoint is for users clicking feedback links in emails.
+    It validates the token before accepting feedback.
+
+    Args:
+        feedback: Dict with token, message_id, is_positive, optional comment
+
+    Returns:
+        FeedbackResponse with success status
+    """
+    try:
+        from src.email.db_models import ConversationMessage, ResponseFeedback
+        from src.email.email_sender import decode_feedback_token
+
+        # Extract fields
+        token = feedback.get("token")
+        message_id = feedback.get("message_id")
+        is_positive = feedback.get("is_positive")
+        comment = feedback.get("comment")
+
+        if not token or message_id is None:
+            raise HTTPException(status_code=400, detail="Missing required fields")
+
+        # Decode and validate token
+        decoded_message_id = decode_feedback_token(token)
+        if decoded_message_id != message_id:
+            raise HTTPException(status_code=400, detail="Invalid feedback token")
+
+        # Verify message exists and is a reply
+        with conversation_manager.db_manager.get_session() as db_session:
+            message = (
+                db_session.query(ConversationMessage)
+                .filter(ConversationMessage.id == message_id)
+                .first()
+            )
+
+            if not message:
+                raise HTTPException(status_code=404, detail="Message not found")
+
+            if message.message_type != MessageType.REPLY:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Can only provide feedback on assistant replies",
+                )
+
+            # Get user email from the conversation
+            user_email = message.conversation.sender
+
+            # Check if feedback already exists for this message from this user
+            existing_feedback = (
+                db_session.query(ResponseFeedback)
+                .filter(
+                    ResponseFeedback.message_id == message_id,
+                    ResponseFeedback.user_email == user_email,
+                )
+                .first()
+            )
+
+            if existing_feedback:
+                # Update existing feedback
+                existing_feedback.is_positive = is_positive
+                existing_feedback.comment = comment
+                existing_feedback.submitted_at = datetime.utcnow()
+                db_session.commit()
+                logger.info(
+                    f"Updated email feedback for message {message_id} from {user_email}"
+                )
+            else:
+                # Create new feedback
+                new_feedback = ResponseFeedback(
+                    message_id=message_id,
+                    is_positive=is_positive,
+                    comment=comment,
+                    user_email=user_email,
+                    channel=message.conversation.channel,
+                )
+                db_session.add(new_feedback)
+                db_session.commit()
+                logger.info(
+                    f"Stored email feedback for message {message_id} from {user_email}"
+                )
+
+        return FeedbackResponse(success=True, message="Feedback submitted successfully")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error submitting email feedback: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to submit feedback")
+
+
 @app.get("/")
 async def root(request: Request):
     """Serve main web interface."""
@@ -1127,8 +1257,15 @@ async def query(
                 f"Continuing conversation {query_request.conversation_id} (thread: {thread_id})"
             )
     else:
-        # Create new conversation with session-based thread_id
-        thread_id = f"webchat_{session.session_id}"
+        # Create new conversation with unique thread_id
+        import uuid
+        from datetime import datetime
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = str(uuid.uuid4())[:8]
+        thread_id = f"webchat_{session.session_id[:8]}_{timestamp}_{unique_id}"
+
+        logger.info(f"Created new conversation thread: {thread_id}")
 
     # Store user query in conversation database
     conversation_manager.add_message(
@@ -1216,7 +1353,7 @@ async def query(
         )
 
         # Store assistant response in conversation database
-        conversation_manager.add_message(
+        reply_message_id = conversation_manager.add_message(
             thread_id=thread_id,
             message_type=MessageType.REPLY,
             content=result["response"],
@@ -1235,6 +1372,7 @@ async def query(
             attachments=attachment_urls,
             timestamp=result["timestamp"],
             session_id=session.session_id,
+            message_id=reply_message_id,
         )
 
     except Exception as e:
@@ -1258,6 +1396,93 @@ async def query(
             timestamp=datetime.now().isoformat(),
             session_id=session.session_id,
         )
+
+
+@app.post("/api/feedback", response_model=FeedbackResponse)
+async def submit_feedback(
+    feedback: FeedbackRequest,
+    session: Session = Depends(require_auth),
+):
+    """
+    Submit feedback on an assistant response.
+
+    Requires authentication.
+
+    Args:
+        feedback: Feedback data (message_id, is_positive, optional comment)
+        session: Authenticated session (injected by dependency)
+
+    Returns:
+        FeedbackResponse with success status
+    """
+    try:
+        from src.email.db_models import ConversationMessage, ResponseFeedback
+
+        # Get user email from session
+        user_email = (
+            session.email
+            if hasattr(session, "email") and session.email
+            else f"web_user_{session.session_id[:8]}"
+        )
+
+        # Verify message exists and is a reply
+        with conversation_manager.db_manager.get_session() as db_session:
+            message = (
+                db_session.query(ConversationMessage)
+                .filter(ConversationMessage.id == feedback.message_id)
+                .first()
+            )
+
+            if not message:
+                raise HTTPException(status_code=404, detail="Message not found")
+
+            if message.message_type != MessageType.REPLY:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Can only provide feedback on assistant replies",
+                )
+
+            # Check if feedback already exists for this message from this user
+            existing_feedback = (
+                db_session.query(ResponseFeedback)
+                .filter(
+                    ResponseFeedback.message_id == feedback.message_id,
+                    ResponseFeedback.user_email == user_email,
+                )
+                .first()
+            )
+
+            if existing_feedback:
+                # Update existing feedback
+                existing_feedback.is_positive = feedback.is_positive
+                existing_feedback.comment = feedback.comment
+                existing_feedback.submitted_at = datetime.utcnow()
+                db_session.commit()
+                logger.info(
+                    f"Updated feedback for message {feedback.message_id} from {user_email}"
+                )
+            else:
+                # Create new feedback
+                new_feedback = ResponseFeedback(
+                    message_id=feedback.message_id,
+                    is_positive=feedback.is_positive,
+                    comment=feedback.comment,
+                    user_email=user_email,
+                    channel=message.conversation.channel,
+                )
+                db_session.add(new_feedback)
+                db_session.commit()
+                logger.info(
+                    f"Stored feedback for message {feedback.message_id} from {user_email}"
+                )
+
+        return FeedbackResponse(success=True, message="Feedback submitted successfully")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error submitting feedback: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to submit feedback")
 
 
 @app.get("/api/history", response_model=HistoryResponse)
@@ -3123,6 +3348,135 @@ async def get_user_queries(
         logger.error(f"Error getting user queries: {e}", exc_info=True)
         raise HTTPException(
             status_code=500, detail=f"Error getting user queries: {str(e)}"
+        )
+
+
+@app.get("/api/admin/feedback/analytics", response_model=FeedbackAnalyticsResponse)
+async def get_feedback_analytics(
+    days: Optional[int] = None,
+    session: Session = Depends(require_admin),
+):
+    """
+    Get comprehensive feedback analytics.
+
+    Requires admin privileges.
+
+    Args:
+        days: Number of days to look back (7, 30, 90, or None for all)
+        session: Admin session (injected by dependency)
+
+    Returns:
+        FeedbackAnalyticsResponse with overview stats and negative responses
+
+    Raises:
+        HTTPException: If query fails
+    """
+    try:
+
+        from src.email.db_models import ConversationMessage, ResponseFeedback
+
+        logger.info(f"Admin {session.email} requested feedback analytics (days={days})")
+
+        # Determine date range
+        start_date = None
+        if days:
+            start_date = datetime.utcnow() - timedelta(days=days)
+
+        with conversation_manager.db_manager.get_session() as db_session:
+            # Base query
+            query = db_session.query(ResponseFeedback)
+
+            if start_date:
+                query = query.filter(ResponseFeedback.submitted_at >= start_date)
+
+            # Get all feedback
+            all_feedback = query.all()
+
+            # Calculate overview stats
+            total_feedback = len(all_feedback)
+            positive_count = sum(1 for f in all_feedback if f.is_positive)
+            negative_count = total_feedback - positive_count
+            positive_rate = (
+                (positive_count / total_feedback * 100) if total_feedback > 0 else 0
+            )
+
+            overview = {
+                "total_feedback": total_feedback,
+                "positive_count": positive_count,
+                "negative_count": negative_count,
+                "positive_rate": round(positive_rate, 1),
+            }
+
+            # Get negative responses with details
+            negative_query = (
+                db_session.query(ResponseFeedback, ConversationMessage)
+                .join(
+                    ConversationMessage,
+                    ResponseFeedback.message_id == ConversationMessage.id,
+                )
+                .filter(ResponseFeedback.is_positive.is_(False))
+            )
+
+            if start_date:
+                negative_query = negative_query.filter(
+                    ResponseFeedback.submitted_at >= start_date
+                )
+
+            negative_query = negative_query.order_by(
+                ResponseFeedback.submitted_at.desc()
+            )
+
+            negative_responses = []
+            for feedback, message in negative_query.all():
+                negative_responses.append(
+                    {
+                        "id": feedback.id,
+                        "message_id": feedback.message_id,
+                        "response_content": (
+                            message.content[:200] + "..."
+                            if len(message.content) > 200
+                            else message.content
+                        ),
+                        "comment": feedback.comment,
+                        "user_email": feedback.user_email,
+                        "channel": (
+                            feedback.channel.value
+                            if hasattr(feedback.channel, "value")
+                            else feedback.channel
+                        ),
+                        "submitted_at": feedback.submitted_at.isoformat(),
+                    }
+                )
+
+            # Date range
+            if start_date:
+                date_range = {
+                    "start": start_date.date().isoformat(),
+                    "end": datetime.utcnow().date().isoformat(),
+                }
+            else:
+                if all_feedback:
+                    earliest = min(f.submitted_at for f in all_feedback)
+                    date_range = {
+                        "start": earliest.date().isoformat(),
+                        "end": datetime.utcnow().date().isoformat(),
+                    }
+                else:
+                    date_range = {
+                        "start": "N/A",
+                        "end": "N/A",
+                    }
+
+        return FeedbackAnalyticsResponse(
+            date_range=date_range,
+            overview=overview,
+            negative_responses=negative_responses,
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting feedback analytics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Error getting feedback analytics: {str(e)}"
         )
 
 
