@@ -383,6 +383,11 @@ class AdminPanel {
                 <button class="btn-info" title="Show/hide description">ℹ️</button>
             ` : '';
 
+            // Enhancement indicator - show green star icon if enhanced
+            const enhancementIndicator = doc.enhanced ? `
+                <i class="fas fa-star enhancement-indicator" title="Enhanced with AI (${doc.enhancement_count} enhancements: narrative + Q&A)"></i>
+            ` : '';
+
             const downloadButton = canDownload ? `
                 <button class="btn-download" onclick="adminPanel.downloadDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')" title="Download">
                     ⬇
@@ -403,6 +408,7 @@ class AdminPanel {
                     <td class="doc-filename">
                         <div class="filename-container">
                             <span class="filename" title="${this.escapeHtml(displayName)}">${this.escapeHtml(displayName)}</span>
+                            ${enhancementIndicator}
                             ${infoButton}
                         </div>
                         ${hasDescription ? `<div class="document-description">${descriptionText}</div>` : ''}
@@ -536,6 +542,11 @@ class AdminPanel {
                 <button class="btn-info" title="Show/hide description">ℹ️</button>
             ` : '';
 
+            // Enhancement indicator - show green star icon if enhanced
+            const enhancementIndicator = doc.enhanced ? `
+                <i class="fas fa-star enhancement-indicator" title="Enhanced with AI (${doc.enhancement_count} enhancements: narrative + Q&A)"></i>
+            ` : '';
+
             const downloadButton = canDownload ? `
                 <button class="btn-download" onclick="adminPanel.downloadDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(doc.filename)}')" title="Download">
                     ⬇
@@ -555,6 +566,7 @@ class AdminPanel {
                     <td class="doc-filename">
                         <div class="filename-container">
                             <span class="filename" title="${this.escapeHtml(displayName)}">${this.escapeHtml(displayName)}</span>
+                            ${enhancementIndicator}
                             ${infoButton}
                         </div>
                         ${hasDescription ? `<div class="document-description">${descriptionText}</div>` : ''}
@@ -636,22 +648,44 @@ class AdminPanel {
         document.getElementById('view-modal').classList.remove('active');
     }
 
-    downloadDocument(fileHash, filename) {
-        // Create a download link and trigger it
-        const downloadUrl = `/api/admin/documents/${fileHash}/download`;
+    async downloadDocument(fileHash, filename) {
+        try {
+            const downloadUrl = `/api/admin/documents/${fileHash}/download`;
 
-        // Create temporary link element
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = filename;
-        link.style.display = 'none';
+            // Fetch with credentials to include session cookies
+            const response = await fetch(downloadUrl, {
+                method: 'GET',
+                credentials: 'same-origin',
+            });
 
-        // Add to DOM, click, and remove
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Download failed: ${response.status}`);
+            }
 
-        this.showToast(`Downloading ${filename}...`, 'success');
+            // Get the blob from response
+            const blob = await response.blob();
+
+            // Create a download link and trigger it
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.style.display = 'none';
+
+            // Add to DOM, click, and remove
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // Clean up the object URL
+            window.URL.revokeObjectURL(url);
+
+            this.showToast(`Downloaded ${filename}`, 'success');
+        } catch (error) {
+            console.error('Download error:', error);
+            this.showToast(`Download failed: ${error.message}`, 'error');
+        }
     }
 
     async deleteDocument(fileHash, filename) {

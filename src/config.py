@@ -220,6 +220,24 @@ class Settings(BaseSettings):
         description="Path to custom system prompt additions (appended to base prompt)",
     )
 
+    # Document Enhancement Configuration
+    doc_enhancement_enabled: bool = Field(
+        default=True,
+        description="Enable LLM-based document enhancement for structured data (CSV/Excel)",
+    )
+    doc_enhancement_model: Optional[str] = Field(
+        default=None,
+        description="Model to use for document enhancement (default: same as openrouter_model)",
+    )
+    doc_enhancement_max_tokens: int = Field(
+        default=4000,
+        description="Maximum tokens to use for document enhancement",
+    )
+    doc_enhancement_types: str = Field(
+        default="narrative,qa",
+        description="Comma-separated enhancement types: narrative, qa",
+    )
+
     # Email Response Customization
     email_response_format: str = Field(
         default="html",

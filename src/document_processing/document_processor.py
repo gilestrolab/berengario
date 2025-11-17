@@ -1,7 +1,7 @@
 """
 Document processor for parsing and chunking various document formats.
 
-Supports: PDF, DOCX, TXT, CSV, and other text-based formats.
+Supports: PDF, DOCX, TXT, CSV, XLS, XLSX, and other text-based formats.
 """
 
 import hashlib
@@ -20,12 +20,46 @@ from src.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Lazy import to avoid circular dependencies and API key errors during initialization
+_enhancement_processor = None
+
+
+def _get_enhancement_processor():
+    """
+    Get or create EnhancementProcessor instance (lazy initialization).
+
+    Returns:
+        EnhancementProcessor instance or None if enhancement is disabled.
+    """
+    global _enhancement_processor
+
+    if not settings.doc_enhancement_enabled:
+        return None
+
+    if _enhancement_processor is None:
+        try:
+            from src.document_processing.enhancement_processor import (
+                EnhancementProcessor,
+            )
+
+            model = settings.doc_enhancement_model or settings.openrouter_model
+            _enhancement_processor = EnhancementProcessor(
+                llm_model=model,
+                max_tokens=settings.doc_enhancement_max_tokens,
+            )
+            logger.info("EnhancementProcessor initialized for document enhancement")
+        except Exception as e:
+            logger.warning(f"Failed to initialize EnhancementProcessor: {e}")
+            return None
+
+    return _enhancement_processor
+
 
 class DocumentProcessor:
     """
     Processes documents from various formats into chunked text nodes.
 
-    Handles PDF, DOCX, TXT, CSV and other common document formats.
+    Handles PDF, DOCX, TXT, CSV, XLS, XLSX and other common document formats.
     """
 
     def __init__(
@@ -242,6 +276,120 @@ class DocumentProcessor:
             logger.error(f"Error reading CSV file {file_path}: {e}")
             raise
 
+    def extract_text_from_excel(self, file_path: Path) -> str:
+        """
+        Extract text from Excel file (XLS/XLSX).
+
+        Args:
+            file_path: Path to Excel file.
+
+        Returns:
+            Excel content formatted as text optimized for semantic search.
+
+        Raises:
+            Exception: If Excel reading fails.
+        """
+        try:
+            import openpyxl
+
+            # Load workbook (data_only=True to get calculated values, not formulas)
+            wb = openpyxl.load_workbook(file_path, data_only=True)
+
+            lines = []
+
+            # Add filename as context
+            lines.append(f"Document: {file_path.name}")
+            lines.append("")
+
+            # Process each sheet
+            for sheet_name in wb.sheetnames:
+                sheet = wb[sheet_name]
+
+                # Skip empty sheets
+                if sheet.max_row == 0 or sheet.max_column == 0:
+                    continue
+
+                # Add sheet name as section header
+                lines.append(f"Sheet: {sheet_name}")
+                lines.append("")
+
+                # Read all rows into a list
+                rows_data = list(sheet.iter_rows(values_only=True))
+
+                if not rows_data:
+                    continue
+
+                # Detect if first row is likely headers
+                first_row = rows_data[0]
+                # Headers are likely if first row contains mostly strings and no None
+                non_none_first = [v for v in first_row if v is not None]
+                has_headers = (
+                    len(non_none_first) > 0
+                    and all(isinstance(v, str) for v in non_none_first)
+                    and len(non_none_first) >= len(first_row) / 2
+                )
+
+                if has_headers:
+                    # Use first row as column names
+                    headers = [
+                        str(h) if h is not None else f"Column{i}"
+                        for i, h in enumerate(first_row)
+                    ]
+                    data_rows = rows_data[1:]
+
+                    # Format each data row with column names
+                    for row in data_rows:
+                        # Skip completely empty rows
+                        if all(v is None or str(v).strip() == "" for v in row):
+                            lines.append("")
+                            continue
+
+                        row_lines = []
+                        for col_name, value in zip(headers, row):
+                            if value is not None and str(value).strip():
+                                row_lines.append(f"{col_name}: {value}")
+
+                        if row_lines:
+                            lines.extend(row_lines)
+                            lines.append("")  # Empty line between rows
+                else:
+                    # No headers - format as simple rows
+                    for row in rows_data:
+                        # Skip rows with only empty/None values
+                        row_values = [
+                            str(val)
+                            for val in row
+                            if val is not None and str(val).strip()
+                        ]
+
+                        if not row_values:
+                            lines.append("")  # Preserve spacing
+                            continue
+
+                        # Check if first column looks like a section header
+                        first_val = str(row[0]).strip() if row[0] is not None else ""
+
+                        if len(row_values) == 1:
+                            # Single value - likely a section header
+                            lines.append(first_val)
+                            lines.append("")
+                        else:
+                            # Multiple values - format as structured data
+                            line_parts = []
+                            for i, val in enumerate(row):
+                                if val is not None and str(val).strip():
+                                    line_parts.append(f"Col{i+1}: {val}")
+                            if line_parts:
+                                lines.append(" | ".join(line_parts))
+
+                # Add spacing between sheets
+                lines.append("")
+
+            return "\n".join(lines)
+        except Exception as e:
+            logger.error(f"Error reading Excel file {file_path}: {e}")
+            raise
+
     def extract_text(self, file_path: Path) -> str:
         """
         Extract text from file based on extension.
@@ -266,6 +414,8 @@ class DocumentProcessor:
             return self.extract_text_from_txt(file_path)
         elif suffix == ".csv":
             return self.extract_text_from_csv(file_path)
+        elif suffix in (".xls", ".xlsx"):
+            return self.extract_text_from_excel(file_path)
         else:
             # Try to read as text file
             try:
@@ -303,6 +453,42 @@ class DocumentProcessor:
                 logger.warning(f"No text extracted from {file_path}")
                 return []
 
+            # Enhance document if it's structured data (CSV/Excel)
+            file_type = file_path.suffix.lower()
+            enhanced = False
+            enhancement_count = 0
+
+            enhancer = _get_enhancement_processor()
+            if enhancer and enhancer.should_enhance(file_type):
+                try:
+                    logger.info(f"Enhancing {file_type} document: {file_path.name}")
+
+                    # Parse enhancement types from settings
+                    enhancement_types = [
+                        t.strip()
+                        for t in settings.doc_enhancement_types.split(",")
+                        if t.strip()
+                    ]
+
+                    # Generate enhanced content
+                    enhancement_result = enhancer.enhance_document(
+                        text, file_type, enhancement_types
+                    )
+
+                    # Append enhanced content to original text
+                    if enhancement_result["enhanced_text"]:
+                        text = f"{text}\n\n{enhancement_result['enhanced_text']}"
+                        enhanced = True
+                        enhancement_count = enhancement_result["enhancement_count"]
+                        logger.info(
+                            f"Successfully enhanced document with {enhancement_count} enhancements"
+                        )
+
+                except Exception as e:
+                    logger.error(f"Document enhancement failed: {e}")
+                    # Continue with unenhanced document
+                    pass
+
             # Compute file hash for deduplication
             file_hash = self.compute_file_hash(file_path)
 
@@ -319,7 +505,9 @@ class DocumentProcessor:
                 "file_mtime": file_mtime,  # Modification timestamp for versioning
                 "file_size": file_size,
                 "source_type": source_type,
-                "file_type": file_path.suffix.lower(),
+                "file_type": file_type,
+                "enhanced": enhanced,
+                "enhancement_count": enhancement_count,
             }
 
             # Add extra metadata if provided
@@ -455,7 +643,7 @@ class DocumentProcessor:
         logger.info(f"Processing directory: {directory_path}")
 
         all_nodes = []
-        supported_extensions = {".pdf", ".docx", ".txt", ".csv"}
+        supported_extensions = {".pdf", ".docx", ".txt", ".csv", ".xls", ".xlsx"}
 
         for file_path in directory_path.rglob("*"):
             if file_path.is_file() and file_path.suffix.lower() in supported_extensions:

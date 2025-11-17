@@ -458,6 +458,9 @@ class KnowledgeBaseManager:
                         "date": metadata.get("date"),
                         # Include timestamp for age tracking
                         "file_mtime": metadata.get("file_mtime"),
+                        # Include enhancement metadata
+                        "enhanced": metadata.get("enhanced", False),
+                        "enhancement_count": metadata.get("enhancement_count", 0),
                     }
 
             return list(unique_docs.values())

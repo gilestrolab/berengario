@@ -10,7 +10,7 @@ RAGInbox is a configurable RAG (Retrieval-Augmented Generation) system with emai
 
 ### High-Level Flow
 
-1. **Document Ingestion** → Documents (PDF, DOCX, TXT, CSV) → Chunking → Embeddings → ChromaDB
+1. **Document Ingestion** → Documents (PDF, DOCX, TXT, CSV, XLS, XLSX) → Enhancement (for CSV/Excel) → Chunking → Embeddings → ChromaDB
 2. **Email Integration** → IMAP inbox monitoring → Parse/validate → Extract attachments → Process into KB or handle queries
 3. **Query Processing** → Email/API query → RAG retrieval → LLM response → Email reply/API response
 
@@ -30,7 +30,8 @@ Users can be in one whitelist, both whitelists, or neither. Configure in:
 ### Key Components
 
 #### 1. Document Processing (`src/document_processing/`)
-- **DocumentProcessor**: Parses PDF, DOCX, TXT, CSV using LlamaIndex
+- **DocumentProcessor**: Parses PDF, DOCX, TXT, CSV, XLS, XLSX using LlamaIndex
+- **EnhancementProcessor**: LLM-based enhancement for structured data (CSV/Excel) - converts dry tables to narrative text and generates Q&A pairs for improved RAG retrieval
 - **KnowledgeBaseManager**: ChromaDB vector storage with deduplication via file hashing
 - **FileWatcher**: Monitors `data/documents/` for new files using watchdog
 
@@ -359,6 +360,72 @@ Additional instructions:
 - If a policy has changed recently, mention the effective date
 ```
 
+### Document Enhancement
+
+The system automatically enhances structured data files (CSV/Excel) during ingestion to improve RAG retrieval:
+
+**Problem**: Dry, tabular data (spreadsheets, CSV files) retrieves poorly with semantic search because:
+- Lacks narrative context
+- Missing descriptive text
+- No natural language queries map well to raw table data
+
+**Solution**: LLM-based enhancement that:
+1. **Narrative Expansion**: Converts tables into descriptive text explaining patterns, relationships, and context
+2. **Q&A Generation**: Creates factual question-answer pairs that improve semantic matching
+
+**How it works** (`src/document_processing/enhancement_processor.py`):
+1. DocumentProcessor detects file type (.csv, .xls, .xlsx)
+2. Original text is extracted using semantic-friendly formatting
+3. EnhancementProcessor sends content to LLM with specialized prompts
+4. Enhanced content (narrative + Q&A) is appended to original text
+5. Combined text is chunked and embedded as usual
+6. Metadata tracks enhancement: `enhanced: bool`, `enhancement_count: int`
+
+**Configuration**:
+- `DOC_ENHANCEMENT_ENABLED=true` - Enable/disable feature
+- `DOC_ENHANCEMENT_TYPES=narrative,qa` - Choose enhancement types
+- `DOC_ENHANCEMENT_MAX_TOKENS=4000` - Control detail level vs cost
+- `DOC_ENHANCEMENT_MODEL` - Override LLM model for enhancement
+
+**Example**:
+
+Original CSV:
+```
+Name,Age,Salary
+Alice,25,50000
+Bob,30,60000
+```
+
+Enhanced content appended:
+```
+--- Narrative Summary ---
+This dataset contains employee information with 2 records showing staff demographics
+and compensation. The data includes Alice, a 25-year-old employee earning $50,000
+annually, and Bob, a 30-year-old employee earning $60,000 annually. The salary range
+spans from $50,000 to $60,000, with an average age of 27.5 years.
+
+--- Q&A Pairs ---
+Q: What is Alice's age?
+A: Alice is 25 years old.
+
+Q: What is Bob's salary?
+A: Bob earns $60,000 annually.
+
+Q: How many employees are in this dataset?
+A: There are 2 employees in this dataset.
+```
+
+**Benefits**:
+- Significantly improves retrieval for queries like "Who earns more than 55k?" or "Average employee age"
+- Works automatically - no manual intervention required
+- Falls back gracefully if enhancement fails
+- Can be disabled per-deployment via configuration
+
+**Cost considerations**:
+- Enhancement uses LLM API calls (~$0.01-0.05 per document depending on size/model)
+- Only runs once per document during initial ingestion
+- Can be disabled for cost-sensitive deployments
+
 ### Email Response Customization
 
 Three format options via `EMAIL_RESPONSE_FORMAT`:
@@ -418,6 +485,12 @@ Key environment variables (see `.env.example` for full list):
 - `TOP_K_RETRIEVAL` - Number of chunks to retrieve
 - `SIMILARITY_THRESHOLD` - Minimum similarity score
 - `RAG_CUSTOM_PROMPT_FILE` - Custom system prompt additions (optional)
+
+### Document Enhancement Configuration
+- `DOC_ENHANCEMENT_ENABLED` - Enable LLM-based enhancement for structured data (default: true)
+- `DOC_ENHANCEMENT_MODEL` - Model to use for enhancement (default: same as `OPENROUTER_MODEL`)
+- `DOC_ENHANCEMENT_MAX_TOKENS` - Maximum tokens for enhancement (default: 4000)
+- `DOC_ENHANCEMENT_TYPES` - Enhancement types: `narrative`, `qa` (default: both)
 
 ### Response Customization
 - `EMAIL_RESPONSE_FORMAT` - html/markdown/text
