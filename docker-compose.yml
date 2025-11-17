@@ -53,7 +53,8 @@ services:
     volumes:
       - ./src:/app/src  # Mount src for live code changes
       - ./tests:/app/tests  # Mount tests for development
-      - ./data/documents:/app/data/documents
+      - ./data/kb:/app/data/kb  # Mount KB structure (documents, emails, archive)
+      - ./data/documents:/app/data/documents  # Legacy mount (can be removed after migration)
       - ./data/chroma_db:/app/data/chroma_db
       - ./data/logs:/app/data/logs
       - ./data/config:/app/data/config
@@ -92,7 +93,8 @@ services:
     volumes:
       - ./src:/app/src  # Mount src for live code changes during development
       - ./tests:/app/tests  # Mount tests for development testing
-      - ./data/documents:/app/data/documents
+      - ./data/kb:/app/data/kb  # Mount KB structure (documents, emails, archive)
+      - ./data/documents:/app/data/documents  # Legacy mount (can be removed after migration)
       - ./data/chroma_db:/app/data/chroma_db
       - ./data/logs:/app/data/logs
       - ./data/config:/app/data/config
@@ -147,7 +149,8 @@ services:
     volumes:
       - ./src:/app/src  # Mount src for live code changes during development
       - ./tests:/app/tests  # Mount tests for development testing
-      - ./data/documents:/app/data/documents
+      - ./data/kb:/app/data/kb  # Mount KB structure (documents, emails, archive)
+      - ./data/documents:/app/data/documents  # Legacy mount (can be removed after migration)
       - ./data/chroma_db:/app/data/chroma_db
       - ./data/logs:/app/data/logs
       - ./data/config:/app/data/config

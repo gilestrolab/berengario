@@ -367,7 +367,7 @@ class AdminPanel {
 
         const rowsHtml = sortedDocs.map(doc => {
             // Determine which buttons to show based on source type
-            const canDownload = ['manual', 'file'].includes(doc.source_type);
+            const canDownload = ['manual', 'file', 'attachment'].includes(doc.source_type);
             const canView = doc.source_type === 'email';
 
             // Get display name (improved for emails)
@@ -524,7 +524,7 @@ class AdminPanel {
 
         // Re-render rows
         const rowsHtml = sectionDocs.map(doc => {
-            const canDownload = ['manual', 'file'].includes(doc.source_type);
+            const canDownload = ['manual', 'file', 'attachment'].includes(doc.source_type);
             const canView = doc.source_type === 'email';
             const displayName = this.getDisplayName(doc);
 

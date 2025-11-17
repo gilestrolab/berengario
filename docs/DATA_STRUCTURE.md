@@ -12,12 +12,17 @@ All persistent data for DoLS-GPT is stored under the `data/` directory. This con
 
 ```
 data/
-├── documents/              # Watched folder for document ingestion
-│   ├── *.pdf              # PDF documents
-│   ├── *.docx             # Word documents
-│   ├── *.txt              # Text files
-│   ├── *.csv              # CSV files
-│   └── ...
+├── kb/                     # Knowledge Base content
+│   ├── documents/         # All KB documents (from any source)
+│   │   ├── *.pdf          # PDF documents (attachments + manual uploads)
+│   │   ├── *.docx         # Word documents
+│   │   ├── *.txt          # Text files
+│   │   ├── *.csv          # CSV files
+│   │   └── ...
+│   └── emails/            # Saved email copies (without attachments)
+│       └── Email from *.txt
+├── documents/             # Optional: Legacy watched folder for manual drops
+│   └── ...                # Files here can be manually added
 ├── chroma_db/             # ChromaDB vector database (persistent)
 │   ├── chroma.sqlite3     # Metadata and index
 │   └── {collection_id}/   # Vector embeddings (binary)
@@ -36,14 +41,66 @@ data/
 
 ## Directory Details
 
+### `data/kb/`
+**Purpose**: Knowledge base content storage
+
+This is the primary location for all knowledge base content, organized into two subdirectories:
+
+#### `data/kb/documents/`
+**Purpose**: All documents ingested into the knowledge base (from ANY source)
+
+**Contents**:
+- Email attachments (PDF, DOCX, TXT, CSV, etc.)
+- Web interface uploads (via admin panel)
+- Any document that becomes part of the knowledge base
+
+**Size**: Grows with KB content (typically same size as source documents)
+
+**Backup**: **CRITICAL** - Contains all source documents
+
+**Docker Mount**:
+```yaml
+volumes:
+  - ./data/kb/documents:/app/data/kb/documents
+```
+
+**Configuration**:
+```bash
+KB_DOCUMENTS_PATH=data/kb/documents
+```
+
+#### `data/kb/emails/`
+**Purpose**: Saved copies of emails without attachments
+
+**Contents**:
+- Email body text files with descriptive filenames
+- Format: `Email from {sender} on {date} - {subject}.txt`
+- Attachments are saved separately in `data/kb/documents/`
+
+**Size**: Small (typically <10MB total)
+
+**Backup**: **RECOMMENDED** - Useful for re-ingestion
+
+**Docker Mount**:
+```yaml
+volumes:
+  - ./data/kb/emails:/app/data/kb/emails
+```
+
+**Configuration**:
+```bash
+KB_EMAILS_PATH=data/kb/emails
+```
+
+---
+
 ### `data/documents/`
-**Purpose**: Document ingestion folder monitored by FileWatcher
+**Purpose**: Legacy/optional watched folder for manual document drops
 
 **Usage**:
-- Drop supported files (PDF, DOCX, TXT, CSV) here for automatic KB ingestion
-- Files are processed by DocumentProcessor and added to ChromaDB
-- Supports automatic updates when files are modified
-- Files deleted from this folder are removed from the KB
+- Can still be used for manual file drops (optional)
+- Maintained for backward compatibility
+- Not actively used by email processing or web uploads
 
 **Docker Mount**:
 ```yaml
@@ -259,7 +316,8 @@ volumes:
 ### Critical (Must Backup)
 - ✅ `data/chroma_db/` - Vector database (all knowledge)
 - ✅ `data/message_tracker.db` - Email processing history
-- ✅ `data/documents/` - Source documents
+- ✅ `data/kb/documents/` - Source documents (all KB content)
+- ✅ `data/kb/emails/` - Saved email copies
 
 ### Optional (Nice to Have)
 - ⚠️ Configuration files (`.env`, `data/config/allowed_*.txt`, `data/logs/`)
@@ -275,10 +333,10 @@ volumes:
 # Create backup
 tar -czf backup_$(date +%Y%m%d).tar.gz \
     data/chroma_db/ \
-    data/documents/ \
+    data/kb/ \
     data/message_tracker.db \
     .env \
-    config/
+    data/config/
 
 # Restore backup
 tar -xzf backup_20251029.tar.gz
@@ -287,6 +345,52 @@ tar -xzf backup_20251029.tar.gz
 ---
 
 ## Migration from Old Structure
+
+### Migration to KB Structure (2025-11-13)
+
+**Before**:
+```
+data/
+  ├── documents/
+  │   ├── *.pdf (mixed)
+  │   ├── attachments/  # Email attachments
+  │   └── emails/       # Saved emails
+  ├── chroma_db/
+  └── ...
+```
+
+**After**:
+```
+data/
+  ├── kb/
+  │   ├── documents/    # All documents (attachments + uploads)
+  │   └── emails/       # Saved email copies
+  ├── documents/        # Legacy (optional)
+  ├── chroma_db/
+  └── ...
+```
+
+**Migration Steps**:
+```bash
+# Step 1: Preview migration (dry run)
+python migrate_kb_structure.py
+
+# Step 2: Execute migration
+python migrate_kb_structure.py --execute
+
+# Step 3: Verify new structure
+ls -la data/kb/documents/
+ls -la data/kb/emails/
+
+# Step 4: (Optional) Clean up old empty directories
+rm -rf data/documents/attachments/
+rm -rf data/documents/emails/
+
+# Step 5: Restart services to use new paths
+docker-compose restart
+```
+
+### Previous Migration (2025-10-29)
 
 **Before 2025-10-29**:
 ```
@@ -303,18 +407,6 @@ data/
   ├── chroma_db/
   ├── temp_attachments/
   └── message_tracker.db
-```
-
-**Migration Steps** (if needed):
-```bash
-# Move documents
-mv Documents/ data/documents/
-
-# Update .env
-sed -i 's|DOCUMENTS_PATH=Documents|DOCUMENTS_PATH=data/documents|' .env
-
-# Restart services
-docker-compose restart
 ```
 
 ---

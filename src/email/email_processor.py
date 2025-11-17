@@ -402,7 +402,7 @@ class EmailProcessor:
                             ).strip()
                             descriptive_filename = f"Email from {sender_name} on {date_str} - {subject_clean}.txt"
 
-                            emails_dir = settings.documents_path / "emails"
+                            emails_dir = settings.kb_emails_path
                             emails_dir.mkdir(parents=True, exist_ok=True)
                             persistent_path = emails_dir / descriptive_filename
 
@@ -474,8 +474,8 @@ class EmailProcessor:
                             f"Successfully added email body to KB: {chunks_created} chunks created"
                         )
 
-                        # Persist email body to data/documents/emails/ for future reingestion
-                        emails_dir = settings.documents_path / "emails"
+                        # Persist email body to kb/emails/ for future reingestion
+                        emails_dir = settings.kb_emails_path
                         emails_dir.mkdir(parents=True, exist_ok=True)
 
                         persistent_path = emails_dir / descriptive_filename
@@ -598,7 +598,7 @@ class EmailProcessor:
 
                     nodes = self.doc_processor.process_document(
                         file_path=attachment.filepath,
-                        source_type="email",
+                        source_type="attachment",
                         extra_metadata=extra_metadata,
                     )
 
@@ -612,8 +612,8 @@ class EmailProcessor:
                             f"Added {attachment.filename} to KB: {len(nodes)} chunks"
                         )
 
-                        # Persist attachment to data/documents/attachments/ for future reingestion
-                        attachments_dir = settings.documents_path / "attachments"
+                        # Persist attachment to kb/documents/ for future reingestion
+                        attachments_dir = settings.kb_documents_path
                         attachments_dir.mkdir(parents=True, exist_ok=True)
 
                         persistent_path = attachments_dir / attachment.filename

@@ -175,10 +175,21 @@ class Settings(BaseSettings):
 
     # Document Processing
     documents_path: Path = Field(
-        default=Path("data/documents"), description="Path to documents folder"
+        default=Path("data/kb/documents"),
+        description="Path to documents folder (watched by FileWatcher)",
     )
     chroma_db_path: Path = Field(
         default=Path("data/chroma_db"), description="Path to ChromaDB storage"
+    )
+
+    # Knowledge Base Structure
+    kb_documents_path: Path = Field(
+        default=Path("data/kb/documents"),
+        description="Path to KB documents (attachments and uploads)",
+    )
+    kb_emails_path: Path = Field(
+        default=Path("data/kb/emails"),
+        description="Path to saved email copies (without attachments)",
     )
 
     # RAG Configuration

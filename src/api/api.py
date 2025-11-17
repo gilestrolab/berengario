@@ -2474,8 +2474,8 @@ async def upload_document(
 
             logger.info(f"Saved uploaded file to: {temp_file_path}")
 
-            # Save permanent copy to data/documents/ first
-            documents_dir = Path("data/documents")
+            # Save permanent copy to kb/documents/ first
+            documents_dir = settings.kb_documents_path
             documents_dir.mkdir(parents=True, exist_ok=True)
 
             # Check if file already exists

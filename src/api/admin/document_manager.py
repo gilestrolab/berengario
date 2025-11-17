@@ -46,16 +46,23 @@ class DocumentManager:
             document_processor: DocumentProcessor instance
             base_path: Base path for document storage (default: project root)
         """
+        from src.config import settings
+
         self.kb_manager = kb_manager
         self.document_processor = document_processor
         self.base_path = base_path or Path.cwd()
-        self.documents_path = self.base_path / "data" / "documents"
-        self.archive_path = self.base_path / "data" / "documents" / "archive"
 
-        # Ensure archive directory exists
+        # Use new KB structure exclusively
+        self.kb_documents_path = settings.kb_documents_path
+        self.kb_emails_path = settings.kb_emails_path
+        self.archive_path = self.base_path / "data" / "kb" / "archive"
+
+        # Ensure directories exist
         self.archive_path.mkdir(parents=True, exist_ok=True)
+        self.kb_documents_path.mkdir(parents=True, exist_ok=True)
+        self.kb_emails_path.mkdir(parents=True, exist_ok=True)
 
-        logger.info("DocumentManager initialized")
+        logger.info("DocumentManager initialized with KB structure")
 
     def list_documents(self) -> List[Dict]:
         """
@@ -95,11 +102,23 @@ class DocumentManager:
                     enhanced_doc["age_days"] = None
 
                 # Try to get file size if it exists on filesystem
-                if doc.get("source_type") == "file":
-                    file_path = self.documents_path / doc["filename"]
-                    if file_path.exists():
-                        stats = file_path.stat()
-                        enhanced_doc["size_bytes"] = stats.st_size
+                file_path = None
+                source_type = doc.get("source_type")
+
+                if source_type == "email":
+                    # Email text files in KB emails path
+                    candidate = self.kb_emails_path / doc["filename"]
+                    if candidate.exists():
+                        file_path = candidate
+                else:
+                    # All other documents (attachments, manual uploads, files) in KB documents path
+                    candidate = self.kb_documents_path / doc["filename"]
+                    if candidate.exists():
+                        file_path = candidate
+
+                if file_path:
+                    stats = file_path.stat()
+                    enhanced_doc["size_bytes"] = stats.st_size
 
                 # Add estimated chunk count (would need KB query)
                 enhanced_doc["chunks"] = "?"  # Placeholder
@@ -142,27 +161,38 @@ class DocumentManager:
             # Delete from KB
             chunks_removed = self.kb_manager.delete_document_by_hash(file_hash)
 
-            # Handle file archival/deletion (only for file sources)
+            # Handle file archival/deletion
             archived = False
-            if source_type == "file":
-                file_path = self.documents_path / filename
+            file_path = None
 
-                if file_path.exists():
-                    if archive:
-                        # Move to archive
-                        archive_file = (
-                            self.archive_path
-                            / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
-                        )
-                        shutil.move(str(file_path), str(archive_file))
-                        archived = True
-                        logger.info(f"Archived file: {filename} -> {archive_file.name}")
-                    else:
-                        # Permanent deletion
-                        file_path.unlink()
-                        logger.info(f"Permanently deleted file: {filename}")
+            # Find the file in appropriate location based on source_type
+            if source_type == "email":
+                # Email text files in KB emails path
+                candidate = self.kb_emails_path / filename
+                if candidate.exists():
+                    file_path = candidate
+            else:
+                # All other documents in KB documents path
+                candidate = self.kb_documents_path / filename
+                if candidate.exists():
+                    file_path = candidate
+
+            if file_path:
+                if archive:
+                    # Move to archive
+                    archive_file = (
+                        self.archive_path
+                        / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    )
+                    shutil.move(str(file_path), str(archive_file))
+                    archived = True
+                    logger.info(f"Archived file: {filename} -> {archive_file.name}")
                 else:
-                    logger.warning(f"Source file not found: {filename}")
+                    # Permanent deletion
+                    file_path.unlink()
+                    logger.info(f"Permanently deleted file: {filename}")
+            else:
+                logger.warning(f"Source file not found: {filename}")
 
             logger.info(f"Deleted document: {filename} ({chunks_removed} chunks)")
 
@@ -264,13 +294,13 @@ class DocumentManager:
         safe_filename = Path(filename).name
 
         # Check if file already exists
-        file_path = self.documents_path / safe_filename
+        file_path = self.kb_documents_path / safe_filename
         if file_path.exists():
             # Add timestamp to avoid overwriting
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             name_parts = safe_filename.rsplit(".", 1)
             safe_filename = f"{name_parts[0]}_{timestamp}.{name_parts[1]}"
-            file_path = self.documents_path / safe_filename
+            file_path = self.kb_documents_path / safe_filename
 
         try:
             # Save file
