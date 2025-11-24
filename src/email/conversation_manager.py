@@ -814,10 +814,9 @@ class ConversationManager:
             Dictionary with source usage statistics.
         """
         with self.db_manager.get_session() as session:
-            # Build base query for REPLY messages with sources
-            query = session.query(ConversationMessage).filter(
-                ConversationMessage.message_type == MessageType.REPLY,
-                ConversationMessage.sources_used.isnot(None),
+            # Get total count of all REPLY messages
+            total_replies_query = session.query(ConversationMessage).filter(
+                ConversationMessage.message_type == MessageType.REPLY
             )
 
             # Apply date filter if specified
@@ -825,13 +824,28 @@ class ConversationManager:
                 from datetime import datetime, timedelta
 
                 start_date = datetime.utcnow() - timedelta(days=days)
+                total_replies_query = total_replies_query.filter(
+                    ConversationMessage.timestamp >= start_date
+                )
+
+            total_replies_count = total_replies_query.count()
+
+            # Build query for REPLY messages with sources
+            query = session.query(ConversationMessage).filter(
+                ConversationMessage.message_type == MessageType.REPLY,
+                ConversationMessage.sources_used.isnot(None),
+            )
+
+            # Apply date filter if specified
+            if days:
                 query = query.filter(ConversationMessage.timestamp >= start_date)
 
             all_replies = query.all()
-            total_replies = len(all_replies)
+            replies_with_sources_count = len(all_replies)
 
-            if total_replies == 0:
+            if replies_with_sources_count == 0:
                 return {
+                    "total_replies": total_replies_count,
                     "total_replies_with_sources": 0,
                     "total_sources_used": 0,
                     "avg_sources_per_reply": 0.0,
@@ -844,6 +858,7 @@ class ConversationManager:
             total_sources = 0
             all_scores = []
             document_counts = {}
+            document_scores = {}  # Track scores per document
             source_types = {}
 
             for reply in all_replies:
@@ -856,30 +871,50 @@ class ConversationManager:
                         if "score" in source:
                             all_scores.append(source["score"])
 
-                        # Track document usage
+                        # Track document usage and scores
                         filename = source.get("filename", "Unknown")
                         document_counts[filename] = document_counts.get(filename, 0) + 1
+
+                        # Track scores per document
+                        if "score" in source:
+                            if filename not in document_scores:
+                                document_scores[filename] = []
+                            document_scores[filename].append(source["score"])
 
                         # Track source types
                         source_type = source.get("source_type", "document")
                         source_types[source_type] = source_types.get(source_type, 0) + 1
 
             # Calculate averages
-            avg_sources = total_sources / total_replies if total_replies > 0 else 0
+            avg_sources = (
+                total_sources / replies_with_sources_count
+                if replies_with_sources_count > 0
+                else 0
+            )
             avg_score = sum(all_scores) / len(all_scores) if all_scores else 0
 
-            # Get top 20 most cited documents
+            # Get top 20 most cited documents with average scores
             most_cited = sorted(
                 document_counts.items(), key=lambda x: x[1], reverse=True
             )[:20]
 
             most_cited_list = [
-                {"filename": filename, "citation_count": count}
+                {
+                    "filename": filename,
+                    "citation_count": count,
+                    "avg_score": (
+                        sum(document_scores.get(filename, [0]))
+                        / len(document_scores.get(filename, [1]))
+                        if filename in document_scores
+                        else 0
+                    ),
+                }
                 for filename, count in most_cited
             ]
 
             return {
-                "total_replies_with_sources": total_replies,
+                "total_replies": total_replies_count,
+                "total_replies_with_sources": replies_with_sources_count,
                 "total_sources_used": total_sources,
                 "avg_sources_per_reply": round(avg_sources, 2),
                 "avg_relevance_score": round(avg_score, 3),

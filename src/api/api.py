@@ -3367,7 +3367,22 @@ async def get_optimization_analytics(
 
         analytics = conversation_manager.get_optimization_analytics(days=days)
 
-        return analytics
+        # Transform data to match frontend expectations
+        return {
+            "total_queries": analytics["total_queries"],
+            "optimized_count": analytics["optimized_queries"],
+            "optimization_rate": analytics["optimization_rate"],
+            "avg_query_expansion": (analytics["avg_expansion_ratio"] - 1.0)
+            * 100,  # Convert ratio to percentage
+            "sample_optimizations": [
+                {
+                    "original_query": s["original"],
+                    "optimized_query": s["optimized"],
+                    "timestamp": s.get("timestamp"),
+                }
+                for s in analytics["sample_optimizations"]
+            ],
+        }
 
     except Exception as e:
         logger.error(f"Error getting optimization analytics: {e}", exc_info=True)
@@ -3401,7 +3416,14 @@ async def get_source_analytics(
 
         analytics = conversation_manager.get_source_analytics(days=days)
 
-        return analytics
+        # Transform data to match frontend expectations
+        return {
+            "total_replies": analytics["total_replies"],
+            "replies_with_sources": analytics["total_replies_with_sources"],
+            "avg_sources_per_reply": analytics["avg_sources_per_reply"],
+            "avg_relevance_score": analytics["avg_relevance_score"],
+            "top_sources": analytics["most_cited_documents"],
+        }
 
     except Exception as e:
         logger.error(f"Error getting source analytics: {e}", exc_info=True)
