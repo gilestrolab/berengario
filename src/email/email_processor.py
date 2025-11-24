@@ -753,18 +753,6 @@ class EmailProcessor:
                     action="query",
                 )
 
-            # Store user query in conversation database
-            conversation_manager.add_message(
-                thread_id=thread_id,
-                message_type=MessageType.QUERY,
-                content=query_text,
-                sender=email.sender.email,
-                subject=email.subject,
-                channel=ChannelType.EMAIL,
-                timestamp=email.date,
-            )
-            logger.debug(f"Stored user query in conversation {thread_id}")
-
             # Check if sender is admin
             is_admin = self.admin_validator.is_allowed(email.sender.email)
             if is_admin:
@@ -796,6 +784,20 @@ class EmailProcessor:
                     "conversation_history": conversation_context,  # Add conversation context
                 },
             )
+
+            # Store user query in conversation database (after processing to capture optimization data)
+            conversation_manager.add_message(
+                thread_id=thread_id,
+                message_type=MessageType.QUERY,
+                content=query_text,
+                sender=email.sender.email,
+                subject=email.subject,
+                channel=ChannelType.EMAIL,
+                timestamp=email.date,
+                original_query=result.get("original_query"),
+                optimized_query=result.get("optimized_query"),
+            )
+            logger.debug(f"Stored user query in conversation {thread_id}")
 
             if not result["success"]:
                 logger.error(
@@ -829,6 +831,8 @@ class EmailProcessor:
                 sender=settings.email_target_address,
                 subject=reply_subject,
                 channel=ChannelType.EMAIL,
+                sources_used=result.get("sources"),
+                retrieval_metadata=result.get("metadata"),
             )
             logger.debug(
                 f"Stored assistant reply in conversation {thread_id}, message_id={reply_message_id}"

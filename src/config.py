@@ -220,6 +220,28 @@ class Settings(BaseSettings):
         description="Path to custom system prompt additions (appended to base prompt)",
     )
 
+    # Query Optimization Configuration
+    query_optimization_enabled: bool = Field(
+        default=True,
+        description="Enable LLM-based query optimization to improve RAG retrieval accuracy",
+    )
+    query_optimization_model: Optional[str] = Field(
+        default=None,
+        description="Model to use for query optimization (default: same as openrouter_model)",
+    )
+    query_optimization_max_tokens: int = Field(
+        default=500,
+        description="Maximum tokens for query optimization response",
+    )
+    query_optimization_temperature: float = Field(
+        default=0.3,
+        description="Temperature for query optimization (lower = more deterministic)",
+    )
+    query_optimization_timeout: int = Field(
+        default=10,
+        description="API timeout for query optimization in seconds",
+    )
+
     # Document Enhancement Configuration
     doc_enhancement_enabled: bool = Field(
         default=True,

@@ -1296,16 +1296,7 @@ async def query(
 
         logger.info(f"Created new conversation thread: {thread_id}")
 
-    # Store user query in conversation database
-    conversation_manager.add_message(
-        thread_id=thread_id,
-        message_type=MessageType.QUERY,
-        content=query_request.query,
-        sender=user_identifier,
-        channel=channel,
-    )
-
-    # Add user message to in-memory session history
+    # Add user message to in-memory session history (before processing)
     session.add_message("user", query_request.query)
 
     # Build conversation history from session messages for context
@@ -1325,6 +1316,17 @@ async def query(
             user_email=user_identifier,
             is_admin=session.is_admin if hasattr(session, "is_admin") else False,
             context=context,
+        )
+
+        # Store user query in conversation database (after processing to capture optimization data)
+        conversation_manager.add_message(
+            thread_id=thread_id,
+            message_type=MessageType.QUERY,
+            content=query_request.query,
+            sender=user_identifier,
+            channel=channel,
+            original_query=result.get("original_query"),
+            optimized_query=result.get("optimized_query"),
         )
 
         if not result["success"]:
@@ -1381,13 +1383,15 @@ async def query(
             attachments=attachment_urls,
         )
 
-        # Store assistant response in conversation database
+        # Store assistant response in conversation database with sources and metadata
         reply_message_id = conversation_manager.add_message(
             thread_id=thread_id,
             message_type=MessageType.REPLY,
             content=result["response"],
             sender=settings.instance_name,
             channel=channel,
+            sources_used=result.get("sources"),
+            retrieval_metadata=result.get("metadata"),
         )
 
         # Schedule cleanup
@@ -3333,6 +3337,76 @@ async def get_usage_analytics(
         logger.error(f"Error getting usage analytics: {e}", exc_info=True)
         raise HTTPException(
             status_code=500, detail=f"Error getting usage analytics: {str(e)}"
+        )
+
+
+@app.get("/api/admin/analytics/optimization")
+async def get_optimization_analytics(
+    days: Optional[int] = None,
+    session: Session = Depends(require_admin),
+):
+    """
+    Get query optimization analytics.
+
+    Requires admin privileges.
+
+    Args:
+        days: Number of days to look back (None for all time)
+        session: Admin session (injected by dependency)
+
+    Returns:
+        Dictionary with optimization statistics
+
+    Raises:
+        HTTPException: If query fails
+    """
+    try:
+        logger.info(
+            f"Admin {session.email} requested optimization analytics (days={days})"
+        )
+
+        analytics = conversation_manager.get_optimization_analytics(days=days)
+
+        return analytics
+
+    except Exception as e:
+        logger.error(f"Error getting optimization analytics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Error getting optimization analytics: {str(e)}"
+        )
+
+
+@app.get("/api/admin/analytics/sources")
+async def get_source_analytics(
+    days: Optional[int] = None,
+    session: Session = Depends(require_admin),
+):
+    """
+    Get source document usage analytics.
+
+    Requires admin privileges.
+
+    Args:
+        days: Number of days to look back (None for all time)
+        session: Admin session (injected by dependency)
+
+    Returns:
+        Dictionary with source usage statistics
+
+    Raises:
+        HTTPException: If query fails
+    """
+    try:
+        logger.info(f"Admin {session.email} requested source analytics (days={days})")
+
+        analytics = conversation_manager.get_source_analytics(days=days)
+
+        return analytics
+
+    except Exception as e:
+        logger.error(f"Error getting source analytics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Error getting source analytics: {str(e)}"
         )
 
 

@@ -1571,6 +1571,10 @@ class UsageAnalytics {
             this.renderTrendsChart(data.daily_stats);
             this.renderUserTable(data.user_activity);
 
+            // Load additional analytics
+            this.loadOptimizationAnalytics();
+            this.loadSourceAnalytics();
+
         } catch (error) {
             console.error('Error loading analytics:', error);
             adminPanel.showToast('Error loading usage analytics', 'error');
@@ -1819,6 +1823,162 @@ class UsageAnalytics {
             element.classList.add('expanded');
             element.textContent = fullText;
         }
+    }
+
+    async loadOptimizationAnalytics() {
+        try {
+            const params = this.currentTimeRange ? `?days=${this.currentTimeRange}` : '';
+            const response = await fetch(`/api/admin/analytics/optimization${params}`);
+
+            if (!response.ok) {
+                throw new Error('Failed to load optimization analytics');
+            }
+
+            const data = await response.json();
+            this.renderOptimizationAnalytics(data);
+        } catch (error) {
+            console.error('Error loading optimization analytics:', error);
+            const container = document.getElementById('optimization-container');
+            if (container) {
+                container.innerHTML = '<p style="color: var(--text-secondary, #666);">Error loading optimization analytics</p>';
+            }
+        }
+    }
+
+    renderOptimizationAnalytics(data) {
+        const container = document.getElementById('optimization-container');
+        if (!container) return;
+
+        if (data.total_queries === 0) {
+            container.innerHTML = '<p style="color: var(--text-secondary, #666);">No queries in this period</p>';
+            return;
+        }
+
+        const optimizationRate = data.optimization_rate.toFixed(1);
+        const avgExpansion = data.avg_query_expansion.toFixed(1);
+
+        container.innerHTML = `
+            <div class="stats-grid" style="margin-bottom: 1.5rem;">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-magic"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">Optimization Rate</div>
+                        <div class="stat-value">${optimizationRate}%</div>
+                        <div class="stat-sub">${data.optimized_count} of ${data.total_queries} queries</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-expand-arrows-alt"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">Avg Query Expansion</div>
+                        <div class="stat-value">${avgExpansion}%</div>
+                        <div class="stat-sub">Average length increase</div>
+                    </div>
+                </div>
+            </div>
+            ${data.sample_optimizations.length > 0 ? `
+                <div class="optimization-samples">
+                    <h4 style="margin-bottom: 1rem;">Sample Optimizations</h4>
+                    ${data.sample_optimizations.map((sample, i) => `
+                        <div class="optimization-sample" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary, #f8f9fa); border-radius: 6px;">
+                            <div style="margin-bottom: 0.5rem;">
+                                <strong>Original:</strong> <span style="color: var(--text-secondary, #666);">${this.escapeHtml(sample.original_query)}</span>
+                            </div>
+                            <div>
+                                <strong>Optimized:</strong> <span style="color: var(--success, #28a745);">${this.escapeHtml(sample.optimized_query)}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+        `;
+    }
+
+    async loadSourceAnalytics() {
+        try {
+            const params = this.currentTimeRange ? `?days=${this.currentTimeRange}` : '';
+            const response = await fetch(`/api/admin/analytics/sources${params}`);
+
+            if (!response.ok) {
+                throw new Error('Failed to load source analytics');
+            }
+
+            const data = await response.json();
+            this.renderSourceAnalytics(data);
+        } catch (error) {
+            console.error('Error loading source analytics:', error);
+            const container = document.getElementById('sources-container');
+            if (container) {
+                container.innerHTML = '<p style="color: var(--text-secondary, #666);">Error loading source analytics</p>';
+            }
+        }
+    }
+
+    renderSourceAnalytics(data) {
+        const container = document.getElementById('sources-container');
+        if (!container) return;
+
+        if (data.total_replies === 0) {
+            container.innerHTML = '<p style="color: var(--text-secondary, #666);">No replies with sources in this period</p>';
+            return;
+        }
+
+        const avgSources = data.avg_sources_per_reply.toFixed(1);
+        const avgScore = data.avg_relevance_score ? (data.avg_relevance_score * 100).toFixed(1) : 'N/A';
+
+        container.innerHTML = `
+            <div class="stats-grid" style="margin-bottom: 1.5rem;">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-file-alt"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">Total Replies</div>
+                        <div class="stat-value">${data.total_replies}</div>
+                        <div class="stat-sub">${data.replies_with_sources} with sources</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-layer-group"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">Avg Sources/Reply</div>
+                        <div class="stat-value">${avgSources}</div>
+                        <div class="stat-sub">Documents cited</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-star"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-label">Avg Relevance</div>
+                        <div class="stat-value">${avgScore}${avgScore !== 'N/A' ? '%' : ''}</div>
+                        <div class="stat-sub">Source quality</div>
+                    </div>
+                </div>
+            </div>
+            ${data.top_sources.length > 0 ? `
+                <div class="top-sources">
+                    <h4 style="margin-bottom: 1rem;">Most Cited Documents</h4>
+                    <div class="table-responsive">
+                        <table class="users-table">
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>Citations</th>
+                                    <th>Avg Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.top_sources.slice(0, 10).map(source => `
+                                    <tr>
+                                        <td>${this.escapeHtml(source.filename)}</td>
+                                        <td>${source.citation_count}</td>
+                                        <td>${(source.avg_score * 100).toFixed(1)}%</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ` : ''}
+        `;
     }
 
     refresh() {

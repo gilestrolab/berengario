@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Optional
 
+from src.rag.query_optimizer import QueryOptimizer
 from src.rag.rag_engine import RAGEngine
 from src.rag.tools import clear_tool_context, set_tool_context
 
@@ -29,6 +30,7 @@ class QueryHandler:
             rag_engine: RAG engine instance (creates new if None).
         """
         self.rag_engine = rag_engine or RAGEngine()
+        self.query_optimizer = QueryOptimizer()
         logger.info("QueryHandler initialized")
 
     def process_query(
@@ -84,9 +86,20 @@ class QueryHandler:
                 if context and "conversation_history" in context:
                     conversation_history = context["conversation_history"]
 
+                # Optimize query for better RAG retrieval
+                optimized_query = self.query_optimizer.optimize_query(
+                    query_text, conversation_history
+                )
+
+                # Log optimization for analysis
+                if optimized_query != query_text:
+                    logger.info(
+                        f"Query optimized: '{query_text[:80]}...' → '{optimized_query[:80]}...'"
+                    )
+
                 # Process query through RAG engine with conversation history
                 result = self.rag_engine.query(
-                    query_text,
+                    optimized_query,
                     conversation_history=conversation_history,
                 )
 
@@ -98,6 +111,10 @@ class QueryHandler:
                     "attachments": result.get("attachments", []),
                     "metadata": result["metadata"],
                     "timestamp": timestamp,
+                    # Query optimization tracking
+                    "original_query": query_text,
+                    "optimized_query": optimized_query,
+                    "optimization_applied": optimized_query != query_text,
                 }
 
                 if user_email:

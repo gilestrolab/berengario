@@ -12,7 +12,7 @@ RAGInbox is a configurable RAG (Retrieval-Augmented Generation) system with emai
 
 1. **Document Ingestion** → Documents (PDF, DOCX, TXT, CSV, XLS, XLSX) → Enhancement (for CSV/Excel) → Chunking → Embeddings → ChromaDB
 2. **Email Integration** → IMAP inbox monitoring → Parse/validate → Extract attachments → Process into KB or handle queries
-3. **Query Processing** → Email/API query → RAG retrieval → LLM response → Email reply/API response
+3. **Query Processing** → Email/API query → Query Optimization → RAG retrieval → LLM response → Email reply/API response
 
 ### Multi-Mode Email Processing
 
@@ -38,6 +38,7 @@ Users can be in one whitelist, both whitelists, or neither. Configure in:
 #### 2. RAG Engine (`src/rag/`)
 - **RAGEngine**: LlamaIndex query engine with customizable prompts per instance
 - **QueryHandler**: High-level interface for query processing with source citations
+- **QueryOptimizer**: LLM-based query optimization for improved retrieval (expansion, rewriting, context-aware)
 - **Function Calling System** (`src/rag/tools/`): Calendar event creation, export formatting
 
 #### 3. Email Integration (`src/email/`)
@@ -425,6 +426,124 @@ A: There are 2 employees in this dataset.
 - Enhancement uses LLM API calls (~$0.01-0.05 per document depending on size/model)
 - Only runs once per document during initial ingestion
 - Can be disabled for cost-sensitive deployments
+
+### Query Optimization
+
+The system includes an LLM-based query optimizer that transparently improves user queries before RAG retrieval to enhance search accuracy and relevance.
+
+**Problem**: User queries are often:
+- Too terse or ambiguous ("vacation days?")
+- Missing context from conversation history
+- Grammatically incorrect (especially from email)
+- Lacking relevant synonyms for semantic search
+
+**Solution**: Transparent query optimization that:
+1. **Query Expansion**: Adds relevant synonyms and related terms
+2. **Query Rewriting**: Improves clarity, grammar, and sentence structure
+3. **Context-Aware Enhancement**: Uses conversation history to resolve ambiguity
+
+**How it works** (`src/rag/query_optimizer.py`):
+1. QueryHandler receives user query (from email or web API)
+2. QueryOptimizer calls LLM to optimize the query
+3. LLM expands, rewrites, and enhances based on conversation context
+4. Optimized query is validated (length, format, no hallucinations)
+5. RAG engine uses optimized query for retrieval
+6. Original query is logged alongside optimized version for analysis
+
+**Configuration**:
+- `QUERY_OPTIMIZATION_ENABLED=true` - Enable/disable feature (default: enabled)
+- `QUERY_OPTIMIZATION_MODEL` - LLM model to use (default: same as main LLM)
+- `QUERY_OPTIMIZATION_MAX_TOKENS=500` - Response token limit
+- `QUERY_OPTIMIZATION_TEMPERATURE=0.3` - Low temperature for consistency
+- `QUERY_OPTIMIZATION_TIMEOUT=10` - API timeout in seconds
+
+**Example**:
+
+Original query (email): "what policy vacation?"
+
+Optimized query: "What is the company vacation policy?"
+
+Result: Better semantic matching with KB documents about vacation policies.
+
+**Benefits**:
+- Improves retrieval accuracy for ambiguous or poorly-worded queries
+- Handles typos and grammar issues automatically (especially useful for email)
+- Context-aware: resolves follow-up questions using conversation history
+- Transparent: users never see the optimization (happens behind the scenes)
+- Safe fallback: returns original query if optimization fails
+
+**Performance considerations**:
+- Adds ~200-500ms latency per query (LLM API call)
+- Cost: ~$0.001-0.005 per query depending on model
+- Very short queries (< 3 chars) skip optimization
+- Can be disabled per-deployment if latency/cost is a concern
+
+**Integration points**:
+- Integrated at `QueryHandler.process_query()` (src/rag/query_handler.py:89)
+- Works for both email queries and web API queries
+- Optimization is logged for analysis and monitoring
+
+### Query Tracking and Analytics
+
+The system tracks the complete query pipeline (original query → optimized query → sources → answer) and provides detailed analytics in the admin panel.
+
+**What's tracked** (`src/email/db_models.py`, `ConversationMessage` model):
+
+For QUERY messages:
+- `original_query` - User's original query text
+- `optimized_query` - LLM-optimized query used for retrieval
+- `optimization_applied` - Boolean flag (True if query was modified)
+
+For REPLY messages:
+- `sources_used` - JSON array of source documents with scores
+- `retrieval_metadata` - JSON object with RAG engine metadata
+
+**Database storage** (`src/email/conversation_manager.py`):
+- `add_message()` accepts optional parameters: `original_query`, `optimized_query`, `sources_used`, `retrieval_metadata`
+- Auto-calculates `optimization_applied` flag (True if queries differ)
+- All new fields are nullable for backward compatibility
+- `get_message_optimization_details()` - Retrieve optimization data for a message
+- `get_message_source_details()` - Retrieve source document data for a message
+- `get_optimization_analytics()` - Calculate optimization statistics
+- `get_source_analytics()` - Calculate source usage statistics
+
+**Analytics endpoints** (`src/api/api.py`):
+- `/api/admin/analytics/optimization` - Query optimization analytics:
+  - Total queries, optimized count, optimization rate
+  - Average query expansion ratio
+  - Sample optimizations showing original vs optimized
+- `/api/admin/analytics/sources` - Source document analytics:
+  - Total replies, replies with sources
+  - Average sources per reply, average relevance score
+  - Most cited documents with citation counts
+
+**Admin UI** (`src/api/static/admin.html`, `admin.js`):
+- "Query Optimization Analytics" section shows:
+  - Optimization rate (% of queries optimized)
+  - Average query expansion (% length increase)
+  - Sample optimizations with before/after comparison
+- "Source Document Usage" section shows:
+  - Total replies and replies with sources
+  - Average sources per reply
+  - Average relevance score
+  - Most cited documents table
+
+**Time filtering**:
+- All analytics support time range filtering (7 days, 30 days, 90 days, all time)
+- Time range buttons control all analytics sections simultaneously
+
+**Use cases**:
+- Monitor query optimizer effectiveness
+- Identify documents that need improvement (low citation counts)
+- Identify over-cited documents (may need splitting or updating)
+- Analyze query patterns and optimization trends
+- Debug retrieval issues by examining source relevance scores
+
+**Implementation details**:
+- Query storage moved to AFTER processing (so optimization metadata is available)
+- Both web API (`api.py`) and email processor (`email_processor.py`) store tracking data
+- JavaScript methods: `loadOptimizationAnalytics()`, `renderOptimizationAnalytics()`, `loadSourceAnalytics()`, `renderSourceAnalytics()`
+- Analytics calculated on-the-fly from database (no pre-aggregation)
 
 ### Email Response Customization
 

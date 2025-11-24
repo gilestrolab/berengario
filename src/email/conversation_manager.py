@@ -154,6 +154,10 @@ class ConversationManager:
         subject: Optional[str] = None,
         channel: ChannelType = ChannelType.EMAIL,
         timestamp: Optional[datetime] = None,
+        original_query: Optional[str] = None,
+        optimized_query: Optional[str] = None,
+        sources_used: Optional[list] = None,
+        retrieval_metadata: Optional[dict] = None,
     ) -> int:
         """
         Add a message to a conversation.
@@ -166,6 +170,10 @@ class ConversationManager:
             subject: Email subject (optional)
             channel: Channel type (email or webchat)
             timestamp: Message timestamp (defaults to now)
+            original_query: Original user query before optimization (QUERY messages only)
+            optimized_query: LLM-optimized query used for RAG (QUERY messages only)
+            sources_used: List of source documents with scores (REPLY messages only)
+            retrieval_metadata: RAG retrieval metrics (REPLY messages only)
 
         Returns:
             ID of the created message.
@@ -199,6 +207,11 @@ class ConversationManager:
                 .count()
             )
 
+            # Calculate optimization_applied flag
+            optimization_applied = False
+            if original_query and optimized_query:
+                optimization_applied = original_query != optimized_query
+
             # Create message
             message = ConversationMessage(
                 conversation_id=conversation.id,
@@ -208,6 +221,11 @@ class ConversationManager:
                 subject=subject,
                 timestamp=timestamp or datetime.utcnow(),
                 message_order=message_count,
+                original_query=original_query,
+                optimized_query=optimized_query,
+                optimization_applied=optimization_applied,
+                sources_used=sources_used,
+                retrieval_metadata=retrieval_metadata,
             )
             session.add(message)
 
@@ -630,6 +648,244 @@ class ConversationManager:
                 }
                 for msg in messages
             ]
+
+    def get_message_optimization_details(
+        self, message_id: int
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get query optimization details for a specific message.
+
+        Args:
+            message_id: ID of the message
+
+        Returns:
+            Dictionary with optimization details or None if not found.
+        """
+        with self.db_manager.get_session() as session:
+            message = (
+                session.query(ConversationMessage)
+                .filter(ConversationMessage.id == message_id)
+                .first()
+            )
+
+            if not message:
+                return None
+
+            return {
+                "message_id": message.id,
+                "original_query": message.original_query,
+                "optimized_query": message.optimized_query,
+                "optimization_applied": message.optimization_applied,
+                "timestamp": (
+                    message.timestamp.isoformat() if message.timestamp else None
+                ),
+            }
+
+    def get_message_source_details(self, message_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get source document details for a specific reply message.
+
+        Args:
+            message_id: ID of the message
+
+        Returns:
+            Dictionary with source details or None if not found.
+        """
+        with self.db_manager.get_session() as session:
+            message = (
+                session.query(ConversationMessage)
+                .filter(ConversationMessage.id == message_id)
+                .first()
+            )
+
+            if not message:
+                return None
+
+            return {
+                "message_id": message.id,
+                "sources_used": message.sources_used,
+                "retrieval_metadata": message.retrieval_metadata,
+                "timestamp": (
+                    message.timestamp.isoformat() if message.timestamp else None
+                ),
+            }
+
+    def get_optimization_analytics(self, days: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Get query optimization analytics.
+
+        Args:
+            days: Number of days to analyze (None = all time)
+
+        Returns:
+            Dictionary with optimization statistics.
+        """
+        with self.db_manager.get_session() as session:
+
+            # Build base query for QUERY messages
+            query = session.query(ConversationMessage).filter(
+                ConversationMessage.message_type == MessageType.QUERY
+            )
+
+            # Apply date filter if specified
+            if days:
+                from datetime import datetime, timedelta
+
+                start_date = datetime.utcnow() - timedelta(days=days)
+                query = query.filter(ConversationMessage.timestamp >= start_date)
+
+            all_queries = query.all()
+            total_queries = len(all_queries)
+
+            if total_queries == 0:
+                return {
+                    "total_queries": 0,
+                    "optimized_queries": 0,
+                    "optimization_rate": 0.0,
+                    "avg_query_length_original": 0,
+                    "avg_query_length_optimized": 0,
+                    "avg_expansion_ratio": 0.0,
+                    "sample_optimizations": [],
+                }
+
+            # Calculate optimization metrics
+            optimized_count = sum(1 for q in all_queries if q.optimization_applied)
+
+            # Calculate average query lengths
+            original_lengths = [
+                len(q.original_query) for q in all_queries if q.original_query
+            ]
+            optimized_lengths = [
+                len(q.optimized_query)
+                for q in all_queries
+                if q.optimized_query and q.optimization_applied
+            ]
+
+            avg_original_length = (
+                sum(original_lengths) / len(original_lengths) if original_lengths else 0
+            )
+            avg_optimized_length = (
+                sum(optimized_lengths) / len(optimized_lengths)
+                if optimized_lengths
+                else 0
+            )
+
+            # Calculate expansion ratio
+            expansion_ratio = (
+                avg_optimized_length / avg_original_length
+                if avg_original_length > 0
+                else 0
+            )
+
+            # Get sample optimizations (last 10)
+            sample_optimizations = []
+            for q in reversed(all_queries[-10:]):
+                if q.optimization_applied and q.original_query and q.optimized_query:
+                    sample_optimizations.append(
+                        {
+                            "original": q.original_query[:100],
+                            "optimized": q.optimized_query[:100],
+                            "timestamp": (
+                                q.timestamp.isoformat() if q.timestamp else None
+                            ),
+                        }
+                    )
+
+            return {
+                "total_queries": total_queries,
+                "optimized_queries": optimized_count,
+                "optimization_rate": (
+                    (optimized_count / total_queries * 100) if total_queries > 0 else 0
+                ),
+                "avg_query_length_original": round(avg_original_length, 1),
+                "avg_query_length_optimized": round(avg_optimized_length, 1),
+                "avg_expansion_ratio": round(expansion_ratio, 2),
+                "sample_optimizations": sample_optimizations,
+            }
+
+    def get_source_analytics(self, days: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Get source document usage analytics.
+
+        Args:
+            days: Number of days to analyze (None = all time)
+
+        Returns:
+            Dictionary with source usage statistics.
+        """
+        with self.db_manager.get_session() as session:
+            # Build base query for REPLY messages with sources
+            query = session.query(ConversationMessage).filter(
+                ConversationMessage.message_type == MessageType.REPLY,
+                ConversationMessage.sources_used.isnot(None),
+            )
+
+            # Apply date filter if specified
+            if days:
+                from datetime import datetime, timedelta
+
+                start_date = datetime.utcnow() - timedelta(days=days)
+                query = query.filter(ConversationMessage.timestamp >= start_date)
+
+            all_replies = query.all()
+            total_replies = len(all_replies)
+
+            if total_replies == 0:
+                return {
+                    "total_replies_with_sources": 0,
+                    "total_sources_used": 0,
+                    "avg_sources_per_reply": 0.0,
+                    "avg_relevance_score": 0.0,
+                    "most_cited_documents": [],
+                    "source_type_distribution": {},
+                }
+
+            # Count total sources and calculate metrics
+            total_sources = 0
+            all_scores = []
+            document_counts = {}
+            source_types = {}
+
+            for reply in all_replies:
+                if reply.sources_used:
+                    sources = reply.sources_used
+                    total_sources += len(sources)
+
+                    for source in sources:
+                        # Track relevance scores
+                        if "score" in source:
+                            all_scores.append(source["score"])
+
+                        # Track document usage
+                        filename = source.get("filename", "Unknown")
+                        document_counts[filename] = document_counts.get(filename, 0) + 1
+
+                        # Track source types
+                        source_type = source.get("source_type", "document")
+                        source_types[source_type] = source_types.get(source_type, 0) + 1
+
+            # Calculate averages
+            avg_sources = total_sources / total_replies if total_replies > 0 else 0
+            avg_score = sum(all_scores) / len(all_scores) if all_scores else 0
+
+            # Get top 20 most cited documents
+            most_cited = sorted(
+                document_counts.items(), key=lambda x: x[1], reverse=True
+            )[:20]
+
+            most_cited_list = [
+                {"filename": filename, "citation_count": count}
+                for filename, count in most_cited
+            ]
+
+            return {
+                "total_replies_with_sources": total_replies,
+                "total_sources_used": total_sources,
+                "avg_sources_per_reply": round(avg_sources, 2),
+                "avg_relevance_score": round(avg_score, 3),
+                "most_cited_documents": most_cited_list,
+                "source_type_distribution": source_types,
+            }
 
 
 # Global conversation manager instance

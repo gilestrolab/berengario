@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     Date,
@@ -315,8 +316,8 @@ class ConversationMessage(Base):
     """
     Individual messages within a conversation thread.
 
-    Stores each query and reply in a conversation with metadata and
-    optional rating for future rating feature.
+    Stores each query and reply in a conversation with metadata,
+    query optimization tracking, source documents, and optional rating.
 
     Attributes:
         id: Auto-increment primary key
@@ -328,6 +329,11 @@ class ConversationMessage(Base):
         timestamp: When message was sent/received
         message_order: Sequential order within conversation
         rating: Optional 1-5 rating for replies (for future rating feature)
+        original_query: Original user query before optimization (QUERY messages only)
+        optimized_query: LLM-optimized query used for RAG retrieval (QUERY messages only)
+        optimization_applied: Whether optimization changed the query
+        sources_used: List of source documents with scores (REPLY messages only)
+        retrieval_metadata: RAG retrieval metrics like num_sources, avg_score (REPLY messages only)
         conversation: Relationship to Conversation record
     """
 
@@ -355,6 +361,25 @@ class ConversationMessage(Base):
     # Rating (1-5, nullable, for future rating feature)
     rating = Column(Integer, nullable=True)
 
+    # Query optimization tracking (for QUERY messages)
+    original_query = Column(
+        Text, nullable=True
+    )  # Original user query before optimization
+    optimized_query = Column(
+        Text, nullable=True
+    )  # LLM-optimized query used for RAG retrieval
+    optimization_applied = Column(
+        Boolean, default=False, nullable=False
+    )  # Whether optimization changed the query
+
+    # Source document tracking (for REPLY messages)
+    sources_used = Column(
+        JSON, nullable=True
+    )  # List of source documents with scores and metadata
+    retrieval_metadata = Column(
+        JSON, nullable=True
+    )  # RAG retrieval metrics (num_sources, avg_score, etc.)
+
     # Relationship to conversation
     conversation = relationship("Conversation", back_populates="messages")
 
@@ -375,6 +400,11 @@ class ConversationMessage(Base):
         timestamp: Optional[datetime] = None,
         message_order: int = 0,
         rating: Optional[int] = None,
+        original_query: Optional[str] = None,
+        optimized_query: Optional[str] = None,
+        optimization_applied: bool = False,
+        sources_used: Optional[list] = None,
+        retrieval_metadata: Optional[dict] = None,
     ):
         """Initialize ConversationMessage with defaults."""
         self.conversation_id = conversation_id
@@ -385,6 +415,11 @@ class ConversationMessage(Base):
         self.timestamp = timestamp or datetime.utcnow()
         self.message_order = message_order
         self.rating = rating
+        self.original_query = original_query
+        self.optimized_query = optimized_query
+        self.optimization_applied = optimization_applied
+        self.sources_used = sources_used
+        self.retrieval_metadata = retrieval_metadata
 
     def __repr__(self) -> str:
         """String representation of ConversationMessage."""
@@ -414,6 +449,11 @@ class ConversationMessage(Base):
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
             "message_order": self.message_order,
             "rating": self.rating,
+            "original_query": self.original_query,
+            "optimized_query": self.optimized_query,
+            "optimization_applied": self.optimization_applied,
+            "sources_used": self.sources_used,
+            "retrieval_metadata": self.retrieval_metadata,
         }
 
 
