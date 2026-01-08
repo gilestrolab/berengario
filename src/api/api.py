@@ -48,8 +48,6 @@ from src.api.models import (
     CrawlRequest,
     DocumentListResponse,
     FeedbackAnalyticsResponse,
-    FeedbackRequest,
-    FeedbackResponse,
     HistoryResponse,
     QueryRequest,
     QueryResponse,
@@ -61,6 +59,7 @@ from src.api.models import (
     WhitelistResponse,
 )
 from src.api.routes.auth import create_auth_router
+from src.api.routes.feedback import create_feedback_router
 from src.config import settings
 from src.document_processing.document_processor import DocumentProcessor
 from src.document_processing.kb_manager import KnowledgeBaseManager
@@ -161,7 +160,11 @@ document_manager = DocumentManager(
 audit_logger = AdminAuditLogger()
 backup_manager = BackupManager()
 
-# Setup routers with dependency injection
+# Setup static files directory (needed by feedback router)
+static_dir = Path(__file__).parent / "static"
+static_dir.mkdir(exist_ok=True)
+
+# Setup auth router (can be done early, doesn't need require_auth)
 auth_router = create_auth_router(
     session_manager=session_manager,
     otp_manager=otp_manager,
@@ -173,12 +176,10 @@ auth_router = create_auth_router(
     settings=settings,
 )
 
-# Include routers
+# Include auth router
 app.include_router(auth_router)
 
 # Mount static files
-static_dir = Path(__file__).parent / "static"
-static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Setup templates (using same directory as static for HTML templates)
@@ -297,117 +298,23 @@ async def require_admin(request: Request) -> Session:
     return session
 
 
+# Setup routers that depend on require_auth
+feedback_router = create_feedback_router(
+    conversation_manager=conversation_manager,
+    static_dir=static_dir,
+    require_auth=require_auth,
+)
+
+# Include routers
+app.include_router(feedback_router)
+
+
 # API Endpoints
 # Note: Authentication endpoints moved to routes/auth.py
+# Note: Feedback endpoints moved to routes/feedback.py
 
 
 # Protected Endpoints (require authentication)
-@app.get("/feedback")
-async def feedback_page(request: Request):
-    """Serve feedback page for email link clicks."""
-    feedback_file = static_dir / "feedback.html"
-    if feedback_file.exists():
-        return FileResponse(feedback_file)
-    raise HTTPException(status_code=404, detail="Feedback page not found")
-
-
-@app.post("/api/feedback/email", response_model=FeedbackResponse)
-async def submit_email_feedback(
-    feedback: dict,
-):
-    """
-    Submit feedback from email link (no authentication required).
-
-    This endpoint is for users clicking feedback links in emails.
-    It validates the token before accepting feedback.
-
-    Args:
-        feedback: Dict with token, message_id, is_positive, optional comment
-
-    Returns:
-        FeedbackResponse with success status
-    """
-    try:
-        from src.email.db_models import ConversationMessage, ResponseFeedback
-        from src.email.email_sender import decode_feedback_token
-
-        # Extract fields
-        token = feedback.get("token")
-        message_id = feedback.get("message_id")
-        is_positive = feedback.get("is_positive")
-        comment = feedback.get("comment")
-
-        if not token or message_id is None:
-            raise HTTPException(status_code=400, detail="Missing required fields")
-
-        # Decode and validate token
-        decoded_message_id = decode_feedback_token(token)
-        if decoded_message_id != message_id:
-            raise HTTPException(status_code=400, detail="Invalid feedback token")
-
-        # Verify message exists and is a reply
-        with conversation_manager.db_manager.get_session() as db_session:
-            message = (
-                db_session.query(ConversationMessage)
-                .filter(ConversationMessage.id == message_id)
-                .first()
-            )
-
-            if not message:
-                raise HTTPException(status_code=404, detail="Message not found")
-
-            if message.message_type != MessageType.REPLY:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Can only provide feedback on assistant replies",
-                )
-
-            # Get user email from the conversation
-            user_email = message.conversation.sender
-
-            # Check if feedback already exists for this message from this user
-            existing_feedback = (
-                db_session.query(ResponseFeedback)
-                .filter(
-                    ResponseFeedback.message_id == message_id,
-                    ResponseFeedback.user_email == user_email,
-                )
-                .first()
-            )
-
-            if existing_feedback:
-                # Update existing feedback
-                existing_feedback.is_positive = is_positive
-                existing_feedback.comment = comment
-                existing_feedback.submitted_at = datetime.utcnow()
-                db_session.commit()
-                logger.info(
-                    f"Updated email feedback for message {message_id} from {user_email}"
-                )
-            else:
-                # Create new feedback
-                new_feedback = ResponseFeedback(
-                    message_id=message_id,
-                    is_positive=is_positive,
-                    comment=comment,
-                    user_email=user_email,
-                    channel=message.conversation.channel,
-                )
-                db_session.add(new_feedback)
-                db_session.commit()
-                logger.info(
-                    f"Stored email feedback for message {message_id} from {user_email}"
-                )
-
-        return FeedbackResponse(success=True, message="Feedback submitted successfully")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error submitting email feedback: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to submit feedback")
-
-
 @app.get("/")
 async def root(request: Request):
     """
@@ -683,93 +590,6 @@ async def query(
             timestamp=datetime.now().isoformat(),
             session_id=session.session_id,
         )
-
-
-@app.post("/api/feedback", response_model=FeedbackResponse)
-async def submit_feedback(
-    feedback: FeedbackRequest,
-    session: Session = Depends(require_auth),
-):
-    """
-    Submit feedback on an assistant response.
-
-    Requires authentication.
-
-    Args:
-        feedback: Feedback data (message_id, is_positive, optional comment)
-        session: Authenticated session (injected by dependency)
-
-    Returns:
-        FeedbackResponse with success status
-    """
-    try:
-        from src.email.db_models import ConversationMessage, ResponseFeedback
-
-        # Get user email from session
-        user_email = (
-            session.email
-            if hasattr(session, "email") and session.email
-            else f"web_user_{session.session_id[:8]}"
-        )
-
-        # Verify message exists and is a reply
-        with conversation_manager.db_manager.get_session() as db_session:
-            message = (
-                db_session.query(ConversationMessage)
-                .filter(ConversationMessage.id == feedback.message_id)
-                .first()
-            )
-
-            if not message:
-                raise HTTPException(status_code=404, detail="Message not found")
-
-            if message.message_type != MessageType.REPLY:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Can only provide feedback on assistant replies",
-                )
-
-            # Check if feedback already exists for this message from this user
-            existing_feedback = (
-                db_session.query(ResponseFeedback)
-                .filter(
-                    ResponseFeedback.message_id == feedback.message_id,
-                    ResponseFeedback.user_email == user_email,
-                )
-                .first()
-            )
-
-            if existing_feedback:
-                # Update existing feedback
-                existing_feedback.is_positive = feedback.is_positive
-                existing_feedback.comment = feedback.comment
-                existing_feedback.submitted_at = datetime.utcnow()
-                db_session.commit()
-                logger.info(
-                    f"Updated feedback for message {feedback.message_id} from {user_email}"
-                )
-            else:
-                # Create new feedback
-                new_feedback = ResponseFeedback(
-                    message_id=feedback.message_id,
-                    is_positive=feedback.is_positive,
-                    comment=feedback.comment,
-                    user_email=user_email,
-                    channel=message.conversation.channel,
-                )
-                db_session.add(new_feedback)
-                db_session.commit()
-                logger.info(
-                    f"Stored feedback for message {feedback.message_id} from {user_email}"
-                )
-
-        return FeedbackResponse(success=True, message="Feedback submitted successfully")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error submitting feedback: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to submit feedback")
 
 
 @app.get("/api/history", response_model=HistoryResponse)
