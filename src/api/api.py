@@ -1718,6 +1718,8 @@ async def get_conversation_messages(
                 "timestamp": msg.timestamp.isoformat(),
                 "message_order": msg.message_order,
                 "rating": msg.rating,
+                "sources": msg.sources_used,  # Include sources for historical chat display
+                "retrieval_metadata": msg.retrieval_metadata,  # Include RAG metadata
             }
             for msg in messages
         ]

@@ -299,6 +299,8 @@ class ConversationManager:
                     "timestamp": msg.timestamp,
                     "message_order": msg.message_order,
                     "rating": msg.rating,
+                    "sources": msg.sources_used,  # Include sources for frontend display
+                    "retrieval_metadata": msg.retrieval_metadata,  # Include RAG metadata
                 }
                 for msg in messages
             ]
