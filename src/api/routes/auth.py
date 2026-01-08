@@ -65,8 +65,8 @@ If you didn't request this code, please ignore this email.
 {settings.organization}
 """
         try:
-            await email_sender.send_reply(
-                to_email=email,
+            email_sender.send_reply(
+                to_address=email,
                 subject=subject,
                 body_text=body,
                 body_html=None,
