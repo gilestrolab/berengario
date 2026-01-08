@@ -17,7 +17,6 @@ from fastapi import (
     File,
     HTTPException,
     Request,
-    Response,
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,8 +43,6 @@ from src.api.models import (
     CrawlRequest,
     DocumentListResponse,
     FeedbackAnalyticsResponse,
-    QueryRequest,
-    QueryResponse,
     StatsResponse,
     TopicClusteringResponse,
     UsageAnalyticsResponse,
@@ -56,11 +53,11 @@ from src.api.models import (
 from src.api.routes.auth import create_auth_router
 from src.api.routes.conversations import create_conversations_router
 from src.api.routes.feedback import create_feedback_router
+from src.api.routes.query import create_query_router
 from src.config import settings
 from src.document_processing.document_processor import DocumentProcessor
 from src.document_processing.kb_manager import KnowledgeBaseManager
 from src.email.conversation_manager import (
-    ChannelType,
     MessageType,
     conversation_manager,
 )
@@ -307,15 +304,27 @@ conversations_router = create_conversations_router(
     require_auth=require_auth,
 )
 
+query_router = create_query_router(
+    query_handler=query_handler,
+    conversation_manager=conversation_manager,
+    session_manager=session_manager,
+    settings=settings,
+    require_auth=require_auth,
+    set_session_cookie=set_session_cookie,
+    cleanup_old_attachments=cleanup_old_attachments,
+)
+
 # Include routers
 app.include_router(feedback_router)
 app.include_router(conversations_router)
+app.include_router(query_router)
 
 
 # API Endpoints
 # Note: Authentication endpoints moved to routes/auth.py
 # Note: Feedback endpoints moved to routes/feedback.py
 # Note: Conversation endpoints moved to routes/conversations.py
+# Note: Query endpoints moved to routes/query.py
 
 
 # Protected Endpoints (require authentication)
@@ -385,265 +394,6 @@ async def admin_panel(request: Request):
             },
         )
     raise HTTPException(status_code=404, detail="Admin panel not found")
-
-
-@app.post("/api/query", response_model=QueryResponse)
-async def query(
-    query_request: QueryRequest,
-    request: Request,
-    response: Response,
-    background_tasks: BackgroundTasks,
-    session: Session = Depends(require_auth),
-):
-    """
-    Process a RAG query and return response.
-
-    Requires authentication.
-
-    Args:
-        query_request: Query request with text and optional context
-        request: FastAPI request object
-        response: FastAPI response object
-        background_tasks: Background task manager
-        session: Authenticated session (injected by dependency)
-
-    Returns:
-        QueryResponse with answer, sources, and attachments
-    """
-    # Session is already authenticated via dependency
-    set_session_cookie(response, session.session_id)
-
-    user_identifier = (
-        session.email
-        if hasattr(session, "email") and session.email
-        else f"web_user_{session.session_id[:8]}"
-    )
-
-    # Determine thread_id: use existing conversation or create new
-    thread_id = None
-    channel = ChannelType.WEBCHAT
-
-    if query_request.conversation_id:
-        # Continue existing conversation
-        from src.email.db_models import Conversation
-
-        with conversation_manager.db_manager.get_session() as db_session:
-            existing_conv = (
-                db_session.query(Conversation)
-                .filter(Conversation.id == query_request.conversation_id)
-                .first()
-            )
-
-            if not existing_conv:
-                raise HTTPException(status_code=404, detail="Conversation not found")
-
-            # Verify user owns this conversation
-            if existing_conv.sender != user_identifier:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Access denied. You can only continue your own conversations.",
-                )
-
-            thread_id = existing_conv.thread_id
-            channel = existing_conv.channel
-
-            logger.info(
-                f"Continuing conversation {query_request.conversation_id} (thread: {thread_id})"
-            )
-    else:
-        # Create new conversation with unique thread_id
-        import uuid
-        from datetime import datetime
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        unique_id = str(uuid.uuid4())[:8]
-        thread_id = f"webchat_{session.session_id[:8]}_{timestamp}_{unique_id}"
-
-        logger.info(f"Created new conversation thread: {thread_id}")
-
-    # Add user message to in-memory session history (before processing)
-    session.add_message("user", query_request.query)
-
-    # Build conversation history from session messages for context
-    conversation_history = conversation_manager.format_conversation_context(
-        thread_id=thread_id,
-        max_messages=10,  # Last 10 messages for context
-    )
-
-    try:
-        # Process query through RAG engine with conversation history
-        # Pass admin status from session for tool access control
-        context = query_request.context or {}
-        context["conversation_history"] = conversation_history
-
-        result = query_handler.process_query(
-            query_text=query_request.query,
-            user_email=user_identifier,
-            is_admin=session.is_admin if hasattr(session, "is_admin") else False,
-            context=context,
-        )
-
-        # Store user query in conversation database (after processing to capture optimization data)
-        conversation_manager.add_message(
-            thread_id=thread_id,
-            message_type=MessageType.QUERY,
-            content=query_request.query,
-            sender=user_identifier,
-            channel=channel,
-            original_query=result.get("original_query"),
-            optimized_query=result.get("optimized_query"),
-        )
-
-        if not result["success"]:
-            error_response = f"Error: {result.get('error', 'Unknown error')}"
-            session.add_message("assistant", error_response)
-
-            # Store error response in conversation database
-            conversation_manager.add_message(
-                thread_id=thread_id,
-                message_type=MessageType.REPLY,
-                content=error_response,
-                sender=settings.instance_name,
-                channel=channel,
-            )
-
-            return QueryResponse(
-                success=False,
-                error=result.get("error", "Unknown error"),
-                timestamp=result["timestamp"],
-                session_id=session.session_id,
-            )
-
-        # Process attachments - save to session directory and generate URLs
-        attachment_urls = []
-        if result.get("attachments"):
-            session_dir = settings.email_temp_dir / f"web_{session.session_id}"
-            session_dir.mkdir(parents=True, exist_ok=True)
-
-            for attachment in result["attachments"]:
-                filename = attachment.get("filename", "attachment")
-                content = attachment.get("content")
-
-                if isinstance(content, str):
-                    content = content.encode("utf-8")
-
-                filepath = session_dir / filename
-                with open(filepath, "wb") as f:
-                    f.write(content)
-
-                attachment_url = {
-                    "filename": filename,
-                    "url": f"/api/attachments/{session.session_id}/{filename}",
-                    "content_type": attachment.get(
-                        "content_type", "application/octet-stream"
-                    ),
-                }
-                attachment_urls.append(attachment_url)
-
-        # Add assistant response to in-memory session history
-        session.add_message(
-            "assistant",
-            result["response"],
-            sources=result["sources"],
-            attachments=attachment_urls,
-        )
-
-        # Store assistant response in conversation database with sources and metadata
-        reply_message_id = conversation_manager.add_message(
-            thread_id=thread_id,
-            message_type=MessageType.REPLY,
-            content=result["response"],
-            sender=settings.instance_name,
-            channel=channel,
-            sources_used=result.get("sources"),
-            retrieval_metadata=result.get("metadata"),
-        )
-
-        # Schedule cleanup
-        background_tasks.add_task(session_manager.cleanup_inactive_sessions)
-        background_tasks.add_task(cleanup_old_attachments)
-
-        return QueryResponse(
-            success=True,
-            response=result["response"],
-            sources=result["sources"],
-            attachments=attachment_urls,
-            timestamp=result["timestamp"],
-            session_id=session.session_id,
-            message_id=reply_message_id,
-        )
-
-    except Exception as e:
-        logger.error(f"Error processing query: {e}", exc_info=True)
-        error_msg = str(e)
-        error_response = f"Error: {error_msg}"
-        session.add_message("assistant", error_response)
-
-        # Store exception error in conversation database
-        conversation_manager.add_message(
-            thread_id=thread_id,
-            message_type=MessageType.REPLY,
-            content=error_response,
-            sender=settings.instance_name,
-            channel=channel,
-        )
-
-        return QueryResponse(
-            success=False,
-            error=error_msg,
-            timestamp=datetime.now().isoformat(),
-            session_id=session.session_id,
-        )
-
-
-@app.get("/api/attachments/{session_id}/{filename}")
-async def download_attachment(
-    session_id: str,
-    filename: str,
-    session: Session = Depends(require_auth),
-):
-    """
-    Download attachment file.
-
-    Requires authentication. Users can only download attachments from their own session.
-
-    Args:
-        session_id: Session ID
-        filename: Attachment filename
-        session: Authenticated session (injected by dependency)
-
-    Returns:
-        File download response
-
-    Raises:
-        HTTPException: If file not found or unauthorized
-    """
-    # Verify user is requesting their own session's attachments
-    if session.session_id != session_id:
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied. You can only download your own attachments.",
-        )
-
-    filepath = settings.email_temp_dir / f"web_{session_id}" / filename
-
-    if not filepath.exists():
-        raise HTTPException(status_code=404, detail="Attachment not found")
-
-    # Determine content type
-    content_type = "application/octet-stream"
-    if filename.endswith(".ics"):
-        content_type = "text/calendar"
-    elif filename.endswith(".csv"):
-        content_type = "text/csv"
-    elif filename.endswith(".json"):
-        content_type = "application/json"
-
-    return FileResponse(
-        filepath,
-        media_type=content_type,
-        filename=filename,
-    )
 
 
 @app.get("/api/stats", response_model=StatsResponse)
