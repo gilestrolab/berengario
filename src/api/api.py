@@ -40,8 +40,6 @@ from src.api.auth import (
 # Import all models from models module
 from src.api.models import (
     AdminActionResponse,
-    AuthResponse,
-    AuthStatusResponse,
     ConversationListItem,
     ConversationMessagesResponse,
     ConversationSearchResponse,
@@ -53,8 +51,6 @@ from src.api.models import (
     FeedbackRequest,
     FeedbackResponse,
     HistoryResponse,
-    OTPRequest,
-    OTPVerifyRequest,
     QueryRequest,
     QueryResponse,
     StatsResponse,
@@ -64,6 +60,7 @@ from src.api.models import (
     WhitelistEntryRequest,
     WhitelistResponse,
 )
+from src.api.routes.auth import create_auth_router
 from src.config import settings
 from src.document_processing.document_processor import DocumentProcessor
 from src.document_processing.kb_manager import KnowledgeBaseManager
@@ -164,6 +161,21 @@ document_manager = DocumentManager(
 audit_logger = AdminAuditLogger()
 backup_manager = BackupManager()
 
+# Setup routers with dependency injection
+auth_router = create_auth_router(
+    session_manager=session_manager,
+    otp_manager=otp_manager,
+    query_whitelist=query_whitelist,
+    admin_whitelist=admin_whitelist,
+    email_sender=email_sender,
+    get_session_id=get_session_id,
+    set_session_cookie=set_session_cookie,
+    settings=settings,
+)
+
+# Include routers
+app.include_router(auth_router)
+
 # Mount static files
 static_dir = Path(__file__).parent / "static"
 static_dir.mkdir(exist_ok=True)
@@ -224,111 +236,8 @@ async def cleanup_old_attachments():
         logger.error(f"Error during attachment cleanup: {e}")
 
 
-def send_otp_email(email: str, otp_code: str) -> bool:
-    """
-    Send OTP code via email.
-
-    Args:
-        email: Recipient email address
-        otp_code: 6-digit OTP code
-
-    Returns:
-        True if sent successfully, False otherwise
-    """
-    subject = f"{settings.instance_name} - Login Code"
-
-    # Plain text version
-    body_text = f"""Hello,
-
-Your login code for {settings.instance_name} is: {otp_code}
-
-This code will expire in 5 minutes.
-
-If you did not request this code, please ignore this email.
-
-Best regards,
-{settings.instance_name}
-{settings.organization}
-"""
-
-    # HTML version
-    body_html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body {{
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }}
-        .container {{
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 30px;
-        }}
-        .otp-code {{
-            font-size: 32px;
-            font-weight: bold;
-            letter-spacing: 8px;
-            color: #2563eb;
-            text-align: center;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-            border: 2px dashed #2563eb;
-        }}
-        .footer {{
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #e2e8f0;
-            font-size: 14px;
-            color: #64748b;
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>Login Code for {settings.instance_name}</h2>
-        <p>Hello,</p>
-        <p>Your login code is:</p>
-        <div class="otp-code">{otp_code}</div>
-        <p><strong>This code will expire in 5 minutes.</strong></p>
-        <p>If you did not request this code, please ignore this email.</p>
-        <div class="footer">
-            <p>Best regards,<br>
-            <strong>{settings.instance_name}</strong><br>
-            {settings.organization}</p>
-        </div>
-    </div>
-</body>
-</html>
-"""
-
-    try:
-        success = email_sender.send_reply(
-            to_address=email,
-            subject=subject,
-            body_text=body_text,
-            body_html=body_html,
-        )
-        if success:
-            logger.info(f"Sent OTP email to {email}")
-        else:
-            logger.error(f"Failed to send OTP email to {email}")
-        return success
-    except Exception as e:
-        logger.error(f"Error sending OTP email: {e}")
-        return False
-
-
 # Authentication dependency
+# Note: send_otp_email moved to routes/auth.py
 async def require_auth(request: Request) -> Session:
     """
     Dependency to require authentication for endpoints.
@@ -389,169 +298,7 @@ async def require_admin(request: Request) -> Session:
 
 
 # API Endpoints
-
-
-# Authentication Endpoints
-@app.post("/api/auth/request-otp", response_model=AuthResponse)
-async def request_otp(request: OTPRequest, background_tasks: BackgroundTasks):
-    """
-    Request OTP for email authentication.
-
-    Args:
-        request: OTP request with email
-        background_tasks: Background task manager
-
-    Returns:
-        AuthResponse with success/failure message
-    """
-    email = request.email.lower()
-
-    # Check if email is in query whitelist
-    if not query_whitelist.is_allowed(email):
-        logger.warning(f"OTP request denied for non-whitelisted email: {email}")
-        return AuthResponse(
-            success=False,
-            message="Access denied. Your email address is not authorized to use this system. "
-            "Please contact your administrator if you believe this is an error.",
-        )
-
-    # Development mode: Skip OTP email sending
-    if settings.disable_otp_for_dev:
-        logger.warning(
-            f"⚠️ SECURITY WARNING: OTP disabled for development! "
-            f"Allowing login for {email} without email verification. "
-            f"DO NOT USE IN PRODUCTION!"
-        )
-        return AuthResponse(
-            success=True,
-            message=f"Development mode: OTP disabled. Enter any code to login as {email}.",
-            email=email,
-        )
-
-    # Generate OTP
-    otp_code = otp_manager.generate_otp(email)
-
-    # Send OTP email in background
-    background_tasks.add_task(send_otp_email, email, otp_code)
-    background_tasks.add_task(otp_manager.cleanup_expired)
-
-    logger.info(f"OTP requested for {email}")
-
-    return AuthResponse(
-        success=True,
-        message=f"A login code has been sent to {email}. Please check your email and enter the code to continue.",
-        email=email,
-    )
-
-
-@app.post("/api/auth/verify-otp", response_model=AuthResponse)
-async def verify_otp(
-    verify_request: OTPVerifyRequest,
-    request: Request,
-    response: Response,
-):
-    """
-    Verify OTP and authenticate session.
-
-    Args:
-        verify_request: OTP verification request
-        request: FastAPI request object
-        response: FastAPI response object
-
-    Returns:
-        AuthResponse with success/failure message
-    """
-    email = verify_request.email.lower()
-    otp_code = verify_request.otp_code
-
-    # Development mode: Skip OTP verification
-    if settings.disable_otp_for_dev:
-        logger.warning(
-            f"⚠️ SECURITY WARNING: OTP verification bypassed for development! "
-            f"Authenticating {email} without verification. DO NOT USE IN PRODUCTION!"
-        )
-        success = True
-        message = "Development mode: OTP verification bypassed"
-    else:
-        # Verify OTP
-        success, message = otp_manager.verify_otp(email, otp_code)
-
-    if success:
-        # Get or create session
-        session_id = get_session_id(request)
-        session = session_manager.get_or_create_session(session_id)
-
-        # Check if user is admin
-        is_admin = admin_whitelist.is_allowed(email)
-
-        # Authenticate session with admin status
-        session.authenticate(email, is_admin=is_admin)
-
-        # Set session cookie
-        set_session_cookie(response, session.session_id)
-
-        admin_status = " (admin)" if is_admin else ""
-        logger.info(f"Successfully authenticated {email}{admin_status}")
-
-        return AuthResponse(
-            success=True,
-            message="Successfully authenticated! Redirecting to chat...",
-            email=email,
-        )
-    else:
-        logger.warning(f"Failed OTP verification for {email}: {message}")
-        return AuthResponse(
-            success=False,
-            message=message,
-        )
-
-
-@app.post("/api/auth/logout")
-async def logout(request: Request, response: Response):
-    """
-    Logout and clear session.
-
-    Args:
-        request: FastAPI request object
-        response: FastAPI response object
-
-    Returns:
-        Success message
-    """
-    session_id = get_session_id(request)
-    if session_id:
-        session_manager.delete_session(session_id)
-        response.delete_cookie("session_id")
-        logger.info(f"Logged out session {session_id}")
-
-    return {"success": True, "message": "Logged out successfully"}
-
-
-@app.get("/api/auth/status", response_model=AuthStatusResponse)
-async def auth_status(request: Request):
-    """
-    Check authentication status.
-
-    Args:
-        request: FastAPI request object
-
-    Returns:
-        AuthStatusResponse with authentication status
-    """
-    session_id = get_session_id(request)
-    if not session_id:
-        return AuthStatusResponse(authenticated=False)
-
-    session = session_manager.get_session(session_id)
-    if not session or not session.is_authenticated():
-        return AuthStatusResponse(authenticated=False)
-
-    return AuthStatusResponse(
-        authenticated=True,
-        email=session.email,
-        session_id=session.session_id,
-        is_admin=session.is_admin,
-    )
+# Note: Authentication endpoints moved to routes/auth.py
 
 
 # Protected Endpoints (require authentication)
