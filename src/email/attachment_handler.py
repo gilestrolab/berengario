@@ -316,6 +316,75 @@ class AttachmentHandler:
         logger.info(f"Extracted {len(attachments)} valid attachments from {message_id}")
         return attachments
 
+    def save_attachment_from_bytes(
+        self, filename: str, content: bytes, subdir: Optional[str] = None
+    ) -> Optional[AttachmentInfo]:
+        """
+        Save attachment from bytes content.
+
+        Args:
+            filename: Original filename
+            content: File content in bytes
+            subdir: Optional subdirectory within temp_dir
+
+        Returns:
+            AttachmentInfo if saved successfully, None otherwise.
+        """
+        try:
+            size = len(content)
+
+            # Validate file type
+            if not self.validate_file_type(filename):
+                logger.warning(f"Skipping unsupported file: {filename}")
+                return None
+
+            # Validate file size
+            if not self.validate_file_size(size, filename):
+                logger.warning(f"Skipping oversized file: {filename}")
+                return None
+
+            # Determine directory
+            if subdir:
+                target_dir = self.temp_dir / subdir
+            else:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                target_dir = self.temp_dir / f"manual_{timestamp}"
+
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+            # Sanitize filename
+            safe_filename = self._sanitize_filename(filename)
+            filepath = target_dir / safe_filename
+
+            # Handle duplicate filenames
+            if filepath.exists():
+                base = filepath.stem
+                suffix = filepath.suffix
+                counter = 1
+                while filepath.exists():
+                    filepath = target_dir / f"{base}_{counter}{suffix}"
+                    counter += 1
+
+            # Write file
+            with open(filepath, "wb") as f:
+                f.write(content)
+
+            extension = filepath.suffix.lower()
+            info = AttachmentInfo(
+                filename=filename,
+                filepath=filepath,
+                size=size,
+                mime_type="",  # We might not know mime type from bytes easily without magic
+                extension=extension,
+            )
+
+            logger.info(f"Saved attachment from bytes: {filepath} ({size} bytes)")
+            return info
+
+        except Exception as e:
+            logger.error(f"Error saving attachment from bytes {filename}: {e}")
+            return None
+
     def _sanitize_filename(self, filename: str) -> str:
         """
         Sanitize filename for safe filesystem storage.
