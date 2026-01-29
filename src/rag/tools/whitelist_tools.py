@@ -12,12 +12,10 @@ from src.config import settings
 from src.email.email_sender import EmailSender
 
 from .base import ParameterType, Tool, ToolParameter, register_tool
+from .context import get_tool_context, is_email_request, validate_admin_access
 from .pending_actions import get_pending_action_manager
 
 logger = logging.getLogger(__name__)
-
-# Global context for passing requester email
-_tool_context = {}
 
 # Global email sender instance
 _email_sender = None
@@ -29,44 +27,6 @@ def _get_email_sender() -> EmailSender:
     if _email_sender is None:
         _email_sender = EmailSender()
     return _email_sender
-
-
-def set_tool_context(user_email: str, is_admin: bool, is_email_request: bool = False):
-    """
-    Set the context for tool execution (called before tool execution).
-
-    Args:
-        user_email: Email of the user making the request
-        is_admin: Whether the user is an admin
-        is_email_request: Whether this request is from email (requires confirmation)
-    """
-    global _tool_context
-    _tool_context = {
-        "user_email": user_email,
-        "is_admin": is_admin,
-        "is_email_request": is_email_request,
-    }
-
-
-def clear_tool_context():
-    """Clear the tool context after execution."""
-    global _tool_context
-    _tool_context = {}
-
-
-def _validate_admin_access() -> None:
-    """
-    Validate that the current requester is an admin.
-
-    Raises:
-        PermissionError: If requester is not an admin
-    """
-    if not _tool_context.get("is_admin", False):
-        requester = _tool_context.get("user_email", "unknown")
-        error_msg = f"Access denied: Only administrators can manage whitelists. Requester: {requester}"
-        logger.warning(error_msg)
-        raise PermissionError(error_msg)
-    logger.info(f"Admin access validated for {_tool_context.get('user_email')}")
 
 
 def _add_to_whitelist_file(filepath: Path, email: str) -> None:
@@ -149,17 +109,18 @@ def add_to_teach_whitelist(email: str) -> Dict[str, Any]:
         Dictionary with success status and message
     """
     try:
-        _validate_admin_access()
+        validate_admin_access()
 
         email = email.strip().lower()
         if not email:
             raise ValueError("Email address cannot be empty")
 
-        admin_email = _tool_context.get("user_email", "unknown")
-        is_email_request = _tool_context.get("is_email_request", False)
+        context = get_tool_context()
+        admin_email = context.get("user_email", "unknown")
+        is_email_req = is_email_request()
 
         # Email requests require confirmation to prevent spoofing
-        if is_email_request:
+        if is_email_req:
             pending_mgr = get_pending_action_manager()
             action = pending_mgr.create_pending_action(
                 action_type="add_teach",
@@ -247,17 +208,18 @@ def remove_from_teach_whitelist(email: str) -> Dict[str, Any]:
         Dictionary with success status and message
     """
     try:
-        _validate_admin_access()
+        validate_admin_access()
 
         email = email.strip().lower()
         if not email:
             raise ValueError("Email address cannot be empty")
 
-        admin_email = _tool_context.get("user_email", "unknown")
-        is_email_request = _tool_context.get("is_email_request", False)
+        context = get_tool_context()
+        admin_email = context.get("user_email", "unknown")
+        is_email_req = is_email_request()
 
         # Email requests require confirmation to prevent spoofing
-        if is_email_request:
+        if is_email_req:
             pending_mgr = get_pending_action_manager()
             action = pending_mgr.create_pending_action(
                 action_type="remove_teach",
@@ -348,17 +310,18 @@ def add_to_query_whitelist(email: str) -> Dict[str, Any]:
         Dictionary with success status and message
     """
     try:
-        _validate_admin_access()
+        validate_admin_access()
 
         email = email.strip().lower()
         if not email:
             raise ValueError("Email address cannot be empty")
 
-        admin_email = _tool_context.get("user_email", "unknown")
-        is_email_request = _tool_context.get("is_email_request", False)
+        context = get_tool_context()
+        admin_email = context.get("user_email", "unknown")
+        is_email_req = is_email_request()
 
         # Email requests require confirmation to prevent spoofing
-        if is_email_request:
+        if is_email_req:
             pending_mgr = get_pending_action_manager()
             action = pending_mgr.create_pending_action(
                 action_type="add_query",
@@ -446,17 +409,18 @@ def remove_from_query_whitelist(email: str) -> Dict[str, Any]:
         Dictionary with success status and message
     """
     try:
-        _validate_admin_access()
+        validate_admin_access()
 
         email = email.strip().lower()
         if not email:
             raise ValueError("Email address cannot be empty")
 
-        admin_email = _tool_context.get("user_email", "unknown")
-        is_email_request = _tool_context.get("is_email_request", False)
+        context = get_tool_context()
+        admin_email = context.get("user_email", "unknown")
+        is_email_req = is_email_request()
 
         # Email requests require confirmation to prevent spoofing
-        if is_email_request:
+        if is_email_req:
             pending_mgr = get_pending_action_manager()
             action = pending_mgr.create_pending_action(
                 action_type="remove_query",
