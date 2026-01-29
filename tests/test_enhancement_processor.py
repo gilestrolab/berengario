@@ -119,9 +119,7 @@ Department: Engineering"""
         # Mock LLM response with Q&A format
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[
-            0
-        ].message.content = """Q: What is Alice's age?
+        mock_response.choices[0].message.content = """Q: What is Alice's age?
 A: Alice is 25 years old.
 
 Q: What department does Alice work in?
