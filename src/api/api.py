@@ -163,22 +163,51 @@ templates = Jinja2Templates(directory=str(static_dir))
 
 # Version information
 def get_version() -> str:
-    """Get version string combining package version and git commit."""
+    """Get version string combining package version, git branch, and commit."""
+    import os
     import subprocess
 
     base_version = "0.1.0"  # From pyproject.toml
+
+    # Try environment variables first (set by docker-compose)
+    git_branch = os.getenv("GIT_BRANCH")
+    git_commit = os.getenv("GIT_COMMIT")
+
+    if (
+        git_branch
+        and git_commit
+        and git_branch != "unknown"
+        and git_commit != "unknown"
+    ):
+        return f"{base_version} ({git_branch}@{git_commit})"
+
+    # Fall back to git commands if running locally
     try:
+        repo_path = Path(__file__).parent.parent.parent
+
+        # Get git branch
+        git_branch = (
+            subprocess.check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                stderr=subprocess.DEVNULL,
+                cwd=repo_path,
+            )
+            .decode()
+            .strip()
+        )
+
         # Get git commit hash
         git_hash = (
             subprocess.check_output(
                 ["git", "rev-parse", "--short", "HEAD"],
                 stderr=subprocess.DEVNULL,
-                cwd=Path(__file__).parent.parent.parent,
+                cwd=repo_path,
             )
             .decode()
             .strip()
         )
-        return f"{base_version}+{git_hash}"
+
+        return f"{base_version} ({git_branch}@{git_hash})"
     except Exception:
         return base_version
 

@@ -53,6 +53,7 @@ services:
     volumes:
       - ./src:/app/src  # Mount src for live code changes
       - ./tests:/app/tests  # Mount tests for development
+      - ./.git:/app/.git:ro  # Mount git directory (read-only) for version info
       - ./data/kb:/app/data/kb  # Mount KB structure (documents, emails, archive)
       - ./data/documents:/app/data/documents  # Legacy mount (can be removed after migration)
       - ./data/chroma_db:/app/data/chroma_db
@@ -89,10 +90,13 @@ services:
       DB_NAME: raginbox
       DB_USER: raginbox
       DB_PASSWORD: test_password
+      GIT_BRANCH: ${GIT_BRANCH:-unknown}
+      GIT_COMMIT: ${GIT_COMMIT:-unknown}
 
     volumes:
       - ./src:/app/src  # Mount src for live code changes during development
       - ./tests:/app/tests  # Mount tests for development testing
+      - ./.git:/app/.git:ro  # Mount git directory (read-only) for version info
       - ./data/kb:/app/data/kb  # Mount KB structure (documents, emails, archive)
       - ./data/documents:/app/data/documents  # Legacy mount (can be removed after migration)
       - ./data/chroma_db:/app/data/chroma_db
@@ -145,10 +149,13 @@ services:
       DB_NAME: raginbox
       DB_USER: raginbox
       DB_PASSWORD: test_password
+      GIT_BRANCH: ${GIT_BRANCH:-unknown}
+      GIT_COMMIT: ${GIT_COMMIT:-unknown}
 
     volumes:
       - ./src:/app/src  # Mount src for live code changes during development
       - ./tests:/app/tests  # Mount tests for development testing
+      - ./.git:/app/.git:ro  # Mount git directory (read-only) for version info
       - ./data/kb:/app/data/kb  # Mount KB structure (documents, emails, archive)
       - ./data/documents:/app/data/documents  # Legacy mount (can be removed after migration)
       - ./data/chroma_db:/app/data/chroma_db
@@ -158,14 +165,14 @@ services:
       - ./data/backups:/app/data/backups  # Mount backups for persistence
 
     ports:
-      - "8000:8000"  # Web interface port
+      - "8090:8000"  # Web interface port (host:container)
 
     depends_on:
       mariadb:
         condition: service_healthy
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health", "||", "exit", "1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
