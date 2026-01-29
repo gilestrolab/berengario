@@ -74,6 +74,9 @@ dependencies = [
     "watchdog>=6.0.0",
     "aiofiles>=24.0.0",
 
+    # Web Search (Phase 2 - Agent Enhancement)
+    "duckduckgo-search>=7.0.0",
+
     # CLI
     "typer>=0.15.0",
     "rich>=13.0.0",

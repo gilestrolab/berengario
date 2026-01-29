@@ -270,6 +270,12 @@ class Settings(BaseSettings):
         description="Path to custom email footer text (replaces default footer)",
     )
 
+    # Web Search Configuration (Phase 2 - Agent Enhancement)
+    web_search_max_results: int = Field(
+        default=10,
+        description="Maximum number of web search results to return per query",
+    )
+
     # Web API Configuration
     api_host: str = Field(default="0.0.0.0", description="API host address")
     api_port: int = Field(default=8000, description="API port")
