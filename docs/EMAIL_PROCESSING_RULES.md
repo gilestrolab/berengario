@@ -4,7 +4,7 @@
 
 ## Overview
 
-RAGInbox processes incoming emails differently based on how the bot email address appears in the recipient fields. This allows for two distinct workflows:
+Berengario processes incoming emails differently based on how the bot email address appears in the recipient fields. This allows for two distinct workflows:
 
 1. **Query Mode** - User asks a question and expects a reply
 2. **KB Ingestion Mode** - User shares information to be added to the knowledge base
@@ -140,7 +140,7 @@ Subject: Fwd: Department meeting notes
 
 ### Dual Whitelist System
 
-RAGInbox uses **three separate whitelists** with hierarchical permissions:
+Berengario uses **three separate whitelists** with hierarchical permissions:
 
 1. **Teaching Whitelist** (`allowed_teachers.txt`)
    - Controls who can add content to the knowledge base

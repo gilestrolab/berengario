@@ -74,7 +74,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build test image
-        run: docker build -t raginbox:test .
+        run: docker build -t berengario:test .
 
       - name: Test image runs
         run: |
@@ -92,12 +92,12 @@ jobs:
           # Test that the container starts and doesn't crash immediately
           docker run --rm \
             --env-file .env.test \
-            raginbox:test \
+            berengario:test \
             python -c "import src.config; print('Config loads successfully')"
 
       - name: Test package imports
         run: |
-          docker run --rm raginbox:test python -c "
+          docker run --rm berengario:test python -c "
           import src.config
           import src.rag.rag_engine
           import src.email.email_sender

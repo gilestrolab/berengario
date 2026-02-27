@@ -2,7 +2,7 @@
 
 ## Overview
 
-RAGInbox uses a database abstraction layer that supports both **SQLite** (for development/simple deployments) and **MariaDB/MySQL** (for production/containerized deployments).
+Berengario uses a database abstraction layer that supports both **SQLite** (for development/simple deployments) and **MariaDB/MySQL** (for production/containerized deployments).
 
 This design ensures:
 - Easy local development with SQLite (no setup required)
@@ -90,8 +90,8 @@ SQLITE_DB_PATH=./data/message_tracker.db
 DB_TYPE=mariadb
 DB_HOST=mariadb
 DB_PORT=3306
-DB_NAME=raginbox
-DB_USER=raginbox
+DB_NAME=berengario
+DB_USER=berengario
 DB_PASSWORD=your_secure_password
 DB_POOL_SIZE=5
 DB_POOL_RECYCLE=3600
@@ -353,9 +353,9 @@ services:
     image: mariadb:11
     environment:
       MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: raginbox
-      MYSQL_USER: raginbox
-      MYSQL_PASSWORD: raginbox_pass
+      MYSQL_DATABASE: berengario
+      MYSQL_USER: berengario
+      MYSQL_PASSWORD: berengario_pass
     volumes:
       - mariadb_data:/var/lib/mysql
     ports:
@@ -366,15 +366,15 @@ services:
       timeout: 5s
       retries: 5
 
-  raginbox:
+  berengario:
     build: .
     environment:
       DB_TYPE: mariadb
       DB_HOST: mariadb
       DB_PORT: 3306
-      DB_NAME: raginbox
-      DB_USER: raginbox
-      DB_PASSWORD: raginbox_pass
+      DB_NAME: berengario
+      DB_USER: berengario
+      DB_PASSWORD: berengario_pass
     depends_on:
       mariadb:
         condition: service_healthy
@@ -484,8 +484,8 @@ DB_TYPE=sqlite
 ```bash
 DB_TYPE=mariadb
 DB_HOST=mariadb
-DB_NAME=raginbox
-DB_USER=raginbox
+DB_NAME=berengario
+DB_USER=berengario
 DB_PASSWORD=secure_password
 ```
 

@@ -1,5 +1,5 @@
 """
-Admin Audit Logger for RAGInbox.
+Admin Audit Logger for Berengario.
 
 Logs all admin actions to a dedicated audit log file.
 """

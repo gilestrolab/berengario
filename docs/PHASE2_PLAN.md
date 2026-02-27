@@ -6,7 +6,7 @@
 
 ## Overview
 
-Phase 2 adds email inbox monitoring to RAGInbox, enabling automatic knowledge base updates from CC'd emails with attachments. This allows instances to receive documents via email instead of manual uploads.
+Phase 2 adds email inbox monitoring to Berengario, enabling automatic knowledge base updates from CC'd emails with attachments. This allows instances to receive documents via email instead of manual uploads.
 
 ## Scope
 
@@ -227,8 +227,8 @@ SQLITE_DB_PATH=./data/message_tracker.db
 # MariaDB (production/docker)
 # DB_HOST=mariadb
 # DB_PORT=3306
-# DB_NAME=raginbox
-# DB_USER=raginbox
+# DB_NAME=berengario
+# DB_USER=berengario
 # DB_PASSWORD=secure_password
 # DB_POOL_SIZE=5
 # DB_POOL_RECYCLE=3600
@@ -303,16 +303,16 @@ After Phase 2:
 
 ```bash
 # Start email monitoring service
-raginbox --mode email
+berengario --mode email
 
 # Check email service status
-raginbox --mode email --status
+berengario --mode email --status
 
 # View processing statistics
-raginbox --mode email --stats
+berengario --mode email --stats
 
 # Process inbox once (no daemon)
-raginbox --mode email --once
+berengario --mode email --once
 ```
 
 ## Security Considerations

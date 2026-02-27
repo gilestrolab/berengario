@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-RAGInbox - Main CLI interface.
+Berengario - Main CLI interface.
 
-This script provides the command-line interface for RAGInbox functionality:
+This script provides the command-line interface for Berengario functionality:
 1. Document processing from the Documents folder
 2. Adding documents to the knowledge base
 3. Querying the knowledge base
 4. File watching for automatic updates
 
 Usage:
-    raginbox --mode process
-    raginbox --mode query --query "Your question"
-    raginbox --mode watch
+    berengario --mode process
+    berengario --mode query --query "Your question"
+    berengario --mode watch
 """
 
 import argparse
@@ -156,7 +156,7 @@ def run_file_watcher(
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="RAGInbox: Email-integrated RAG Knowledge Base System"
+        description="Berengario: Email-integrated RAG Knowledge Base System"
     )
     parser.add_argument(
         "--mode",

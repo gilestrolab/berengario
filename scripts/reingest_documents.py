@@ -23,7 +23,7 @@ def main():
     """Process all documents from data/documents directory."""
 
     logger.info("="*60)
-    logger.info("RAGInbox Knowledge Base Reingestion")
+    logger.info("Berengario Knowledge Base Reingestion")
     logger.info("="*60)
 
     # Initialize components

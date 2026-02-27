@@ -1,4 +1,4 @@
-# Query Whitelist for RAGInbox
+# Query Whitelist for Berengario
 # Users in this list can QUERY the knowledge base and receive automated RAG replies
 # via direct emails (To: bot@domain.com)
 #

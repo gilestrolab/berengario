@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Entry point for RAGInbox web service.
+Entry point for Berengario web service.
 
 Starts the FastAPI web interface for RAG query testing.
 

@@ -279,8 +279,8 @@ SQLITE_DB_PATH=data/message_tracker.db
 version: '3.8'
 
 services:
-  raginbox:
-    image: raginbox:latest
+  berengario:
+    image: berengario:latest
     volumes:
       # Documents folder (bind mount for easy access)
       - ./data/documents:/app/data/documents

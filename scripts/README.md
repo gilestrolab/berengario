@@ -1,6 +1,6 @@
-# RAGInbox Scripts
+# Berengario Scripts
 
-Utility scripts for managing the RAGInbox system.
+Utility scripts for managing the Berengario system.
 
 ## Available Scripts
 
@@ -19,7 +19,7 @@ Utility scripts for managing the RAGInbox system.
 ```
 
 **How it works**:
-1. Stops raginbox-web and raginbox-email containers
+1. Stops berengario-web and berengario-email containers
 2. Runs `reingest_documents.py` in a temporary container
 3. Restarts the containers
 
@@ -33,7 +33,7 @@ Utility scripts for managing the RAGInbox system.
 
 If needed to run manually in Docker:
 ```bash
-docker-compose run --rm raginbox-web python /app/scripts/reingest_documents.py
+docker-compose run --rm berengario-web python /app/scripts/reingest_documents.py
 ```
 
 ---
@@ -48,7 +48,7 @@ docker-compose run --rm raginbox-web python /app/scripts/reingest_documents.py
 
 **Usage**:
 ```bash
-docker exec raginbox-web python /app/scripts/init_conversation_db.py
+docker exec berengario-web python /app/scripts/init_conversation_db.py
 ```
 
 ---

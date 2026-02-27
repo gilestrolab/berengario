@@ -1,17 +1,17 @@
-# RAGInbox Quick Start
+# Berengario Quick Start
 
 ## Installation (5 minutes)
 
 ```bash
 # Clone repository
-git clone https://github.com/gilestrolab/RAGInbox.git
-cd RAGInbox
+git clone https://github.com/gilestrolab/berengar.io.git
+cd Berengario
 
 # Setup Python environment
 python -m venv .venv
 source .venv/bin/activate
 
-# Install RAGInbox
+# Install Berengario
 pip install -e .
 ```
 
@@ -36,19 +36,19 @@ OPENAI_API_KEY=your-key-here
 Add documents to `data/documents/` folder, then:
 
 ```bash
-raginbox --mode process
+berengario --mode process
 ```
 
 ### Query Knowledge Base
 
 ```bash
-raginbox --mode query --query "What are the policies?"
+berengario --mode query --query "What are the policies?"
 ```
 
 ### Watch for New Documents
 
 ```bash
-raginbox --mode watch  # Runs continuously
+berengario --mode watch  # Runs continuously
 ```
 
 ## Example: DoLS-GPT Instance
@@ -63,12 +63,12 @@ OPENAI_API_KEY=ng-your-naga-key
 
 Query example:
 ```bash
-raginbox --mode query --query "What are the PhD application deadlines?"
+berengario --mode query --query "What are the PhD application deadlines?"
 ```
 
 ## Troubleshooting
 
-### Command not found: raginbox
+### Command not found: berengario
 ```bash
 # Reinstall package
 pip install -e .
@@ -89,7 +89,7 @@ ls data/documents/
 ## Next Steps
 
 1. **Add your documents** to `data/documents/` folder
-2. **Process them**: `raginbox --mode process`
-3. **Start querying**: `raginbox --mode query --query "..."`
+2. **Process them**: `berengario --mode process`
+3. **Start querying**: `berengario --mode query --query "..."`
 
 See [README.md](README.md) for full documentation.

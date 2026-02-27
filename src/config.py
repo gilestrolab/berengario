@@ -1,5 +1,5 @@
 """
-Configuration management for RAGInbox.
+Configuration management for Berengario.
 
 This module uses Pydantic Settings to load and validate configuration
 from environment variables. Supports multiple instances with different configurations.
@@ -28,7 +28,9 @@ class Settings(BaseSettings):
     )
 
     # Instance Configuration (customizable per deployment)
-    instance_name: str = Field(default="RAGInbox", description="Name of this instance")
+    instance_name: str = Field(
+        default="Berengario", description="Name of this instance"
+    )
     instance_description: str = Field(
         default="AI-powered Knowledge Base Assistant",
         description="Description of this instance",
@@ -165,8 +167,8 @@ class Settings(BaseSettings):
     # MariaDB/MySQL settings
     db_host: str = Field(default="localhost", description="Database host")
     db_port: int = Field(default=3306, description="Database port")
-    db_name: str = Field(default="raginbox", description="Database name")
-    db_user: str = Field(default="raginbox", description="Database username")
+    db_name: str = Field(default="berengario", description="Database name")
+    db_user: str = Field(default="berengario", description="Database username")
     db_password: str = Field(default="", description="Database password")
     db_pool_size: int = Field(default=5, description="Connection pool size")
     db_pool_recycle: int = Field(

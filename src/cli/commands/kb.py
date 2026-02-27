@@ -1,7 +1,7 @@
 """
 Knowledge Base CLI commands.
 
-Manages documents in the RAGInbox knowledge base (ChromaDB).
+Manages documents in the Berengario knowledge base (ChromaDB).
 """
 
 import logging
@@ -409,7 +409,7 @@ def query_kb(
     Query the knowledge base with a question.
 
     Example:
-        raginbox-cli kb query "When is the FYP examination week?"
+        berengario-cli kb query "When is the FYP examination week?"
     """
     try:
         from src.rag.query_handler import QueryHandler

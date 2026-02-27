@@ -1,6 +1,6 @@
-# RAGInbox CLI Documentation
+# Berengario CLI Documentation
 
-Command-line interface for RAGInbox administration and management.
+Command-line interface for Berengario administration and management.
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@ Command-line interface for RAGInbox administration and management.
 
 ## Overview
 
-The RAGInbox CLI (`raginbox-cli`) provides a unified command-line interface for managing your RAGInbox instance. It offers commands for:
+The Berengario CLI (`berengario-cli`) provides a unified command-line interface for managing your Berengario instance. It offers commands for:
 
 - **Knowledge Base management** - List, stats, reingest, delete documents
 - **Database operations** - Initialize, test connection, view statistics
@@ -25,22 +25,22 @@ The RAGInbox CLI (`raginbox-cli`) provides a unified command-line interface for 
 
 ## Installation
 
-The CLI is included with RAGInbox and runs inside the Docker container:
+The CLI is included with Berengario and runs inside the Docker container:
 
 ```bash
 # Access the CLI inside the container
-docker exec raginbox-web python -m src.cli.main [COMMAND]
+docker exec berengario-web python -m src.cli.main [COMMAND]
 ```
 
 For convenience, you can create an alias:
 
 ```bash
 # Add to your ~/.bashrc or ~/.zshrc
-alias raginbox="docker exec raginbox-web python -m src.cli.main"
+alias berengario="docker exec berengario-web python -m src.cli.main"
 
 # Then use it directly
-raginbox kb list
-raginbox db stats
+berengario kb list
+berengario db stats
 ```
 
 ## Usage
@@ -77,7 +77,7 @@ python -m src.cli.main db init --help
 
 ### Knowledge Base Commands
 
-Manage documents in the RAGInbox knowledge base (ChromaDB).
+Manage documents in the Berengario knowledge base (ChromaDB).
 
 #### `kb list`
 
@@ -298,7 +298,7 @@ python -m src.cli.main backup delete <FILENAME> [--force]
 python -m src.cli.main backup list
 
 # Delete specific backup
-python -m src.cli.main backup delete raginbox_backup_20251101_153045.zip
+python -m src.cli.main backup delete berengario_backup_20251101_153045.zip
 ```
 
 #### `backup cleanup`
@@ -331,7 +331,7 @@ View system information and configuration.
 
 #### `version`
 
-Show RAGInbox version and instance information.
+Show Berengario version and instance information.
 
 ```bash
 python -m src.cli.main version
@@ -411,15 +411,15 @@ For easier access, create a shell alias:
 
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
-alias raginbox="docker exec raginbox-web python -m src.cli.main"
+alias berengario="docker exec berengario-web python -m src.cli.main"
 
 # Reload shell
 source ~/.bashrc  # or source ~/.zshrc
 
 # Now use commands directly
-raginbox kb list
-raginbox db stats
-raginbox backup create
+berengario kb list
+berengario db stats
+berengario backup create
 ```
 
 ### Scripting and Automation
@@ -431,15 +431,15 @@ The CLI can be used in scripts and automation:
 # Daily backup and cleanup script
 
 # Create backup
-docker exec raginbox-web python -m src.cli.main backup create
+docker exec berengario-web python -m src.cli.main backup create
 
 # Clean up old backups (keep last 7, delete older than 30 days)
-docker exec raginbox-web python -m src.cli.main backup cleanup \
+docker exec berengario-web python -m src.cli.main backup cleanup \
   --keep 7 --days 30 --force
 
 # Check statistics
-docker exec raginbox-web python -m src.cli.main kb stats
-docker exec raginbox-web python -m src.cli.main db stats
+docker exec berengario-web python -m src.cli.main kb stats
+docker exec berengario-web python -m src.cli.main db stats
 ```
 
 ## Migration from Scripts
@@ -448,9 +448,9 @@ The CLI replaces the scripts in the `scripts/` folder:
 
 | Old Script | New CLI Command |
 |-----------|----------------|
-| `scripts/reingest.sh` | `raginbox kb reingest` |
-| `scripts/init_conversation_db.py` | `raginbox db init` |
-| Manual backup | `raginbox backup create` |
+| `scripts/reingest.sh` | `berengario kb reingest` |
+| `scripts/init_conversation_db.py` | `berengario db init` |
+| Manual backup | `berengario backup create` |
 
 ## Exit Codes
 
@@ -471,29 +471,29 @@ The CLI uses standard exit codes:
 
 1. **Always create backups before major operations**
    ```bash
-   raginbox backup create
-   raginbox kb clear  # or other destructive operation
+   berengario backup create
+   berengario kb clear  # or other destructive operation
    ```
 
 2. **Use verbose mode for troubleshooting**
    ```bash
-   raginbox --verbose kb reingest
+   berengario --verbose kb reingest
    ```
 
 3. **Regular maintenance**
    ```bash
    # Weekly: Clean up old backups
-   raginbox backup cleanup --keep 5 --days 7
+   berengario backup cleanup --keep 5 --days 7
 
    # Monthly: Check statistics
-   raginbox kb stats
-   raginbox db stats --days 30
+   berengario kb stats
+   berengario db stats --days 30
    ```
 
 4. **Test database connection after configuration changes**
    ```bash
-   raginbox db test
-   raginbox db info
+   berengario db test
+   berengario db info
    ```
 
 ## Troubleshooting
@@ -504,14 +504,14 @@ The CLI uses standard exit codes:
 
 **Solution:** Make sure you're running commands inside the Docker container:
 ```bash
-docker exec raginbox-web python -m src.cli.main --help
+docker exec berengario-web python -m src.cli.main --help
 ```
 
 ### Permission denied
 
 **Problem:** Permission errors when creating backups or accessing files
 
-**Solution:** The CLI runs as the `raginbox` user inside the container. File permissions should be correct by default.
+**Solution:** The CLI runs as the `berengario` user inside the container. File permissions should be correct by default.
 
 ### Import errors
 
@@ -519,7 +519,7 @@ docker exec raginbox-web python -m src.cli.main --help
 
 **Solution:** Ensure dependencies are installed:
 ```bash
-docker exec raginbox-web pip install typer rich
+docker exec berengario-web pip install typer rich
 ```
 
 ## Future Enhancements
@@ -535,7 +535,7 @@ Planned additions for future releases:
 
 ## See Also
 
-- [RAGInbox Documentation](../README.md)
+- [Berengario Documentation](../README.md)
 - [Configuration Guide](../.env.example)
 - [Docker Deployment](../docker-compose.yml)
 - [Admin Web Panel](http://localhost:8000/admin)

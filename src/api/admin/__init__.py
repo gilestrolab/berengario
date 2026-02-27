@@ -1,1 +1,1 @@
-"""Admin interface modules for RAGInbox."""
+"""Admin interface modules for Berengario."""

@@ -1,5 +1,5 @@
 """
-Email processing package for RAGInbox.
+Email processing package for Berengario.
 
 Handles IMAP inbox monitoring, email parsing, attachment extraction,
 query processing with RAG, and automated email responses.

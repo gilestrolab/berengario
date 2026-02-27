@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-RAGInbox CLI entry point.
+Berengario CLI entry point.
 
-This script provides a command-line interface for RAGInbox administration.
-Usage: raginbox-cli [COMMAND] [OPTIONS]
+This script provides a command-line interface for Berengario administration.
+Usage: berengario-cli [COMMAND] [OPTIONS]
 """
 
 if __name__ == "__main__":

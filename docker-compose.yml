@@ -2,17 +2,17 @@ services:
   # MariaDB Database (shared by production and development)
   mariadb:
     image: mariadb:11.2
-    container_name: raginbox-db
+    container_name: berengario-db
     restart: unless-stopped
 
     environment:
       MYSQL_ROOT_PASSWORD: test_root_password
-      MYSQL_DATABASE: raginbox
-      MYSQL_USER: raginbox
+      MYSQL_DATABASE: berengario
+      MYSQL_USER: berengario
       MYSQL_PASSWORD: test_password
 
     volumes:
-      - raginbox-db-data:/var/lib/mysql
+      - berengario-db-data:/var/lib/mysql
 
     ports:
       - "3307:3306"  # Use 3307 to avoid conflicts with local MySQL
@@ -25,17 +25,17 @@ services:
       start_period: 30s
 
     networks:
-      - raginbox-network
+      - berengario-network
 
   # Development Container (for testing, linting, formatting)
   # This container only starts when explicitly requested with: docker-compose --profile dev up
-  raginbox-dev:
+  berengario-dev:
     profiles: ["dev"]  # Don't start by default, only with --profile dev
     build:
       context: .
       dockerfile: Dockerfile
       target: dev  # Use dev image with all testing tools
-    container_name: raginbox-dev
+    container_name: berengario-dev
     restart: "no"  # Don't auto-restart - this is a utility container
     command: tail -f /dev/null  # Keep container alive for running commands
 
@@ -46,8 +46,8 @@ services:
       DB_TYPE: mariadb
       DB_HOST: mariadb
       DB_PORT: 3306
-      DB_NAME: raginbox
-      DB_USER: raginbox
+      DB_NAME: berengario
+      DB_USER: berengario
       DB_PASSWORD: test_password
 
     volumes:
@@ -67,15 +67,15 @@ services:
         condition: service_healthy
 
     networks:
-      - raginbox-network
+      - berengario-network
 
-  # RAGInbox Email Service (depends on MariaDB)
-  raginbox-email:
+  # Berengario Email Service (depends on MariaDB)
+  berengario-email:
     build:
       context: .
       dockerfile: Dockerfile
       target: production  # Use production image (minimal size)
-    container_name: raginbox-email
+    container_name: berengario-email
     restart: unless-stopped
     command: python run_email_service.py
 
@@ -87,8 +87,8 @@ services:
       DB_TYPE: mariadb
       DB_HOST: mariadb
       DB_PORT: 3306
-      DB_NAME: raginbox
-      DB_USER: raginbox
+      DB_NAME: berengario
+      DB_USER: berengario
       DB_PASSWORD: test_password
       GIT_BRANCH: ${GIT_BRANCH:-unknown}
       GIT_COMMIT: ${GIT_COMMIT:-unknown}
@@ -126,15 +126,15 @@ services:
           memory: 1G
 
     networks:
-      - raginbox-network
+      - berengario-network
 
-  # RAGInbox Web Interface (depends on MariaDB)
-  raginbox-web:
+  # Berengario Web Interface (depends on MariaDB)
+  berengario-web:
     build:
       context: .
       dockerfile: Dockerfile
       target: production  # Use production image (minimal size)
-    container_name: raginbox-web
+    container_name: berengario-web
     restart: unless-stopped
     command: python run_web_service.py
 
@@ -146,8 +146,8 @@ services:
       DB_TYPE: mariadb
       DB_HOST: mariadb
       DB_PORT: 3306
-      DB_NAME: raginbox
-      DB_USER: raginbox
+      DB_NAME: berengario
+      DB_USER: berengario
       DB_PASSWORD: test_password
       GIT_BRANCH: ${GIT_BRANCH:-unknown}
       GIT_COMMIT: ${GIT_COMMIT:-unknown}
@@ -188,12 +188,12 @@ services:
           memory: 1G
 
     networks:
-      - raginbox-network
+      - berengario-network
 
 networks:
-  raginbox-network:
+  berengario-network:
     driver: bridge
 
 volumes:
-  raginbox-db-data:
+  berengario-db-data:
     driver: local

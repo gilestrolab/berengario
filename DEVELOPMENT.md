@@ -1,18 +1,18 @@
-# RAGInbox Development Environment
+# Berengario Development Environment
 
-This document describes the development environment setup for RAGInbox contributors.
+This document describes the development environment setup for Berengario contributors.
 
 ## Docker Containers
 
-RAGInbox uses a streamlined setup with **4 containers**:
+Berengario uses a streamlined setup with **4 containers**:
 
 ### Production Containers (3)
-- **raginbox-web**: Web interface (production image, ~900MB)
-- **raginbox-email**: Email service (production image, ~900MB)
-- **raginbox-db**: MariaDB database (shared by all services)
+- **berengario-web**: Web interface (production image, ~900MB)
+- **berengario-email**: Email service (production image, ~900MB)
+- **berengario-db**: MariaDB database (shared by all services)
 
 ### Development Container (1)
-- **raginbox-dev**: Testing and development tools (dev image, ~1.2GB)
+- **berengario-dev**: Testing and development tools (dev image, ~1.2GB)
   - Includes: pytest, black, ruff, coverage, gcc/g++
   - Used for: Running tests, linting, formatting
   - Shares the same database as production
@@ -24,16 +24,16 @@ RAGInbox uses a streamlined setup with **4 containers**:
 docker-compose up -d
 
 # Run tests
-docker exec raginbox-dev pytest tests/ -v
+docker exec berengario-dev pytest tests/ -v
 
 # Format code
-docker exec raginbox-dev black src/ tests/
+docker exec berengario-dev black src/ tests/
 
 # Lint code
-docker exec raginbox-dev ruff check src/ tests/ --fix
+docker exec berengario-dev ruff check src/ tests/ --fix
 
 # Access dev shell
-docker exec -it raginbox-dev bash
+docker exec -it berengario-dev bash
 
 # Stop all services
 docker-compose down
@@ -43,9 +43,9 @@ docker-compose down
 
 1. **Make changes** in `src/` or `tests/` directories
 2. **Code changes are live** - no rebuild needed (volume-mapped)
-3. **Run tests** in dev container: `docker exec raginbox-dev pytest tests/`
-4. **Format code** before committing: `docker exec raginbox-dev black src/ tests/`
-5. **Lint code**: `docker exec raginbox-dev ruff check src/ tests/ --fix`
+3. **Run tests** in dev container: `docker exec berengario-dev pytest tests/`
+4. **Format code** before committing: `docker exec berengario-dev black src/ tests/`
+5. **Lint code**: `docker exec berengario-dev ruff check src/ tests/ --fix`
 6. **Commit** - pre-commit hook runs automatically
 
 ### When to Rebuild
@@ -67,12 +67,12 @@ docker-compose up -d
 
 ```bash
 # Build development image
-docker build --target dev -t raginbox:dev .
+docker build --target dev -t berengario:dev .
 
 # Build production image (default)
-docker build -t raginbox:prod .
+docker build -t berengario:prod .
 # Or explicitly:
-docker build --target production -t raginbox:prod .
+docker build --target production -t berengario:prod .
 ```
 
 ## Port Mappings
@@ -82,10 +82,10 @@ docker build --target production -t raginbox:prod .
 
 ## Container Names
 
-- `raginbox-web` - Production web interface
-- `raginbox-email` - Production email service
-- `raginbox-dev` - Development container (testing/linting)
-- `raginbox-db` - MariaDB database (shared)
+- `berengario-web` - Production web interface
+- `berengario-email` - Production email service
+- `berengario-dev` - Development container (testing/linting)
+- `berengario-db` - MariaDB database (shared)
 
 ## Running Tests
 
@@ -96,16 +96,16 @@ Always use the development container for testing:
 docker-compose up -d
 
 # Run all tests
-docker exec raginbox-dev pytest tests/ -v
+docker exec berengario-dev pytest tests/ -v
 
 # Run specific test file
-docker exec raginbox-dev pytest tests/test_email_parser.py -v
+docker exec berengario-dev pytest tests/test_email_parser.py -v
 
 # Run with coverage
-docker exec raginbox-dev pytest tests/ -v --cov=src --cov-report=term-missing
+docker exec berengario-dev pytest tests/ -v --cov=src --cov-report=term-missing
 
 # Run tests matching a pattern
-docker exec raginbox-dev pytest tests/ -v -k "email"
+docker exec berengario-dev pytest tests/ -v -k "email"
 ```
 
 ## Code Quality Tools
@@ -114,16 +114,16 @@ The development container includes all code quality tools:
 
 ### Black (Code Formatting)
 ```bash
-docker exec raginbox-dev black src/ tests/
+docker exec berengario-dev black src/ tests/
 ```
 
 ### Ruff (Linting)
 ```bash
 # Auto-fix issues
-docker exec raginbox-dev ruff check src/ tests/ --fix
+docker exec berengario-dev ruff check src/ tests/ --fix
 
 # Check without fixing
-docker exec raginbox-dev ruff check src/ tests/
+docker exec berengario-dev ruff check src/ tests/
 ```
 
 ### Pre-commit Hook
@@ -147,7 +147,7 @@ git commit -m "your message"
 ### Tests fail with "ModuleNotFoundError"
 **Solution**: Use the dev container, not local `.venv`:
 ```bash
-docker exec raginbox-dev pytest tests/
+docker exec berengario-dev pytest tests/
 ```
 
 ### "Container not found" error
@@ -165,7 +165,7 @@ volumes:
 ```
 
 ### Permission errors
-**Solution**: The containers run as user `raginbox` (UID 1000). Ensure your host user owns the files:
+**Solution**: The containers run as user `berengario` (UID 1000). Ensure your host user owns the files:
 ```bash
 sudo chown -R $USER:$USER .
 ```
@@ -177,7 +177,7 @@ The CI pipeline uses the development image to run tests:
 ```yaml
 # .github/workflows/ci.yml
 - name: Run tests
-  run: docker run --rm raginbox:dev pytest tests/ -v
+  run: docker run --rm berengario:dev pytest tests/ -v
 ```
 
 ## Docker Multi-Stage Build

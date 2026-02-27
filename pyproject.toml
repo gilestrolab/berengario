@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "raginbox"
+name = "berengario"
 version = "0.1.0"
 description = "A configurable RAG (Retrieval-Augmented Generation) system with email integration for knowledge base management"
 authors = [
@@ -86,9 +86,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/gilestrolab/RAGInbox"
-Repository = "https://github.com/gilestrolab/RAGInbox.git"
-Issues = "https://github.com/gilestrolab/RAGInbox/issues"
+Homepage = "https://github.com/gilestrolab/berengar.io"
+Repository = "https://github.com/gilestrolab/berengar.io.git"
+Issues = "https://github.com/gilestrolab/berengar.io/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -106,8 +106,8 @@ mariadb = [
 ]
 
 [project.scripts]
-raginbox-cli = "src.cli.main:cli"
-raginbox-demo = "src.demo_phase1:main"
+berengario-cli = "src.cli.main:cli"
+berengario-demo = "src.demo_phase1:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -252,7 +252,7 @@ def main():
     )
 
     logger.info("=" * 60)
-    logger.info("RAGInbox Email Service Daemon")
+    logger.info("Berengario Email Service Daemon")
     logger.info("=" * 60)
 
     # Create and start service

@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class BackupManager:
     """
-    Manages data backups for the RAGInbox system.
+    Manages data backups for the Berengario system.
 
     Creates zip archives of the data directory and provides download links.
     """

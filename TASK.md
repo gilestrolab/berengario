@@ -148,7 +148,7 @@
 - [ ] Update help documentation
 
 #### Step 10: Docker & Documentation
-- [ ] Create `docker/Dockerfile` for RAGInbox
+- [ ] Create `docker/Dockerfile` for Berengario
 - [ ] Create `docker-compose.yml` with MariaDB service
 - [ ] Add health checks and depends_on conditions
 - [ ] Test Docker deployment with MariaDB

@@ -1,14 +1,14 @@
-# RAGInbox
+# Berengario
 
 **A configurable RAG (Retrieval-Augmented Generation) system with email integration for knowledge base management.**
 
-RAGInbox is a flexible infrastructure that combines document processing, vector search, and LLM-powered question answering with unique email integration capabilities. Deploy multiple instances with different configurations for various organizations or departments.
+Berengario is a flexible infrastructure that combines document processing, vector search, and LLM-powered question answering with unique email integration capabilities. Deploy multiple instances with different configurations for various organizations or departments.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://github.com/gilestrolab/RAGInbox/workflows/CI/badge.svg)](https://github.com/gilestrolab/RAGInbox/actions/workflows/ci.yml)
-[![Docker Build](https://github.com/gilestrolab/RAGInbox/workflows/Docker%20Build/badge.svg)](https://github.com/gilestrolab/RAGInbox/actions/workflows/docker.yml)
-[![codecov](https://codecov.io/gh/gilestrolab/RAGInbox/branch/master/graph/badge.svg)](https://codecov.io/gh/gilestrolab/RAGInbox)
+[![CI](https://github.com/gilestrolab/berengar.io/workflows/CI/badge.svg)](https://github.com/gilestrolab/berengar.io/actions/workflows/ci.yml)
+[![Docker Build](https://github.com/gilestrolab/berengar.io/workflows/Docker%20Build/badge.svg)](https://github.com/gilestrolab/berengar.io/actions/workflows/docker.yml)
+[![codecov](https://codecov.io/gh/gilestrolab/berengar.io/branch/master/graph/badge.svg)](https://codecov.io/gh/gilestrolab/berengar.io)
 
 ## Features
 
@@ -55,7 +55,7 @@ RAGInbox is a flexible infrastructure that combines document processing, vector 
 
 ```bash
 # Clone the repository
-git clone https://github.com/gilestrolab/RAGInbox.git
+git clone https://github.com/gilestrolab/berengar.io.git
 cd RAGInbox
 
 # Copy and configure environment
@@ -66,28 +66,28 @@ cp .env.example .env
 docker-compose up -d
 
 # View logs
-docker-compose logs -f raginbox
+docker-compose logs -f berengario
 ```
 
 Docker images are automatically built and published to GitHub Container Registry:
 
 ```bash
 # Pull latest image
-docker pull ghcr.io/gilestrolab/raginbox:latest
+docker pull ghcr.io/gilestrolab/berengar.io:latest
 
 # Run with docker
 docker run -d \
-  --name raginbox \
+  --name berengario \
   --env-file .env \
   -v $(pwd)/data:/app/data \
-  ghcr.io/gilestrolab/raginbox:latest
+  ghcr.io/gilestrolab/berengar.io:latest
 ```
 
 #### Option 2: Local Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/gilestrolab/RAGInbox.git
+git clone https://github.com/gilestrolab/berengar.io.git
 cd RAGInbox
 
 # Create virtual environment
@@ -135,51 +135,51 @@ The web interface provides:
 
 #### CLI Administration Tool
 
-RAGInbox includes a unified CLI for administration and management (Docker-only):
+Berengario includes a unified CLI for administration and management (Docker-only):
 
 ```bash
 # Basic usage
-docker exec raginbox-web raginbox-cli [COMMAND] [OPTIONS]
+docker exec berengario-web berengario-cli [COMMAND] [OPTIONS]
 
 # Get help
-docker exec raginbox-web raginbox-cli help
-docker exec raginbox-web raginbox-cli --help
+docker exec berengario-web berengario-cli help
+docker exec berengario-web berengario-cli --help
 
 # Knowledge Base operations
-docker exec raginbox-web raginbox-cli kb list              # List all documents in the KB
-docker exec raginbox-web raginbox-cli kb stats             # Show KB statistics
-docker exec raginbox-web raginbox-cli kb reingest          # Reingest all documents
-docker exec raginbox-web raginbox-cli kb delete <hash>     # Delete a specific document
-docker exec raginbox-web raginbox-cli kb clear             # Clear entire KB (confirmation required)
+docker exec berengario-web berengario-cli kb list              # List all documents in the KB
+docker exec berengario-web berengario-cli kb stats             # Show KB statistics
+docker exec berengario-web berengario-cli kb reingest          # Reingest all documents
+docker exec berengario-web berengario-cli kb delete <hash>     # Delete a specific document
+docker exec berengario-web berengario-cli kb clear             # Clear entire KB (confirmation required)
 
 # Database operations
-docker exec raginbox-web raginbox-cli db init              # Initialize database tables
-docker exec raginbox-web raginbox-cli db test              # Test database connection
-docker exec raginbox-web raginbox-cli db info              # Show database configuration
-docker exec raginbox-web raginbox-cli db stats             # Show processing statistics
+docker exec berengario-web berengario-cli db init              # Initialize database tables
+docker exec berengario-web berengario-cli db test              # Test database connection
+docker exec berengario-web berengario-cli db info              # Show database configuration
+docker exec berengario-web berengario-cli db stats             # Show processing statistics
 
 # Backup operations
-docker exec raginbox-web raginbox-cli backup create        # Create a new backup
-docker exec raginbox-web raginbox-cli backup list          # List available backups
-docker exec raginbox-web raginbox-cli backup delete <file> # Delete a specific backup
-docker exec raginbox-web raginbox-cli backup cleanup       # Clean up old backups
+docker exec berengario-web berengario-cli backup create        # Create a new backup
+docker exec berengario-web berengario-cli backup list          # List available backups
+docker exec berengario-web berengario-cli backup delete <file> # Delete a specific backup
+docker exec berengario-web berengario-cli backup cleanup       # Clean up old backups
 
 # System information
-docker exec raginbox-web raginbox-cli version              # Show version and instance info
-docker exec raginbox-web raginbox-cli info                 # Show detailed configuration
+docker exec berengario-web berengario-cli version              # Show version and instance info
+docker exec berengario-web berengario-cli info                 # Show detailed configuration
 ```
 
 **Features:**
 - Colorized output with progress bars
 - Interactive confirmations for destructive operations
 - Pretty-printed tables for list commands
-- Comprehensive help text (`raginbox-cli help` or `raginbox-cli <command> --help`)
+- Comprehensive help text (`berengario-cli help` or `berengario-cli <command> --help`)
 - Replaces scripts folder with unified interface
 
 **Tip:** For easier access, you can create a shell alias:
 ```bash
-alias raginbox="docker exec raginbox-web raginbox-cli"
-# Then use: raginbox kb list, raginbox db stats, etc.
+alias berengario="docker exec berengario-web berengario-cli"
+# Then use: berengario kb list, berengario db stats, etc.
 ```
 
 See [`docs/CLI.md`](docs/CLI.md) for complete CLI documentation.
@@ -410,7 +410,7 @@ RAGInbox/
 
 ### Email Integration
 
-RAGInbox includes comprehensive email integration for automatic knowledge base updates and intelligent email replies:
+Berengario includes comprehensive email integration for automatic knowledge base updates and intelligent email replies:
 
 **How it works:**
 - **Direct emails** (To: bot) → RAG-powered query processing + automated reply
@@ -447,7 +447,7 @@ See [`docs/EMAIL_PROCESSING_RULES.md`](docs/EMAIL_PROCESSING_RULES.md) for detai
 
 ### Web Authentication
 
-RAGInbox's web interface uses OTP-based passwordless authentication for secure access:
+Berengario's web interface uses OTP-based passwordless authentication for secure access:
 
 **How it works:**
 1. User enters their email address on the login page
@@ -479,7 +479,7 @@ Users must be in the query whitelist to receive OTP codes. The system uses your 
 
 ### Admin Panel
 
-RAGInbox includes a comprehensive admin panel for managing your instance:
+Berengario includes a comprehensive admin panel for managing your instance:
 
 **Access:** Users in the admin whitelist (`allowed_admins.txt`) will see an admin button after logging in to the web interface.
 
@@ -524,7 +524,7 @@ admin@example.com
 
 ### Customization
 
-RAGInbox supports extensive customization to match your organization's needs:
+Berengario supports extensive customization to match your organization's needs:
 
 #### Custom Email Format
 
@@ -630,7 +630,7 @@ ruff check src/ tests/
 
 ### CI/CD Pipeline
 
-RAGInbox uses GitHub Actions for automated testing, building, and deployment:
+Berengario uses GitHub Actions for automated testing, building, and deployment:
 
 #### Continuous Integration (`.github/workflows/ci.yml`)
 
@@ -655,7 +655,7 @@ Builds and publishes Docker images:
 - **On Push to Main**: Builds multi-platform images (amd64, arm64)
 - **On Tags**: Publishes versioned releases to GitHub Container Registry
 - **Image Testing**: Validates container startup and imports
-- **Registry**: `ghcr.io/gilestrolab/raginbox`
+- **Registry**: `ghcr.io/gilestrolab/berengar.io`
 
 Available tags:
 - `latest` - Latest stable build from main branch
@@ -715,7 +715,7 @@ git push origin v1.0.0
 
 ## API Providers
 
-RAGInbox works with OpenAI-compatible APIs:
+Berengario works with OpenAI-compatible APIs:
 
 - **[Naga.ac](https://naga.ac)**: Recommended - cheaper, same models
 - **[OpenAI](https://openai.com)**: Original provider
@@ -747,8 +747,8 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 ## Support
 
 - 📖 [Documentation](docs/)
-- 🐛 [Issue Tracker](https://github.com/gilestrolab/RAGInbox/issues)
-- 💬 [Discussions](https://github.com/gilestrolab/RAGInbox/discussions)
+- 🐛 [Issue Tracker](https://github.com/gilestrolab/berengar.io/issues)
+- 💬 [Discussions](https://github.com/gilestrolab/berengar.io/discussions)
 
 ## Credits
 

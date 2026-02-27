@@ -1,6 +1,6 @@
 # Documentation
 
-This directory contains all technical documentation for the DoLS-GPT / RAGInbox project.
+This directory contains all technical documentation for the DoLS-GPT / Berengario project.
 
 ## Core Documentation
 

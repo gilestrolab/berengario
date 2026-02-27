@@ -32,7 +32,7 @@ class WebCrawler:
         self,
         timeout: Optional[int] = None,
         max_size_mb: Optional[int] = None,
-        user_agent: str = "RAGInbox/1.0 (Educational RAG System)",
+        user_agent: str = "Berengario/1.0 (Educational RAG System)",
         delay: Optional[float] = None,
     ):
         """

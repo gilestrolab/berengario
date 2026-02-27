@@ -53,7 +53,7 @@ def _create_calendar_event_impl(
 
         # Create calendar
         cal = Calendar()
-        cal.add("prodid", "-//RAGInbox Calendar//EN")
+        cal.add("prodid", "-//Berengario Calendar//EN")
         cal.add("version", "2.0")
 
         # Create event
@@ -72,7 +72,7 @@ def _create_calendar_event_impl(
         event.add("dtstamp", datetime.now())
 
         # Generate UID
-        event.add("uid", f"{datetime.now().timestamp()}@raginbox")
+        event.add("uid", f"{datetime.now().timestamp()}@berengar.io")
 
         # Add event to calendar
         cal.add_component(event)
@@ -148,7 +148,7 @@ def create_calendar_from_data(
     try:
         # Create calendar
         cal = Calendar()
-        cal.add("prodid", "-//RAGInbox Calendar//EN")
+        cal.add("prodid", "-//Berengario Calendar//EN")
         cal.add("version", "2.0")
         cal.add("x-wr-calname", calendar_name)
 
@@ -172,7 +172,7 @@ def create_calendar_from_data(
                 event.add("dtstamp", datetime.now())
                 event.add(
                     "uid",
-                    f"{datetime.now().timestamp()}_{event_data['title']}@raginbox",
+                    f"{datetime.now().timestamp()}_{event_data['title']}@berengar.io",
                 )
 
                 cal.add_component(event)

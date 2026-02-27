@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-RAGInbox is a configurable RAG (Retrieval-Augmented Generation) system with email integration for knowledge base management. It combines document processing, vector search, and LLM-powered question answering with email integration capabilities. The system can be deployed in multiple instances with different configurations for various organizations or departments.
+Berengario is a configurable RAG (Retrieval-Augmented Generation) system with email integration for knowledge base management. It combines document processing, vector search, and LLM-powered question answering with email integration capabilities. The system can be deployed in multiple instances with different configurations for various organizations or departments.
 
 ## Core Architecture
 
@@ -70,21 +70,21 @@ Users can be in one whitelist, both whitelists, or neither. Configure in:
 **Docker-First Development** (Recommended):
 1. Make code changes in `src/` or `tests/` directories
 2. Changes are immediately available in the running container (volume-mapped)
-3. Run tests in Docker: `docker exec raginbox-dev pytest tests/ -v`
+3. Run tests in Docker: `docker exec berengario-dev pytest tests/ -v`
 4. No need to rebuild container unless dependencies change in `pyproject.toml`
 5. Pre-commit hook automatically runs Black, Ruff, and pytest before each commit
 
 **Docker Containers:**
 
-RAGInbox uses a streamlined container setup with 3 production containers + 1 optional dev container:
+Berengario uses a streamlined container setup with 3 production containers + 1 optional dev container:
 
 - **Production Containers** (3 - start automatically):
-  - `raginbox-web`: Web interface (production image)
-  - `raginbox-email`: Email service (production image)
-  - `raginbox-db`: MariaDB database (shared by all services)
+  - `berengario-web`: Web interface (production image)
+  - `berengario-email`: Email service (production image)
+  - `berengario-db`: MariaDB database (shared by all services)
 
 - **Development Container** (1 - starts only when explicitly requested):
-  - `raginbox-dev`: Testing and development tools (dev image)
+  - `berengario-dev`: Testing and development tools (dev image)
     - Includes: pytest, black, ruff, coverage, gcc/g++
     - Used for: Running tests, linting, formatting
     - Shares the same database as production
@@ -100,22 +100,22 @@ docker-compose up -d
 docker-compose --profile dev up -d
 
 # Run tests (will auto-start dev container if not running)
-docker-compose run --rm raginbox-dev pytest tests/ -v
+docker-compose run --rm berengario-dev pytest tests/ -v
 
 # Or if dev container is already running:
-docker exec raginbox-dev pytest tests/ -v
+docker exec berengario-dev pytest tests/ -v
 
 # Run code formatting
-docker-compose run --rm raginbox-dev black src/ tests/
+docker-compose run --rm berengario-dev black src/ tests/
 
 # Run linting
-docker-compose run --rm raginbox-dev ruff check src/ tests/ --fix
+docker-compose run --rm berengario-dev ruff check src/ tests/ --fix
 
 # Run with coverage
-docker-compose run --rm raginbox-dev pytest tests/ -v --cov=src --cov-report=term-missing
+docker-compose run --rm berengario-dev pytest tests/ -v --cov=src --cov-report=term-missing
 
 # Access dev shell
-docker-compose run --rm raginbox-dev bash
+docker-compose run --rm berengario-dev bash
 
 # Stop all services (including dev if running)
 docker-compose --profile dev down
@@ -138,41 +138,41 @@ docker-compose up -d
 
 ### CLI Commands (Docker-only)
 
-RAGInbox includes a unified CLI for administration:
+Berengario includes a unified CLI for administration:
 
 ```bash
 # Basic usage
-docker exec raginbox-web raginbox-cli [COMMAND] [OPTIONS]
+docker exec berengario-web berengario-cli [COMMAND] [OPTIONS]
 
 # Get help
-docker exec raginbox-web raginbox-cli help
-docker exec raginbox-web raginbox-cli --help
+docker exec berengario-web berengario-cli help
+docker exec berengario-web berengario-cli --help
 
 # Knowledge base operations
-docker exec raginbox-web raginbox-cli kb list       # List documents
-docker exec raginbox-web raginbox-cli kb stats      # Show statistics
-docker exec raginbox-web raginbox-cli kb reingest   # Reingest all documents
+docker exec berengario-web berengario-cli kb list       # List documents
+docker exec berengario-web berengario-cli kb stats      # Show statistics
+docker exec berengario-web berengario-cli kb reingest   # Reingest all documents
 
 # Database operations
-docker exec raginbox-web raginbox-cli db init       # Initialize database
-docker exec raginbox-web raginbox-cli db test       # Test connection
-docker exec raginbox-web raginbox-cli db info       # Show DB info
-docker exec raginbox-web raginbox-cli db stats      # Show statistics
+docker exec berengario-web berengario-cli db init       # Initialize database
+docker exec berengario-web berengario-cli db test       # Test connection
+docker exec berengario-web berengario-cli db info       # Show DB info
+docker exec berengario-web berengario-cli db stats      # Show statistics
 
 # Backup operations
-docker exec raginbox-web raginbox-cli backup create  # Create backup
-docker exec raginbox-web raginbox-cli backup list    # List backups
-docker exec raginbox-web raginbox-cli backup cleanup # Clean old backups
+docker exec berengario-web berengario-cli backup create  # Create backup
+docker exec berengario-web berengario-cli backup list    # List backups
+docker exec berengario-web berengario-cli backup cleanup # Clean old backups
 
 # System information
-docker exec raginbox-web raginbox-cli version        # Show version
-docker exec raginbox-web raginbox-cli info           # Show configuration
+docker exec berengario-web berengario-cli version        # Show version
+docker exec berengario-web berengario-cli info           # Show configuration
 ```
 
 **Tip:** Create an alias for easier access:
 ```bash
-alias raginbox="docker exec raginbox-web raginbox-cli"
-# Then use: raginbox kb list, raginbox db stats, etc.
+alias berengario="docker exec berengario-web berengario-cli"
+# Then use: berengario kb list, berengario db stats, etc.
 ```
 
 See `docs/CLI.md` for complete CLI documentation.
@@ -183,23 +183,23 @@ See `docs/CLI.md` for complete CLI documentation.
 
 ```bash
 # Method 1: Use docker-compose run (recommended - auto-starts/stops dev container)
-docker-compose run --rm raginbox-dev pytest tests/ -v
+docker-compose run --rm berengario-dev pytest tests/ -v
 
 # Method 2: Start dev container persistently, then use docker exec
 docker-compose --profile dev up -d
-docker exec raginbox-dev pytest tests/ -v
+docker exec berengario-dev pytest tests/ -v
 
 # Run specific test file
-docker-compose run --rm raginbox-dev pytest tests/test_email_parser.py -v
+docker-compose run --rm berengario-dev pytest tests/test_email_parser.py -v
 
 # Run specific test function
-docker-compose run --rm raginbox-dev pytest tests/test_email_parser.py::test_function_name -v
+docker-compose run --rm berengario-dev pytest tests/test_email_parser.py::test_function_name -v
 
 # Run with coverage report
-docker-compose run --rm raginbox-dev pytest tests/ -v --cov=src --cov-report=term-missing
+docker-compose run --rm berengario-dev pytest tests/ -v --cov=src --cov-report=term-missing
 
 # Run tests matching a pattern
-docker-compose run --rm raginbox-dev pytest tests/ -v -k "email"
+docker-compose run --rm berengario-dev pytest tests/ -v -k "email"
 ```
 
 **Why Docker for testing?**
@@ -207,13 +207,13 @@ docker-compose run --rm raginbox-dev pytest tests/ -v -k "email"
 - Code changes are immediately available without rebuilding
 - Ensures consistent test environment with all dependencies
 - The dev container includes pytest and all testing tools
-- Container name: `raginbox-dev`
+- Container name: `berengario-dev`
 
-**Note:** Production containers (`raginbox-web`, `raginbox-email`) do not include testing tools. Always use `raginbox-dev` for running tests.
+**Note:** Production containers (`berengario-web`, `berengario-email`) do not include testing tools. Always use `berengario-dev` for running tests.
 
 ### Code Quality & Pre-commit Hook
 
-RAGInbox includes a pre-commit hook that automatically runs before each commit:
+Berengario includes a pre-commit hook that automatically runs before each commit:
 
 1. **Black** - Code formatting
 2. **Ruff** - Linting
@@ -222,13 +222,13 @@ RAGInbox includes a pre-commit hook that automatically runs before each commit:
 **Manual commands (using dev container):**
 ```bash
 # Format code (required before committing)
-docker-compose run --rm raginbox-dev black src/ tests/
+docker-compose run --rm berengario-dev black src/ tests/
 
 # Fix auto-fixable linting issues
-docker-compose run --rm raginbox-dev ruff check src/ tests/ --fix
+docker-compose run --rm berengario-dev ruff check src/ tests/ --fix
 
 # Check without fixing
-docker-compose run --rm raginbox-dev ruff check src/ tests/
+docker-compose run --rm berengario-dev ruff check src/ tests/
 
 # Or use local tools if installed
 black src/ tests/
@@ -241,9 +241,9 @@ ruff check src/ tests/ --fix
 git commit -m "your message"
 
 # If checks fail, fix and re-commit
-docker-compose run --rm raginbox-dev black src/ tests/
-docker-compose run --rm raginbox-dev ruff check src/ tests/ --fix
-docker-compose run --rm raginbox-dev pytest tests/
+docker-compose run --rm berengario-dev black src/ tests/
+docker-compose run --rm berengario-dev ruff check src/ tests/ --fix
+docker-compose run --rm berengario-dev pytest tests/
 
 # Only in emergencies (causes CI failures)
 git commit --no-verify -m "bypass hook"
@@ -261,8 +261,8 @@ docker-compose up -d
 docker-compose --profile dev up -d
 
 # View logs for specific services
-docker-compose logs -f raginbox-web
-docker-compose logs -f raginbox-email
+docker-compose logs -f berengario-web
+docker-compose logs -f berengario-email
 
 # Stop production services
 docker-compose down
@@ -275,43 +275,43 @@ docker-compose build
 docker-compose up -d
 
 # Pull latest published image from GitHub Container Registry
-docker pull ghcr.io/gilestrolab/raginbox:latest
+docker pull ghcr.io/gilestrolab/berengar.io:latest
 ```
 
 **Building specific targets manually:**
 ```bash
 # Build production image
-docker build -t raginbox:prod --target production .
+docker build -t berengario:prod --target production .
 
 # Build development image
-docker build -t raginbox:dev --target dev .
+docker build -t berengario:dev --target dev .
 ```
 
 ### Debugging in Docker
 
 ```bash
 # Access Python REPL in containers
-docker exec -it raginbox-web python      # Production web
-docker exec -it raginbox-email python    # Production email
-docker-compose run --rm raginbox-dev python  # Development (on-demand)
+docker exec -it berengario-web python      # Production web
+docker exec -it berengario-email python    # Production email
+docker-compose run --rm berengario-dev python  # Development (on-demand)
 
 # Access bash shell in containers
-docker exec -it raginbox-web bash
-docker exec -it raginbox-email bash
-docker-compose run --rm raginbox-dev bash  # Development (on-demand)
+docker exec -it berengario-web bash
+docker exec -it berengario-email bash
+docker-compose run --rm berengario-dev bash  # Development (on-demand)
 
 # Check container logs with timestamps
-docker-compose logs -f --timestamps raginbox-web
-docker-compose logs -f --timestamps raginbox-email
+docker-compose logs -f --timestamps berengario-web
+docker-compose logs -f --timestamps berengario-email
 
 # Inspect container environment variables
-docker exec raginbox-web env | grep -E "(DB_|EMAIL_|IMAP_|SMTP_)"
+docker exec berengario-web env | grep -E "(DB_|EMAIL_|IMAP_|SMTP_)"
 
 # Check database connection
-docker exec raginbox-web raginbox-cli db test
+docker exec berengario-web berengario-cli db test
 
 # View knowledge base contents
-docker exec raginbox-web raginbox-cli kb list
+docker exec berengario-web berengario-cli kb list
 ```
 
 ## Important Implementation Details
@@ -642,7 +642,7 @@ Runs on push/PR to main/develop:
 
 ### Docker Build (`docker.yml`)
 - Builds multi-platform images (amd64, arm64)
-- Publishes to `ghcr.io/gilestrolab/raginbox`
+- Publishes to `ghcr.io/gilestrolab/berengar.io`
 - Tags: `latest`, `v1.2.3`, `main-abc123`
 
 ### Release (`release.yml`)
@@ -670,10 +670,10 @@ The EmailClient supports both SSL (port 993) and STARTTLS (port 143). Set `IMAP_
 ### Testing Issues
 
 **Problem**: Tests fail locally but need to run in Docker
-**Solution**: Use `docker-compose run --rm raginbox-dev pytest tests/` - local `.venv` may have missing dependencies
+**Solution**: Use `docker-compose run --rm berengario-dev pytest tests/` - local `.venv` may have missing dependencies
 
 **Problem**: Dev container not available for testing
-**Solution**: Use `docker-compose run --rm raginbox-dev` (auto-starts container) or `docker-compose --profile dev up -d` to start it persistently
+**Solution**: Use `docker-compose run --rm berengario-dev` (auto-starts container) or `docker-compose --profile dev up -d` to start it persistently
 
 **Problem**: Tests pass in container but fail in CI
 **Solution**: Ensure you've committed all required files and that `.dockerignore` isn't excluding necessary files
@@ -692,7 +692,7 @@ The EmailClient supports both SSL (port 993) and STARTTLS (port 143). Set `IMAP_
 ### Database Issues
 
 **Problem**: "Table doesn't exist" errors
-**Solution**: Initialize database: `docker exec raginbox-web raginbox-cli db init`
+**Solution**: Initialize database: `docker exec berengario-web berengario-cli db init`
 
 **Problem**: Connection errors with MariaDB
 **Solution**: Check `docker-compose logs mariadb` and ensure healthcheck passes before services start
@@ -703,7 +703,7 @@ The EmailClient supports both SSL (port 993) and STARTTLS (port 143). Set `IMAP_
 **Solution**:
 1. Check whitelist files exist and contain valid entries
 2. Verify IMAP credentials with `accessories/test_email_connection.py`
-3. Check logs: `docker-compose logs -f raginbox-email`
+3. Check logs: `docker-compose logs -f berengario-email`
 
 **Problem**: Can't send email replies
 **Solution**: Verify SMTP settings - most providers require app-specific passwords or OAuth2
@@ -743,4 +743,4 @@ RAG tools follow similar organization:
 - ✅ Phase 4: Web frontend with chat interface, OTP authentication, admin panel
 - ✅ Phase 5: Docker deployment and CI/CD
 
-**Test Coverage**: Run `docker exec raginbox-web pytest tests/ -v` to verify current test status
+**Test Coverage**: Run `docker exec berengario-web pytest tests/ -v` to verify current test status

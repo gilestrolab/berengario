@@ -1,1 +1,1 @@
-"""RAGInbox CLI module."""
+"""Berengario CLI module."""

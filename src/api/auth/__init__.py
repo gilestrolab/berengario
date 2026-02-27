@@ -1,5 +1,5 @@
 """
-Authentication module for RAGInbox API.
+Authentication module for Berengario API.
 
 Provides OTP management, session management, and authentication dependencies.
 """

@@ -1,10 +1,10 @@
 # Pre-commit Hook
 
-RAGInbox includes a pre-commit hook that automatically checks code quality before allowing commits. All checks run in the **development Docker container** to ensure consistency with the CI environment.
+Berengario includes a pre-commit hook that automatically checks code quality before allowing commits. All checks run in the **development Docker container** to ensure consistency with the CI environment.
 
 ## What It Does
 
-The pre-commit hook runs three checks on all staged Python files in the `raginbox-dev` container:
+The pre-commit hook runs three checks on all staged Python files in the `berengario-dev` container:
 
 1. **Black Formatter** - Ensures consistent code formatting
 2. **Ruff Linter** - Catches common Python errors and style issues
@@ -48,14 +48,14 @@ If any check fails, the commit will be aborted with helpful error messages:
 **Black formatting failure:**
 ```
 ❌ Black formatting check failed!
-Run: docker exec raginbox-dev black src/ tests/
+Run: docker exec berengario-dev black src/ tests/
 Or locally if installed: black src/ tests/
 ```
 
 **Ruff linting failure:**
 ```
 ❌ Ruff linting check failed!
-Run: docker exec raginbox-dev ruff check src/ tests/ --fix
+Run: docker exec berengario-dev ruff check src/ tests/ --fix
 Or locally if installed: ruff check src/ tests/ --fix
 ```
 
@@ -63,14 +63,14 @@ Or locally if installed: ruff check src/ tests/ --fix
 ```
 ❌ Pytest failed!
 Fix the failing tests before committing.
-Run: docker exec raginbox-dev pytest tests/ -v
+Run: docker exec berengario-dev pytest tests/ -v
 ```
 
 ## Dependencies
 
 ### Required
 - **Docker and docker-compose** - All checks run in the development container
-- The `raginbox-dev` container must be running
+- The `berengario-dev` container must be running
 
 Start all services (includes dev container):
 ```bash
@@ -79,7 +79,7 @@ docker-compose up -d
 
 If the container is not running, the hook will fail with:
 ```
-⚠️  Docker development container 'raginbox-dev' is not running!
+⚠️  Docker development container 'berengario-dev' is not running!
    Start all services with: docker-compose up -d
 
    The pre-commit hook requires the dev container to run:
@@ -100,23 +100,23 @@ However, the pre-commit hook will always use the dev container to ensure consist
 
 ## Testing in Docker
 
-Since RAGInbox uses Docker-first development, all checks run in the dev container:
+Since Berengario uses Docker-first development, all checks run in the dev container:
 
 ```bash
 # Run all tests in development container
-docker exec raginbox-dev pytest tests/
+docker exec berengario-dev pytest tests/
 
 # Run specific test file
-docker exec raginbox-dev pytest tests/test_email_parser.py
+docker exec berengario-dev pytest tests/test_email_parser.py
 
 # Run with coverage
-docker exec raginbox-dev pytest tests/ --cov=src --cov-report=term-missing
+docker exec berengario-dev pytest tests/ --cov=src --cov-report=term-missing
 
 # Format code
-docker exec raginbox-dev black src/ tests/
+docker exec berengario-dev black src/ tests/
 
 # Lint code
-docker exec raginbox-dev ruff check src/ tests/ --fix
+docker exec berengario-dev ruff check src/ tests/ --fix
 ```
 
 ## Bypassing the Hook
@@ -151,7 +151,7 @@ chmod +x .git/hooks/pre-commit
 docker-compose up -d
 
 # Check if it's running
-docker ps | grep raginbox-dev
+docker ps | grep berengario-dev
 ```
 
 ### Checks are slow
@@ -171,9 +171,9 @@ mv .git/hooks/pre-commit.disabled .git/hooks/pre-commit
 ## Best Practices
 
 1. **Keep dev container running** - Start with `docker-compose up -d` for fast checks
-2. **Always fix formatting issues** - Run `docker exec raginbox-dev black src/ tests/` before committing
-3. **Fix linting errors** - Run `docker exec raginbox-dev ruff check src/ tests/ --fix` to auto-fix most issues
-4. **Run tests before pushing** - Use: `docker exec raginbox-dev pytest tests/`
+2. **Always fix formatting issues** - Run `docker exec berengario-dev black src/ tests/` before committing
+3. **Fix linting errors** - Run `docker exec berengario-dev ruff check src/ tests/ --fix` to auto-fix most issues
+4. **Run tests before pushing** - Use: `docker exec berengario-dev pytest tests/`
 5. **Don't bypass the hook** - It's there to prevent CI failures
 
 ## Why Use the Dev Container?

@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for RAGInbox
+# Multi-stage Dockerfile for Berengario
 # Builds both production and development images with shared base
 
 # ============================================================================
@@ -29,8 +29,8 @@ FROM python:3.12-slim AS base
 WORKDIR /app
 
 # Create non-root user for security
-RUN useradd -m -u 1000 -s /bin/bash raginbox && \
-    chown -R raginbox:raginbox /app
+RUN useradd -m -u 1000 -s /bin/bash berengario && \
+    chown -R berengario:berengario /app
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -43,14 +43,14 @@ COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY --chown=raginbox:raginbox . .
+COPY --chown=berengario:berengario . .
 
 # Create data directories with proper permissions
 RUN mkdir -p data/documents data/chroma_db data/logs data/config data/temp_attachments && \
-    chown -R raginbox:raginbox data/
+    chown -R berengario:berengario data/
 
 # Copy CLI wrapper script to PATH
-COPY --chmod=755 scripts/raginbox-cli /usr/local/bin/raginbox-cli
+COPY --chmod=755 scripts/berengario-cli /usr/local/bin/berengario-cli
 
 # Set Python to run in unbuffered mode (better for Docker logs)
 ENV PYTHONUNBUFFERED=1
@@ -74,7 +74,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir -e ".[dev,mariadb]"
 
 # Switch to non-root user
-USER raginbox
+USER berengario
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
@@ -92,7 +92,7 @@ FROM base AS production
 RUN pip install --no-cache-dir -e ".[mariadb]"
 
 # Switch to non-root user
-USER raginbox
+USER berengario
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

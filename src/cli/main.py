@@ -1,5 +1,5 @@
 """
-RAGInbox CLI - Command-line interface for RAGInbox administration.
+Berengario CLI - Command-line interface for Berengario administration.
 
 Provides unified command-line access to knowledge base, database, and backup operations.
 """
@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 
 # Create main Typer app
 app = typer.Typer(
-    name="raginbox",
-    help="RAGInbox CLI - Administration and management tool",
+    name="berengario",
+    help="Berengario CLI - Administration and management tool",
     add_completion=False,
 )
 
@@ -45,15 +45,15 @@ def main(
     debug: bool = typer.Option(False, "--debug", help="Enable debug logging"),
 ):
     """
-    RAGInbox CLI - Command-line administration tool.
+    Berengario CLI - Command-line administration tool.
 
     Use COMMAND --help for detailed help on each command group.
 
     Examples:
-        raginbox kb list              # List all documents
-        raginbox kb reingest          # Reingest all documents
-        raginbox db init              # Initialize database
-        raginbox backup create        # Create backup
+        berengario kb list              # List all documents
+        berengario kb reingest          # Reingest all documents
+        berengario db init              # Initialize database
+        berengario backup create        # Create backup
     """
     # Configure logging based on flags
     if debug:
@@ -67,10 +67,10 @@ def main(
 @app.command("version")
 def show_version():
     """
-    Show RAGInbox version and instance information.
+    Show Berengario version and instance information.
     """
     console.print()
-    console.print("[bold cyan]RAGInbox CLI[/bold cyan]")
+    console.print("[bold cyan]Berengario CLI[/bold cyan]")
     console.print("─" * 40)
     console.print(f"Instance:     [bold]{settings.instance_name}[/bold]")
     console.print(f"Organization: [bold]{settings.organization}[/bold]")
@@ -91,7 +91,7 @@ def show_info():
     """
     from src.cli.utils import print_header, print_key_value
 
-    print_header("RAGInbox System Information")
+    print_header("Berengario System Information")
 
     # Instance info
     console.print("  [bold cyan]Instance:[/bold cyan]")

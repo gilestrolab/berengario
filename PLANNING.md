@@ -1,8 +1,8 @@
-# RAGInbox - Planning Document
+# Berengario - Planning Document
 
 ## Project Overview
 
-RAGInbox is a configurable RAG (Retrieval-Augmented Generation) infrastructure designed for flexible deployment across different organizations and use cases. It provides automated knowledge base management and query handling through email integration and web interfaces. Multiple instances can be deployed with customized configurations (e.g., DoLS-GPT for Imperial College's Department of Life Sciences, HR-Assistant for corporate HR, etc.).
+Berengario is a configurable RAG (Retrieval-Augmented Generation) infrastructure designed for flexible deployment across different organizations and use cases. It provides automated knowledge base management and query handling through email integration and web interfaces. Multiple instances can be deployed with customized configurations (e.g., DoLS-GPT for Imperial College's Department of Life Sciences, HR-Assistant for corporate HR, etc.).
 
 ## Architecture
 
@@ -64,7 +64,7 @@ RAGInbox/
 ├── src/
 │   ├── __init__.py
 │   ├── config.py                  # Configuration management
-│   ├── demo_phase1.py             # CLI interface (raginbox command)
+│   ├── demo_phase1.py             # CLI interface (berengario command)
 │   ├── document_processing/
 │   │   ├── __init__.py
 │   │   ├── document_processor.py  # Document parsing and chunking
@@ -306,7 +306,7 @@ All configuration via environment variables in `.env` file:
 
 ## Example Instance Deployments
 
-RAGInbox supports multiple deployment scenarios:
+Berengario supports multiple deployment scenarios:
 
 ### 1. DoLS-GPT (Department Assistant)
 ```env

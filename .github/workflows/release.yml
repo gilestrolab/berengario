@@ -105,7 +105,7 @@ jobs:
 
     environment:
       name: pypi
-      url: https://pypi.org/project/raginbox/
+      url: https://pypi.org/project/berengario/
 
     steps:
       - name: Download artifacts
