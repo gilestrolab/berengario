@@ -49,12 +49,18 @@
     color: var(--primary-color, #7A5C3E);
 }
 
+.auth-logo {
+    width: 120px;
+    height: auto;
+}
+
 @keyframes bounce {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-10px); }
 }
 
 .auth-title {
+    font-family: var(--font-serif);
     font-size: 1.875rem;
     font-weight: 700;
     color: var(--text-primary);

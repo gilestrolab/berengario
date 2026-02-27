@@ -1,3 +1,6 @@
+/* Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap');
+
 /* Reset and Base Styles */
 * {
     margin: 0;
@@ -6,6 +9,7 @@
 }
 
 :root {
+    --font-serif: 'Source Serif 4', Georgia, serif;
     --primary-color: #7A5C3E;
     --primary-hover: #2A2520;
     --secondary-color: #6B6259;
@@ -79,9 +83,24 @@ body {
 
 .header-left {
     flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.header-logo {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+}
+
+.welcome-logo {
+    width: 96px;
+    height: auto;
 }
 
 .title {
+    font-family: var(--font-serif);
     font-size: 1.5rem;
     font-weight: 700;
     color: var(--text-primary);
@@ -181,6 +200,7 @@ body {
 }
 
 .welcome-message h2 {
+    font-family: var(--font-serif);
     font-size: 1.5rem;
     color: var(--text-primary);
     margin-bottom: 0.5rem;
@@ -800,6 +820,11 @@ body {
         font-size: 0.8125rem;
     }
 
+    .header-logo {
+        width: 32px;
+        height: 32px;
+    }
+
     /* Welcome Message */
     .welcome-message {
         padding: 2rem 1rem;
@@ -807,6 +832,10 @@ body {
 
     .welcome-icon {
         font-size: 2.5rem;
+    }
+
+    .welcome-logo {
+        width: 72px;
     }
 
     .welcome-message h2 {
@@ -956,6 +985,11 @@ body {
     /* Very compact header */
     .header {
         padding: 0.625rem 0.75rem;
+    }
+
+    .header-logo {
+        width: 28px;
+        height: 28px;
     }
 
     .title {
@@ -1151,6 +1185,7 @@ body {
 }
 
 .sidebar-header h3 {
+    font-family: var(--font-serif);
     font-size: 1.125rem;
     font-weight: 600;
     color: var(--text-primary);
