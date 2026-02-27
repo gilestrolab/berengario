@@ -1308,6 +1308,7 @@ body {
     top: 0.5rem;
     right: 0.5rem;
     opacity: 0;
+    z-index: 2;
     transition: var(--transition);
 }
 

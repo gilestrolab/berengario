@@ -211,7 +211,8 @@ def create_conversations_router(
             if not conversation:
                 raise HTTPException(status_code=404, detail="Conversation not found")
 
-            if conversation.sender != user_email:
+            # Normalize comparison to match SQL case-insensitive behavior
+            if (conversation.sender or "").lower() != (user_email or "").lower():
                 raise HTTPException(
                     status_code=403,
                     detail="Access denied. You can only view your own conversations.",
@@ -292,7 +293,8 @@ def create_conversations_router(
             if not conversation:
                 raise HTTPException(status_code=404, detail="Conversation not found")
 
-            if conversation.sender != user_email:
+            # Normalize comparison to match SQL case-insensitive behavior
+            if (conversation.sender or "").lower() != (user_email or "").lower():
                 raise HTTPException(
                     status_code=403,
                     detail="Access denied. You can only delete your own conversations.",

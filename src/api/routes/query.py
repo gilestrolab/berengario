@@ -106,7 +106,10 @@ def create_query_router(
                     )
 
                 # Verify user owns this conversation
-                if existing_conv.sender != user_identifier:
+                # Normalize comparison to match SQL case-insensitive behavior
+                if (existing_conv.sender or "").lower() != (
+                    user_identifier or ""
+                ).lower():
                     raise HTTPException(
                         status_code=403,
                         detail="Access denied. You can only continue your own conversations.",

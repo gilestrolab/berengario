@@ -736,7 +736,8 @@ class ChatApp {
                 ? '<i class="fas fa-envelope"></i>'
                 : '<i class="fas fa-comment"></i>';
             const isActive = this.currentConversationId === conv.id;
-            const preview = conv.preview || 'No messages yet';
+            const preview = this.escapeHtml(conv.preview || 'No messages yet');
+            const title = this.escapeHtml(conv.subject || 'Conversation');
             const messageCount = conv.message_count || 0;
 
             return `
@@ -745,7 +746,7 @@ class ChatApp {
                         <div style="display: flex; align-items: center; flex: 1;">
                             <span class="conversation-channel">${channelIcon}</span>
                             <div style="flex: 1; min-width: 0;">
-                                <div class="conversation-title">${conv.subject || 'Conversation'}</div>
+                                <div class="conversation-title">${title}</div>
                             </div>
                         </div>
                         <span class="conversation-date">${this.formatRelativeTime(conv.last_message_at)}</span>
@@ -958,6 +959,12 @@ class ChatApp {
     toggleSidebar() {
         this.sidebar.classList.toggle('open');
         document.body.classList.toggle('sidebar-open');
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     formatRelativeTime(timestamp) {
