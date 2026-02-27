@@ -1,4 +1,4 @@
-// RAGInbox Web Interface - Frontend Logic
+// Berengario Web Interface - Frontend Logic
 
 class ChatApp {
     constructor() {
@@ -540,7 +540,7 @@ class ChatApp {
 
             if (data.success) {
                 // Clear messages with dynamic instance name
-                const instanceName = this.config ? this.config.instance_name : 'RAGInbox';
+                const instanceName = this.config ? this.config.instance_name : 'Berengario';
                 const instanceDescription = this.config ? this.config.instance_description : 'Ask me anything about the knowledge base documents.';
 
                 this.messagesContainer.innerHTML = `
@@ -901,7 +901,7 @@ class ChatApp {
                     <div class="welcome-icon">
                         <i class="fas fa-comments"></i>
                     </div>
-                    <h2 id="welcome-title">Welcome to ${this.config?.instance_name || 'RAGInbox'}</h2>
+                    <h2 id="welcome-title">Welcome to ${this.config?.instance_name || 'Berengario'}</h2>
                     <p id="welcome-description">${this.config?.instance_description || 'Ask me anything about the knowledge base documents.'}</p>
                     <p class="welcome-hint">Start a new conversation below.</p>
 
