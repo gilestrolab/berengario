@@ -105,6 +105,12 @@ mariadb = [
     "cryptography>=42.0.0",  # For pymysql SSL support
 ]
 
+# Multi-tenancy support (S3 storage, per-tenant encryption)
+multitenant = [
+    "boto3>=1.34.0",  # S3-compatible object storage (MinIO, AWS S3)
+    "cryptography>=42.0.0",  # Per-tenant encryption (Fernet)
+]
+
 [project.scripts]
 berengario-cli = "src.cli.main:cli"
 berengario-demo = "src.demo_phase1:main"

@@ -295,6 +295,64 @@ class Settings(BaseSettings):
         default=Path("data/logs/dols_gpt.log"), description="Log file path"
     )
 
+    # Multi-Tenancy Configuration
+    multi_tenant: bool = Field(
+        default=False,
+        description="Enable multi-tenant mode. When False, behaves as single-tenant (current behavior).",
+    )
+    platform_domain: str = Field(
+        default="berengar.io",
+        description="Platform domain for tenant email addresses ({slug}@{domain})",
+    )
+
+    # Platform Database (shared across all tenants, only used in multi-tenant mode)
+    platform_db_host: str = Field(
+        default="localhost", description="Platform database host"
+    )
+    platform_db_port: int = Field(default=3306, description="Platform database port")
+    platform_db_name: str = Field(
+        default="berengario_platform", description="Platform database name"
+    )
+    platform_db_user: str = Field(
+        default="berengario", description="Platform database username"
+    )
+    platform_db_password: str = Field(
+        default="", description="Platform database password"
+    )
+
+    # Object Storage (S3-compatible, for multi-tenant file storage)
+    storage_backend: str = Field(
+        default="local",
+        description="Storage backend: 'local' (filesystem) or 's3' (S3/MinIO)",
+    )
+    s3_endpoint_url: str = Field(
+        default="http://localhost:9000",
+        description="S3-compatible endpoint URL (MinIO, AWS S3, etc.)",
+    )
+    s3_access_key: str = Field(default="", description="S3 access key ID")
+    s3_secret_key: str = Field(default="", description="S3 secret access key")
+    s3_region: str = Field(default="us-east-1", description="S3 region")
+    s3_bucket_prefix: str = Field(
+        default="berengario-tenant-",
+        description="Prefix for per-tenant S3 buckets",
+    )
+
+    # Encryption (per-tenant data encryption)
+    master_encryption_key: str = Field(
+        default="",
+        description="Master Encryption Key (MEK) for encrypting per-tenant keys. "
+        'Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"',
+    )
+
+    # Tenant Database Pool Configuration
+    tenant_db_pool_size: int = Field(
+        default=3, description="Connection pool size per tenant database"
+    )
+    tenant_db_max_cached: int = Field(
+        default=50,
+        description="Maximum number of tenant DB connections to keep in LRU cache",
+    )
+
     # Development
     debug: bool = Field(default=False, description="Enable debug mode")
     disable_otp_for_dev: bool = Field(
@@ -359,6 +417,67 @@ class Settings(BaseSettings):
         if v_lower not in valid_types:
             raise ValueError(f"Database type must be one of {valid_types}")
         return v_lower
+
+    @field_validator("storage_backend")
+    @classmethod
+    def validate_storage_backend(cls, v: str) -> str:
+        """
+        Validate storage backend type.
+
+        Args:
+            v: Storage backend string.
+
+        Returns:
+            Validated storage backend.
+
+        Raises:
+            ValueError: If storage backend is invalid.
+        """
+        valid_backends = ["local", "s3"]
+        v_lower = v.lower()
+        if v_lower not in valid_backends:
+            raise ValueError(f"Storage backend must be one of {valid_backends}")
+        return v_lower
+
+    def get_platform_database_url(self) -> str:
+        """
+        Get SQLAlchemy URL for the platform database (multi-tenant mode).
+
+        Returns:
+            Database connection URL string for the platform DB.
+        """
+        if self.platform_db_password:
+            return (
+                f"mysql+pymysql://{self.platform_db_user}:{self.platform_db_password}"
+                f"@{self.platform_db_host}:{self.platform_db_port}/{self.platform_db_name}"
+            )
+        else:
+            return (
+                f"mysql+pymysql://{self.platform_db_user}"
+                f"@{self.platform_db_host}:{self.platform_db_port}/{self.platform_db_name}"
+            )
+
+    def get_tenant_database_url(self, db_name: str) -> str:
+        """
+        Get SQLAlchemy URL for a specific tenant database.
+
+        Args:
+            db_name: Tenant database name (e.g., "berengario_tenant_acme").
+
+        Returns:
+            Database connection URL string for the tenant DB.
+        """
+        # Tenant DBs use same host/credentials as platform DB
+        if self.platform_db_password:
+            return (
+                f"mysql+pymysql://{self.platform_db_user}:{self.platform_db_password}"
+                f"@{self.platform_db_host}:{self.platform_db_port}/{db_name}"
+            )
+        else:
+            return (
+                f"mysql+pymysql://{self.platform_db_user}"
+                f"@{self.platform_db_host}:{self.platform_db_port}/{db_name}"
+            )
 
     def get_database_url(self) -> str:
         """
