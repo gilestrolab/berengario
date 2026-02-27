@@ -6,18 +6,18 @@
 }
 
 :root {
-    --primary-color: #2563eb;
-    --primary-hover: #1d4ed8;
-    --secondary-color: #64748b;
-    --background: #f8fafc;
-    --surface: #ffffff;
-    --text-primary: #1e293b;
-    --text-secondary: #64748b;
-    --border-color: #e2e8f0;
-    --user-message-bg: #2563eb;
-    --assistant-message-bg: #f1f5f9;
-    --success-color: #10b981;
-    --error-color: #ef4444;
+    --primary-color: #7A5C3E;
+    --primary-hover: #2A2520;
+    --secondary-color: #6B6259;
+    --background: #F7F2EA;
+    --surface: #FDFAF5;
+    --text-primary: #2E2E2E;
+    --text-secondary: #8C8279;
+    --border-color: #D5C9B8;
+    --user-message-bg: #7A5C3E;
+    --assistant-message-bg: #F1E8D9;
+    --success-color: #5B8C7A;
+    --error-color: #A3423A;
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
@@ -177,7 +177,7 @@ body {
 .welcome-icon {
     font-size: 3rem;
     margin-bottom: 1rem;
-    color: var(--primary-color, #4a90e2);
+    color: var(--primary-color, #7A5C3E);
 }
 
 .welcome-message h2 {
@@ -294,7 +294,7 @@ body {
     border-radius: 0.25rem;
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
     font-size: 0.875em;
-    color: #d63384;
+    color: #A67B5B;
 }
 
 .assistant-message .message-bubble pre {
@@ -508,13 +508,13 @@ body {
 }
 
 .feedback-thumbs-up:hover:not(:disabled) {
-    background: #dcfce7;
-    border-color: #22c55e;
+    background: #E0EEEA;
+    border-color: #5B8C7A;
 }
 
 .feedback-thumbs-down:hover:not(:disabled) {
-    background: #fee2e2;
-    border-color: #ef4444;
+    background: #F5E0DC;
+    border-color: #A3423A;
 }
 
 .feedback-btn:disabled {
@@ -576,7 +576,7 @@ body {
 .query-input:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 3px rgba(122, 92, 62, 0.1);
 }
 
 .send-btn {
@@ -713,7 +713,7 @@ body {
 /* Error Message */
 .error-message {
     padding: 1rem;
-    background: #fee;
+    background: #F5E0DC;
     border: 1px solid var(--error-color);
     border-radius: 0.5rem;
     color: var(--error-color);
@@ -1222,7 +1222,7 @@ body {
     align-items: center;
     margin-right: 0.5rem;
     font-size: 1rem;
-    color: var(--text-secondary, #666);
+    color: var(--text-secondary, #8C8279);
 }
 
 .conversation-title {
@@ -1294,7 +1294,7 @@ body {
 }
 
 .delete-conversation-btn:hover {
-    background: #dc2626;
+    background: #8A3630;
 }
 
 .delete-conversation-btn svg {
@@ -1471,12 +1471,12 @@ body {
     bottom: 0;
     left: 0;
     right: 0;
-    background: var(--bg-secondary, #f8f9fa);
-    border-top: 1px solid var(--border, #ddd);
+    background: var(--bg-secondary, #F7F2EA);
+    border-top: 1px solid var(--border, #D5C9B8);
     padding: 0.5rem 1rem;
     z-index: 100;
     font-size: 0.75rem;
-    color: var(--text-secondary, #666);
+    color: var(--text-secondary, #8C8279);
 }
 
 .footer-content {
@@ -1485,13 +1485,13 @@ body {
 }
 
 .footer-content a {
-    color: var(--primary, #007bff);
+    color: var(--primary, #7A5C3E);
     text-decoration: none;
     transition: color 0.2s;
 }
 
 .footer-content a:hover {
-    color: var(--primary-dark, #0056b3);
+    color: var(--primary-dark, #5E4730);
     text-decoration: underline;
 }
 

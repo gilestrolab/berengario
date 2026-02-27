@@ -100,10 +100,10 @@ def load_custom_footer(
         feedback_plain = f"\n\nWas this response helpful?\nYes: {feedback_urls['positive']}\nNo: {feedback_urls['negative']}"
 
         feedback_html = f"""
-    <div class="feedback" style="margin-top: 20px; padding: 15px; background-color: #f5f5f5; border-radius: 5px;">
+    <div class="feedback" style="margin-top: 20px; padding: 15px; background-color: #F7F2EA; border-radius: 5px;">
         <p style="margin: 0 0 10px 0; font-weight: bold;">Was this response helpful?</p>
-        <a href="{feedback_urls['positive']}" style="display: inline-block; padding: 8px 16px; margin-right: 10px; background-color: #28a745; color: white; text-decoration: none; border-radius: 4px;">👍 Yes</a>
-        <a href="{feedback_urls['negative']}" style="display: inline-block; padding: 8px 16px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 4px;">👎 No</a>
+        <a href="{feedback_urls['positive']}" style="display: inline-block; padding: 8px 16px; margin-right: 10px; background-color: #5B8C7A; color: white; text-decoration: none; border-radius: 4px;">👍 Yes</a>
+        <a href="{feedback_urls['negative']}" style="display: inline-block; padding: 8px 16px; background-color: #A3423A; color: white; text-decoration: none; border-radius: 4px;">👎 No</a>
     </div>"""
 
     if settings.email_custom_footer_file and settings.email_custom_footer_file.exists():
@@ -489,16 +489,16 @@ def _format_html_email(
         if sender and subject:
             # Email source - show sender and subject
             plain = f'Email from {sender}: "{subject}" (relevance: {score:.2f})'
-            html = f'<strong>Email from {sender}:</strong> "{subject}" <span style="color: #666;">(relevance: {score:.2f})</span>'
+            html = f'<strong>Email from {sender}:</strong> "{subject}" <span style="color: #8C8279;">(relevance: {score:.2f})</span>'
         elif subject:
             # Has subject but no sender
             plain = f'Email: "{subject}" (relevance: {score:.2f})'
-            html = f'<strong>Email:</strong> "{subject}" <span style="color: #666;">(relevance: {score:.2f})</span>'
+            html = f'<strong>Email:</strong> "{subject}" <span style="color: #8C8279;">(relevance: {score:.2f})</span>'
         else:
             # File source - show filename
             filename = source.get("filename", "Unknown document")
             plain = f"{filename} (relevance: {score:.2f})"
-            html = f'<strong>{filename}</strong> <span style="color: #666;">(relevance: {score:.2f})</span>'
+            html = f'<strong>{filename}</strong> <span style="color: #8C8279;">(relevance: {score:.2f})</span>'
 
         return plain, html
 
@@ -537,7 +537,7 @@ def _format_html_email(
         body {{
             font-family: Arial, sans-serif;
             line-height: 1.6;
-            color: #333;
+            color: #2E2E2E;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
@@ -547,28 +547,28 @@ def _format_html_email(
         }}
         .response h3 {{
             margin-top: 0;
-            color: #333;
+            color: #2E2E2E;
         }}
         .response strong {{
-            color: #2c3e50;
+            color: #2A2520;
         }}
         .sources {{
             margin-bottom: 20px;
         }}
         .sources h3 {{
             margin-top: 0;
-            color: #333;
+            color: #2E2E2E;
         }}
         .sources ul {{
             margin: 10px 0;
             padding-left: 20px;
         }}
         .footer {{
-            border-top: 1px solid #ddd;
+            border-top: 1px solid #D5C9B8;
             padding-top: 15px;
             margin-top: 20px;
             font-size: 0.9em;
-            color: #666;
+            color: #8C8279;
         }}
     </style>
 </head>

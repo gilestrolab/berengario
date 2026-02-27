@@ -1015,11 +1015,11 @@ def create_admin_router(
                     body = f"""
 <html>
 <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-    <h2 style="color: #333;">Data Backup Complete</h2>
+    <h2 style="color: #2E2E2E;">Data Backup Complete</h2>
 
     <p>Your data backup has been created successfully.</p>
 
-    <div style="background-color: #f8f9fa; border-left: 4px solid #007bff; padding: 15px; margin: 20px 0;">
+    <div style="background-color: #F7F2EA; border-left: 4px solid #7A5C3E; padding: 15px; margin: 20px 0;">
         <p style="margin: 0;"><strong>Backup Details:</strong></p>
         <p style="margin: 5px 0;">Filename: {backup_path.name}</p>
         <p style="margin: 5px 0;">Size: {backup_path.stat().st_size / (1024*1024):.2f} MB</p>
@@ -1028,13 +1028,13 @@ def create_admin_router(
 
     <p>
         <a href="{download_url}"
-           style="display: inline-block; padding: 12px 24px; background-color: #007bff; color: white;
+           style="display: inline-block; padding: 12px 24px; background-color: #7A5C3E; color: white;
                   text-decoration: none; border-radius: 4px; font-weight: bold;">
             Download Backup
         </a>
     </p>
 
-    <p style="color: #666; font-size: 0.9em;">
+    <p style="color: #8C8279; font-size: 0.9em;">
         Note: Backup files are automatically cleaned up after 7 days or when more than 5 backups exist.
     </p>
 

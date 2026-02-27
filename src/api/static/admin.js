@@ -863,7 +863,7 @@ class AdminPanel {
         if (!container) return;
 
         container.innerHTML = `
-            <div class="empty-state" style="color: var(--danger, #dc3545);">
+            <div class="empty-state" style="color: var(--danger, #A3423A);">
                 Error loading crawled URLs: ${this.escapeHtml(message)}
             </div>
         `;
@@ -1329,7 +1329,7 @@ class AdminPanel {
             this.showToast(data.message, 'success');
             if (statusSpan) {
                 statusSpan.innerHTML = '<i class="fas fa-check"></i> Saved successfully';
-                statusSpan.style.color = 'var(--success, #28a745)';
+                statusSpan.style.color = 'var(--success, #5B8C7A)';
                 setTimeout(() => {
                     statusSpan.textContent = '';
                 }, 3000);
@@ -1343,7 +1343,7 @@ class AdminPanel {
             this.showToast(error.message, 'error');
             if (statusSpan) {
                 statusSpan.innerHTML = '<i class="fas fa-xmark"></i> Save failed';
-                statusSpan.style.color = 'var(--danger, #dc3545)';
+                statusSpan.style.color = 'var(--danger, #A3423A)';
             }
         } finally {
             // Re-enable button
@@ -1367,7 +1367,7 @@ class AdminPanel {
         generateButton.textContent = 'Generating...';
         if (statusSpan) {
             statusSpan.textContent = '⏳ Analyzing knowledge base...';
-            statusSpan.style.color = 'var(--primary, #007bff)';
+            statusSpan.style.color = 'var(--primary, #7A5C3E)';
         }
 
         try {
@@ -1385,7 +1385,7 @@ class AdminPanel {
             this.showToast(data.message, 'success');
             if (statusSpan) {
                 statusSpan.innerHTML = `<i class="fas fa-check"></i> Generated ${data.details.count} questions`;
-                statusSpan.style.color = 'var(--success, #28a745)';
+                statusSpan.style.color = 'var(--success, #5B8C7A)';
             }
 
             // Load and display the questions
@@ -1396,7 +1396,7 @@ class AdminPanel {
             this.showToast(error.message, 'error');
             if (statusSpan) {
                 statusSpan.innerHTML = '<i class="fas fa-xmark"></i> Generation failed';
-                statusSpan.style.color = 'var(--danger, #dc3545)';
+                statusSpan.style.color = 'var(--danger, #A3423A)';
             }
         } finally {
             // Re-enable button
@@ -1702,7 +1702,7 @@ class UsageAnalytics {
                     </div>
                     <div class="modal-body" style="max-height: 600px; overflow-y: auto;">
                         ${queries.length === 0 ? '<p>No queries found</p>' : queries.map((q, i) => `
-                            <div class="query-item" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary, #f8f9fa); border-radius: 6px;">
+                            <div class="query-item" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary, #F7F2EA); border-radius: 6px;">
                                 <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                                     <strong>#${i + 1}</strong>
                                     <span style="color: var(--text-secondary, #666); font-size: 0.875rem;">
@@ -1732,12 +1732,12 @@ class UsageAnalytics {
         const truncated = text.substring(0, maxLength);
         return `
             <span id="${id}-short">${this.escapeHtml(truncated)}...
-                <a href="#" onclick="document.getElementById('${id}-short').style.display='none'; document.getElementById('${id}-full').style.display='block'; return false;" style="color: var(--primary, #007bff);">
+                <a href="#" onclick="document.getElementById('${id}-short').style.display='none'; document.getElementById('${id}-full').style.display='block'; return false;" style="color: var(--primary, #7A5C3E);">
                     [Show More]
                 </a>
             </span>
             <span id="${id}-full" style="display: none;">${this.escapeHtml(text)}
-                <a href="#" onclick="document.getElementById('${id}-full').style.display='none'; document.getElementById('${id}-short').style.display='block'; return false;" style="color: var(--primary, #007bff);">
+                <a href="#" onclick="document.getElementById('${id}-full').style.display='none'; document.getElementById('${id}-short').style.display='block'; return false;" style="color: var(--primary, #7A5C3E);">
                     [Show Less]
                 </a>
             </span>
@@ -1880,12 +1880,12 @@ class UsageAnalytics {
                 <div class="optimization-samples">
                     <h4 style="margin-bottom: 1rem;">Sample Optimizations</h4>
                     ${data.sample_optimizations.map((sample, i) => `
-                        <div class="optimization-sample" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary, #f8f9fa); border-radius: 6px;">
+                        <div class="optimization-sample" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary, #F7F2EA); border-radius: 6px;">
                             <div style="margin-bottom: 0.5rem;">
                                 <strong>Original:</strong> <span style="color: var(--text-secondary, #666);">${this.escapeHtml(sample.original_query)}</span>
                             </div>
                             <div>
-                                <strong>Optimized:</strong> <span style="color: var(--success, #28a745);">${this.escapeHtml(sample.optimized_query)}</span>
+                                <strong>Optimized:</strong> <span style="color: var(--success, #5B8C7A);">${this.escapeHtml(sample.optimized_query)}</span>
                             </div>
                         </div>
                     `).join('')}
@@ -2062,7 +2062,7 @@ class FeedbackAnalytics {
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                         <span style="font-size: 1.25rem;">👎</span>
                         <span style="font-weight: 600; color: var(--text-primary);">${this.escapeHtml(item.user_email)}</span>
-                        <span style="padding: 0.125rem 0.5rem; background: #fee2e2; color: #991b1b; border-radius: 0.25rem; font-size: 0.75rem;">${item.channel}</span>
+                        <span style="padding: 0.125rem 0.5rem; background: #F5E0DC; color: #8A3630; border-radius: 0.25rem; font-size: 0.75rem;">${item.channel}</span>
                     </div>
                     <span style="color: var(--text-secondary); font-size: 0.875rem;">${this.formatDate(item.submitted_at)}</span>
                 </div>
@@ -2070,7 +2070,7 @@ class FeedbackAnalytics {
                     ${this.escapeHtml(item.response_content)}
                 </div>
                 ${item.comment ? `
-                    <div style="padding: 0.5rem; border-left: 3px solid #ef4444; background: #fef2f2; border-radius: 0.25rem; font-size: 0.875rem;">
+                    <div style="padding: 0.5rem; border-left: 3px solid #A3423A; background: #F5E0DC; border-radius: 0.25rem; font-size: 0.875rem;">
                         <strong>User Comment:</strong> ${this.escapeHtml(item.comment)}
                     </div>
                 ` : ''}
