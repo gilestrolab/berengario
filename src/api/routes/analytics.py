@@ -28,6 +28,7 @@ def create_analytics_router(
     conversation_manager,
     query_handler,
     require_admin,
+    component_resolver=None,
 ):
     """
     Create analytics router with dependency injection.
@@ -36,10 +37,23 @@ def create_analytics_router(
         conversation_manager: ConversationManager instance
         query_handler: QueryHandler instance (for topic clustering)
         require_admin: Admin authentication dependency
+        component_resolver: ComponentResolver for MT mode (optional)
 
     Returns:
         Configured APIRouter
     """
+
+    def _get_cm(session):
+        """Get the conversation manager for this session (MT-aware)."""
+        if component_resolver:
+            return component_resolver.resolve(session).conversation_manager
+        return conversation_manager
+
+    def _get_qh(session):
+        """Get the query handler for this session (MT-aware)."""
+        if component_resolver:
+            return component_resolver.resolve(session).query_handler
+        return query_handler
 
     # ============================================================================
     # Usage Analytics
@@ -70,7 +84,7 @@ def create_analytics_router(
                 f"Admin {session.email} requested usage analytics (days={days})"
             )
 
-            analytics = conversation_manager.get_usage_analytics(days=days)
+            analytics = _get_cm(session).get_usage_analytics(days=days)
 
             return UsageAnalyticsResponse(**analytics)
 
@@ -109,7 +123,7 @@ def create_analytics_router(
                 f"Admin {session.email} requested queries for user {sender} (days={days}, limit={limit})"
             )
 
-            queries = conversation_manager.get_user_queries(
+            queries = _get_cm(session).get_user_queries(
                 sender=sender, days=days, limit=limit
             )
 
@@ -152,7 +166,7 @@ def create_analytics_router(
                 f"Admin {session.email} requested optimization analytics (days={days})"
             )
 
-            analytics = conversation_manager.get_optimization_analytics(days=days)
+            analytics = _get_cm(session).get_optimization_analytics(days=days)
 
             # Transform data to match frontend expectations
             return {
@@ -207,7 +221,7 @@ def create_analytics_router(
                 f"Admin {session.email} requested source analytics (days={days})"
             )
 
-            analytics = conversation_manager.get_source_analytics(days=days)
+            analytics = _get_cm(session).get_source_analytics(days=days)
 
             # Transform data to match frontend expectations
             return {
@@ -258,7 +272,7 @@ def create_analytics_router(
             if days:
                 start_date = datetime.utcnow() - timedelta(days=days)
 
-            with conversation_manager.db_manager.get_session() as db_session:
+            with _get_cm(session).db_manager.get_session() as db_session:
                 # Base query
                 query = db_session.query(ResponseFeedback)
 
@@ -385,7 +399,7 @@ def create_analytics_router(
             )
 
             # Get all queries for the period
-            analytics = conversation_manager.get_usage_analytics(days=days)
+            analytics = _get_cm(session).get_usage_analytics(days=days)
             total_queries = analytics["overview"]["total_queries"]
 
             if total_queries == 0:
@@ -396,9 +410,9 @@ def create_analytics_router(
                 )
 
             # Get all query content
-            from src.email.db_manager import db_manager
+            cm = _get_cm(session)
 
-            with db_manager.get_session() as db_session:
+            with cm.db_manager.get_session() as db_session:
                 # Calculate start date
                 start_date = (
                     datetime.utcnow() - timedelta(days=days)
@@ -420,7 +434,7 @@ def create_analytics_router(
             # Use LLM to cluster topics
             from src.rag.topic_clustering import cluster_topics
 
-            topics = cluster_topics(query_texts, query_handler.rag_engine)
+            topics = cluster_topics(query_texts, _get_qh(session).rag_engine)
 
             return TopicClusteringResponse(
                 topics=topics,

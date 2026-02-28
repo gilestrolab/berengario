@@ -10,7 +10,6 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from src.email.db_manager import db_manager
 from src.email.db_models import (
     ChannelType,
     Conversation,
@@ -35,9 +34,21 @@ class ConversationManager:
         db_manager: Database manager instance
     """
 
-    def __init__(self):
-        """Initialize conversation manager."""
-        self.db_manager = db_manager
+    def __init__(self, db_manager=None):
+        """
+        Initialize conversation manager.
+
+        Args:
+            db_manager: Database manager instance. If None, uses the global
+                default (single-tenant mode). For multi-tenant mode, pass a
+                TenantDBSessionAdapter wrapping the tenant's database.
+        """
+        if db_manager is None:
+            from src.email.db_manager import db_manager as default_db_manager
+
+            self.db_manager = default_db_manager
+        else:
+            self.db_manager = db_manager
         logger.info("ConversationManager initialized")
 
     def extract_thread_id_from_email(

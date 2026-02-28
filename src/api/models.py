@@ -155,6 +155,35 @@ class AuthStatusResponse(BaseModel):
     email: Optional[str] = None
     session_id: Optional[str] = None
     is_admin: bool = False
+    tenant_id: Optional[str] = None
+    tenant_name: Optional[str] = None
+    tenant_slug: Optional[str] = None
+    role: Optional[str] = None
+    requires_tenant_selection: bool = False
+    available_tenants: Optional[List[Dict]] = None
+
+
+class TenantSelectRequest(BaseModel):
+    """Request model for selecting active tenant (MT mode)."""
+
+    tenant_id: str
+
+
+class TeamMemberRequest(BaseModel):
+    """Request model for adding/updating team members."""
+
+    email: EmailStr
+    role: str  # "admin", "teacher", "querier"
+
+
+class TeamMemberResponse(BaseModel):
+    """Response model for team member data."""
+
+    id: int
+    email: str
+    role: str
+    tenant_id: str
+    created_at: str
 
 
 @dataclass

@@ -24,6 +24,7 @@ def _make_context(slug: str = "test", tmp_path: Path = Path("/tmp")) -> TenantCo
     return TenantContext(
         tenant_slug=slug,
         tenant_id=f"uuid-{slug}",
+        tenant_db_name=f"tenant_{slug}",
         chroma_db_path=tmp_path / slug / "chroma_db",
         documents_path=tmp_path / slug / "documents",
         kb_documents_path=tmp_path / slug / "kb" / "documents",

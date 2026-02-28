@@ -41,6 +41,7 @@ def create_admin_router(
     query_handler,
     settings,
     require_admin,
+    component_resolver=None,
 ):
     """
     Create admin router with dependency injection.
@@ -57,10 +58,29 @@ def create_admin_router(
         query_handler: Query handler instance
         settings: Settings instance
         require_admin: Admin authentication dependency function
+        component_resolver: ComponentResolver for MT mode (optional)
 
     Returns:
         Configured APIRouter instance
     """
+
+    def _get_kb(session):
+        """Get the KB manager for this session (MT-aware)."""
+        if component_resolver:
+            return component_resolver.resolve(session).kb_manager
+        return kb_manager
+
+    def _get_dp(session):
+        """Get the document processor for this session (MT-aware)."""
+        if component_resolver:
+            return component_resolver.resolve(session).doc_processor
+        return document_processor
+
+    def _get_qh(session):
+        """Get the query handler for this session (MT-aware)."""
+        if component_resolver:
+            return component_resolver.resolve(session).query_handler
+        return query_handler
 
     # ============================================================================
     # Whitelist Management
@@ -408,7 +428,7 @@ def create_admin_router(
                 )
 
             # Get content from KB
-            content = kb_manager.get_document_content(file_hash)
+            content = _get_kb(session).get_document_content(file_hash)
 
             if not content:
                 raise HTTPException(
@@ -595,7 +615,7 @@ def create_admin_router(
 
                 # Process document with correct metadata
                 # Note: Use permanent path and filename in metadata
-                nodes = document_processor.process_document(
+                nodes = _get_dp(session).process_document(
                     temp_file_path,
                     source_type="manual",
                     extra_metadata={
@@ -609,7 +629,7 @@ def create_admin_router(
                 # Add to knowledge base
                 chunks_added = 0
                 if nodes:
-                    kb_manager.add_nodes(nodes)
+                    _get_kb(session).add_nodes(nodes)
                     chunks_added = len(nodes)
                     logger.info(
                         f"Processed uploaded document: {final_filename} ({chunks_added} chunks)"
@@ -711,7 +731,7 @@ def create_admin_router(
             )
 
             # Process URL with DocumentProcessor
-            nodes = document_processor.process_url(
+            nodes = _get_dp(session).process_url(
                 url=request.url,
                 crawl_depth=request.crawl_depth,
                 extra_metadata={
@@ -724,7 +744,7 @@ def create_admin_router(
             pages_crawled = 0
             chunks_added = 0
             if nodes:
-                kb_manager.add_nodes(nodes)
+                _get_kb(session).add_nodes(nodes)
                 chunks_added = len(nodes)
 
                 # Count unique pages (by url_hash)
@@ -794,7 +814,7 @@ def create_admin_router(
             CrawledUrlResponse with list of crawled URLs
         """
         try:
-            urls = kb_manager.get_crawled_urls()
+            urls = _get_kb(session).get_crawled_urls()
 
             # Format timestamps for display
             for url in urls:
@@ -839,7 +859,7 @@ def create_admin_router(
         """
         try:
             # Get all crawled URLs
-            urls = kb_manager.get_crawled_urls()
+            urls = _get_kb(session).get_crawled_urls()
 
             if not urls:
                 return AdminActionResponse(
@@ -855,7 +875,7 @@ def create_admin_router(
             total_chunks = 0
             for url_data in urls:
                 try:
-                    chunks = kb_manager.delete_document_by_url_hash(
+                    chunks = _get_kb(session).delete_document_by_url_hash(
                         url_data["url_hash"]
                     )
                     total_chunks += chunks
@@ -919,7 +939,7 @@ def create_admin_router(
         """
         try:
             # Get URL info before deletion
-            url_info = kb_manager.get_document_by_url_hash(url_hash)
+            url_info = _get_kb(session).get_document_by_url_hash(url_hash)
             if not url_info:
                 raise HTTPException(
                     status_code=404,
@@ -929,7 +949,7 @@ def create_admin_router(
             source_url = url_info.get("source_url", "Unknown")
 
             # Delete from KB
-            chunks_removed = kb_manager.delete_document_by_url_hash(url_hash)
+            chunks_removed = _get_kb(session).delete_document_by_url_hash(url_hash)
 
             # Log to audit trail
             audit_logger.log_action(
@@ -1425,7 +1445,7 @@ def create_admin_router(
 
             # Generate and save questions
             result = generate_and_save_example_questions(
-                rag_engine=query_handler.rag_engine, count=15
+                rag_engine=_get_qh(session).rag_engine, count=15
             )
 
             # Log to audit trail

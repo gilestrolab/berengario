@@ -32,6 +32,7 @@ class TenantContext:
     Attributes:
         tenant_slug: URL-safe tenant identifier (e.g., "acme").
         tenant_id: UUID string (None in single-tenant mode).
+        tenant_db_name: Tenant database name (None in single-tenant mode).
         chroma_db_path: Path to ChromaDB storage for this tenant.
         documents_path: Path to source documents folder.
         kb_documents_path: Path to KB documents (attachments/uploads).
@@ -60,6 +61,7 @@ class TenantContext:
     # Identity
     tenant_slug: str
     tenant_id: Optional[str]
+    tenant_db_name: Optional[str]
 
     # Paths
     chroma_db_path: Path
@@ -135,6 +137,7 @@ class TenantContext:
         return cls(
             tenant_slug="default",
             tenant_id=None,
+            tenant_db_name=None,
             chroma_db_path=settings.chroma_db_path,
             documents_path=settings.documents_path,
             kb_documents_path=settings.kb_documents_path,
@@ -217,6 +220,7 @@ class TenantContext:
         return cls(
             tenant_slug=slug,
             tenant_id=tenant.id,
+            tenant_db_name=tenant.db_name,
             chroma_db_path=chroma_db_path,
             documents_path=documents_path,
             kb_documents_path=kb_documents_path,

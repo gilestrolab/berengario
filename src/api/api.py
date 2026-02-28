@@ -40,6 +40,7 @@ from src.api.routes.auth import create_auth_router
 from src.api.routes.conversations import create_conversations_router
 from src.api.routes.feedback import create_feedback_router
 from src.api.routes.query import create_query_router
+from src.api.routes.team import create_team_router
 from src.config import settings
 from src.document_processing.document_processor import DocumentProcessor
 from src.document_processing.kb_manager import KnowledgeBaseManager
@@ -135,6 +136,29 @@ document_manager = DocumentManager(
 audit_logger = AdminAuditLogger()
 backup_manager = BackupManager()
 
+# Multi-tenant initialization
+platform_db_manager = None
+component_resolver = None
+
+if settings.multi_tenant:
+    from src.platform.component_factory import TenantComponentFactory
+    from src.platform.component_resolver import ComponentResolver
+    from src.platform.db_manager import TenantDBManager
+    from src.platform.storage import create_storage_backend
+
+    logger.info("Multi-tenant mode enabled. Initializing platform components...")
+    platform_db_manager = TenantDBManager()
+    storage_backend = create_storage_backend()
+    component_factory = TenantComponentFactory(
+        storage_backend=storage_backend,
+        db_manager=platform_db_manager,
+    )
+    component_resolver = ComponentResolver(
+        multi_tenant=True,
+        component_factory=component_factory,
+    )
+    logger.info("Multi-tenant platform components initialized")
+
 # Setup static files directory (needed by feedback router)
 static_dir = Path(__file__).parent / "static"
 static_dir.mkdir(exist_ok=True)
@@ -149,6 +173,7 @@ auth_router = create_auth_router(
     get_session_id=get_session_id,
     set_session_cookie=set_session_cookie,
     settings=settings,
+    platform_db_manager=platform_db_manager,
 )
 
 # Include auth router
@@ -307,12 +332,14 @@ feedback_router = create_feedback_router(
     conversation_manager=conversation_manager,
     static_dir=static_dir,
     require_auth=require_auth,
+    component_resolver=component_resolver,
 )
 
 conversations_router = create_conversations_router(
     conversation_manager=conversation_manager,
     session_manager=session_manager,
     require_auth=require_auth,
+    component_resolver=component_resolver,
 )
 
 query_router = create_query_router(
@@ -323,6 +350,7 @@ query_router = create_query_router(
     require_auth=require_auth,
     set_session_cookie=set_session_cookie,
     cleanup_old_attachments=cleanup_old_attachments,
+    component_resolver=component_resolver,
 )
 
 admin_router = create_admin_router(
@@ -337,12 +365,14 @@ admin_router = create_admin_router(
     query_handler=query_handler,
     settings=settings,
     require_admin=require_admin,
+    component_resolver=component_resolver,
 )
 
 analytics_router = create_analytics_router(
     conversation_manager=conversation_manager,
     query_handler=query_handler,
     require_admin=require_admin,
+    component_resolver=component_resolver,
 )
 
 # Include routers
@@ -351,6 +381,14 @@ app.include_router(conversations_router)
 app.include_router(query_router)
 app.include_router(admin_router)
 app.include_router(analytics_router)
+
+# Team management router (MT mode only)
+if settings.multi_tenant and platform_db_manager:
+    team_router = create_team_router(
+        platform_db_manager=platform_db_manager,
+        require_admin=require_admin,
+    )
+    app.include_router(team_router)
 
 
 # API Endpoints

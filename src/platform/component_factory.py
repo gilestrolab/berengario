@@ -29,6 +29,7 @@ class TenantComponents:
         doc_processor: DocumentProcessor for chunking documents.
         rag_engine: RAGEngine for query processing.
         query_handler: QueryHandler wrapping the RAG engine.
+        conversation_manager: ConversationManager for this tenant's DB.
     """
 
     context: TenantContext
@@ -36,6 +37,7 @@ class TenantComponents:
     doc_processor: "DocumentProcessor"  # noqa: F821
     rag_engine: "RAGEngine"  # noqa: F821
     query_handler: "QueryHandler"  # noqa: F821
+    conversation_manager: "ConversationManager"  # noqa: F821
 
 
 class _CacheEntry:
@@ -217,6 +219,8 @@ class TenantComponentFactory:
         # Lazy imports to avoid circular dependencies
         from src.document_processing.document_processor import DocumentProcessor
         from src.document_processing.kb_manager import KnowledgeBaseManager
+        from src.email.conversation_manager import ConversationManager
+        from src.platform.db_session_adapter import TenantDBSessionAdapter
         from src.rag.query_handler import QueryHandler
         from src.rag.rag_engine import RAGEngine
 
@@ -250,12 +254,20 @@ class TenantComponentFactory:
             tenant_context=ctx,
         )
 
+        # 5. ConversationManager with tenant-specific DB
+        if ctx.tenant_db_name and self._db_manager:
+            adapter = TenantDBSessionAdapter(self._db_manager, ctx.tenant_db_name)
+            conv_manager = ConversationManager(db_manager=adapter)
+        else:
+            conv_manager = ConversationManager()
+
         return TenantComponents(
             context=ctx,
             kb_manager=kb_manager,
             doc_processor=doc_processor,
             rag_engine=rag_engine,
             query_handler=query_handler,
+            conversation_manager=conv_manager,
         )
 
     def get_default_components(self) -> TenantComponents:
@@ -263,7 +275,8 @@ class TenantComponentFactory:
         Get components for single-tenant mode (from global settings).
 
         Convenience method that creates a TenantContext from settings
-        and returns the cached component stack.
+        and returns the cached component stack. The conversation_manager
+        uses the global default database.
 
         Returns:
             TenantComponents for the default single-tenant configuration.
