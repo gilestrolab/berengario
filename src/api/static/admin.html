@@ -1726,13 +1726,64 @@
         </div>
 
         <div class="tabs">
-            <button class="tab active" data-tab="whitelists">Whitelists</button>
+            <button class="tab" data-tab="team" id="team-tab-btn" style="display:none;">Team</button>
+            <button class="tab active" data-tab="whitelists" id="whitelists-tab-btn">Whitelists</button>
             <button class="tab" data-tab="usage">Usage Analytics</button>
             <button class="tab" data-tab="feedback">Feedback</button>
             <button class="tab" data-tab="documents">Documents</button>
             <button class="tab" data-tab="webcrawl">Web Crawling</button>
             <button class="tab" data-tab="backups">Backups</button>
             <button class="tab" data-tab="settings">Settings</button>
+        </div>
+
+        <!-- Team Tab (MT mode only) -->
+        <div id="team-tab" class="tab-content">
+            <!-- Invite Code Section -->
+            <div class="whitelist-section">
+                <h3><i class="fas fa-link"></i> Invite Link</h3>
+                <p style="margin-bottom: 1rem; color: var(--text-secondary, #8C8279); font-size: 0.875rem;">
+                    Share this code or QR to invite new members
+                </p>
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                    <code id="invite-code-display" style="font-size: 1.5rem; font-weight: bold; letter-spacing: 0.2rem; padding: 0.5rem 1rem; background: rgba(122,92,62,0.08); border-radius: 0.5rem;">---</code>
+                    <button class="action-btn" id="copy-invite-btn" title="Copy code"><i class="fas fa-copy"></i></button>
+                    <button class="action-btn" id="regenerate-invite-btn" title="Generate new code"><i class="fas fa-sync-alt"></i></button>
+                    <button class="action-btn" id="show-qr-btn" title="Show QR code"><i class="fas fa-qrcode"></i></button>
+                </div>
+                <div id="qr-container" style="display:none; text-align:center; margin: 1rem 0;">
+                    <img id="qr-image" alt="Invite QR Code" style="max-width: 200px; border-radius: 0.5rem;">
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
+                    <label style="font-size: 0.875rem; color: var(--text-secondary);">
+                        <input type="checkbox" id="join-approval-toggle"> Require admin approval to join
+                    </label>
+                </div>
+            </div>
+
+            <!-- Team Members Section -->
+            <div class="whitelist-section">
+                <h3><i class="fas fa-users"></i> Team Members</h3>
+                <div class="whitelist-controls">
+                    <input type="email" id="team-member-email" placeholder="email@example.com" class="whitelist-input">
+                    <select id="team-member-role" style="padding: 0.5rem; border: 1px solid var(--border, #D5C9B8); border-radius: 4px;">
+                        <option value="querier">Querier</option>
+                        <option value="teacher">Teacher</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                    <button class="action-btn" id="add-team-member-btn"><i class="fas fa-plus"></i> Add</button>
+                </div>
+                <div id="team-members-list" class="whitelist-list" style="margin-top: 1rem;">
+                    <div style="color: var(--text-secondary); font-size: 0.875rem; padding: 1rem;">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Join Requests Section -->
+            <div class="whitelist-section" id="join-requests-section">
+                <h3><i class="fas fa-user-clock"></i> Pending Join Requests</h3>
+                <div id="join-requests-list" class="whitelist-list">
+                    <div style="color: var(--text-secondary); font-size: 0.875rem; padding: 1rem;">No pending requests</div>
+                </div>
+            </div>
         </div>
 
         <!-- Whitelists Tab -->

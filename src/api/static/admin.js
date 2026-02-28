@@ -82,6 +82,18 @@ class AdminPanel {
             } else {
                 document.getElementById('admin-title').textContent = headerText;
             }
+
+            // Multi-tenant mode: show Team tab, hide Whitelists tab
+            if (config.multi_tenant) {
+                this.multiTenant = true;
+                const teamTabBtn = document.getElementById('team-tab-btn');
+                const whitelistsTabBtn = document.getElementById('whitelists-tab-btn');
+                if (teamTabBtn) teamTabBtn.style.display = '';
+                if (whitelistsTabBtn) whitelistsTabBtn.style.display = 'none';
+                // Auto-select Team tab instead of Whitelists
+                this.switchTab('team');
+                this.loadTeamData();
+            }
         } catch (error) {
             console.error('Error loading config:', error);
         }
@@ -2086,6 +2098,310 @@ class FeedbackAnalytics {
     refresh() {
         this.loadAnalytics();
         adminPanel.showToast('Feedback analytics refreshed', 'success');
+    }
+
+    // ============================================================
+    // Team Management (MT mode)
+    // ============================================================
+
+    async loadTeamData() {
+        await Promise.all([
+            this.loadTeamMembers(),
+            this.loadInviteInfo(),
+            this.loadJoinRequests(),
+        ]);
+        this.setupTeamEventListeners();
+    }
+
+    setupTeamEventListeners() {
+        document.getElementById('add-team-member-btn')?.addEventListener('click', () => {
+            this.addTeamMember();
+        });
+        document.getElementById('team-member-email')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.addTeamMember();
+        });
+        document.getElementById('copy-invite-btn')?.addEventListener('click', () => {
+            this.copyInviteCode();
+        });
+        document.getElementById('regenerate-invite-btn')?.addEventListener('click', () => {
+            this.regenerateInviteCode();
+        });
+        document.getElementById('show-qr-btn')?.addEventListener('click', () => {
+            this.toggleQRCode();
+        });
+        document.getElementById('join-approval-toggle')?.addEventListener('change', (e) => {
+            this.toggleJoinApproval(e.target.checked);
+        });
+    }
+
+    async loadTeamMembers() {
+        try {
+            const resp = await fetch('/api/admin/team', { credentials: 'include' });
+            const members = await resp.json();
+            this.renderTeamMembers(members);
+        } catch (e) {
+            console.error('Failed to load team members:', e);
+        }
+    }
+
+    renderTeamMembers(members) {
+        const container = document.getElementById('team-members-list');
+        if (!members.length) {
+            container.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.875rem; padding: 1rem;">No team members</div>';
+            return;
+        }
+
+        container.innerHTML = members.map(m => `
+            <div class="whitelist-item" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>${this.escapeHtml(m.email)}</strong>
+                    <span class="role-badge role-${m.role}" style="margin-left: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.75rem; text-transform: uppercase;">${m.role}</span>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <select class="role-select" data-user-id="${m.id}" style="padding: 0.25rem; font-size: 0.75rem; border: 1px solid var(--border, #D5C9B8); border-radius: 3px;">
+                        <option value="querier" ${m.role === 'querier' ? 'selected' : ''}>Querier</option>
+                        <option value="teacher" ${m.role === 'teacher' ? 'selected' : ''}>Teacher</option>
+                        <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
+                    </select>
+                    <button class="action-btn delete-btn" onclick="adminPanel.removeTeamMember(${m.id})" title="Remove"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        `).join('');
+
+        // Add change listeners for role selects
+        container.querySelectorAll('.role-select').forEach(sel => {
+            sel.addEventListener('change', (e) => {
+                this.changeTeamMemberRole(e.target.dataset.userId, e.target.value);
+            });
+        });
+    }
+
+    async addTeamMember() {
+        const emailInput = document.getElementById('team-member-email');
+        const roleSelect = document.getElementById('team-member-role');
+        const email = emailInput.value.trim();
+        const role = roleSelect.value;
+
+        if (!email) {
+            this.showToast('Please enter an email', 'error');
+            return;
+        }
+
+        try {
+            const resp = await fetch('/api/admin/team', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, role }),
+                credentials: 'include',
+            });
+            const data = await resp.json();
+
+            if (resp.ok) {
+                emailInput.value = '';
+                this.showToast(`Added ${email} as ${role}`, 'success');
+                await this.loadTeamMembers();
+            } else {
+                this.showToast(data.detail || data.message || 'Failed to add member', 'error');
+            }
+        } catch (e) {
+            this.showToast('Failed to add member', 'error');
+        }
+    }
+
+    async removeTeamMember(userId) {
+        if (!confirm('Remove this team member?')) return;
+
+        try {
+            const resp = await fetch(`/api/admin/team/${userId}`, {
+                method: 'DELETE',
+                credentials: 'include',
+            });
+
+            if (resp.ok) {
+                this.showToast('Member removed', 'success');
+                await this.loadTeamMembers();
+            } else {
+                const data = await resp.json();
+                this.showToast(data.detail || 'Failed to remove', 'error');
+            }
+        } catch (e) {
+            this.showToast('Failed to remove member', 'error');
+        }
+    }
+
+    async changeTeamMemberRole(userId, newRole) {
+        try {
+            const resp = await fetch(`/api/admin/team/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role: newRole }),
+                credentials: 'include',
+            });
+
+            if (resp.ok) {
+                this.showToast(`Role updated to ${newRole}`, 'success');
+            } else {
+                const data = await resp.json();
+                this.showToast(data.detail || 'Failed to update role', 'error');
+                await this.loadTeamMembers(); // Revert UI
+            }
+        } catch (e) {
+            this.showToast('Failed to update role', 'error');
+            await this.loadTeamMembers();
+        }
+    }
+
+    async loadInviteInfo() {
+        try {
+            const resp = await fetch('/api/admin/tenant/invite', { credentials: 'include' });
+            const data = await resp.json();
+
+            document.getElementById('invite-code-display').textContent = data.invite_code || '---';
+            document.getElementById('join-approval-toggle').checked = data.join_approval_required || false;
+        } catch (e) {
+            console.error('Failed to load invite info:', e);
+        }
+    }
+
+    async copyInviteCode() {
+        const code = document.getElementById('invite-code-display').textContent;
+        if (code && code !== '---') {
+            try {
+                await navigator.clipboard.writeText(code);
+                this.showToast('Invite code copied!', 'success');
+            } catch (e) {
+                // Fallback for non-HTTPS
+                const textarea = document.createElement('textarea');
+                textarea.value = code;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                textarea.remove();
+                this.showToast('Invite code copied!', 'success');
+            }
+        }
+    }
+
+    async regenerateInviteCode() {
+        if (!confirm('Generate a new invite code? The old code will stop working.')) return;
+
+        try {
+            const resp = await fetch('/api/admin/tenant/invite/regenerate', {
+                method: 'POST',
+                credentials: 'include',
+            });
+            const data = await resp.json();
+
+            if (data.invite_code) {
+                document.getElementById('invite-code-display').textContent = data.invite_code;
+                this.showToast('Invite code regenerated', 'success');
+            }
+        } catch (e) {
+            this.showToast('Failed to regenerate code', 'error');
+        }
+    }
+
+    toggleQRCode() {
+        const container = document.getElementById('qr-container');
+        if (container.style.display === 'none') {
+            const img = document.getElementById('qr-image');
+            img.src = '/api/admin/tenant/invite/qr?' + Date.now();
+            container.style.display = 'block';
+        } else {
+            container.style.display = 'none';
+        }
+    }
+
+    async toggleJoinApproval(required) {
+        try {
+            await fetch('/api/admin/tenant/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ join_approval_required: required }),
+                credentials: 'include',
+            });
+            this.showToast(required ? 'Approval now required' : 'Open joining enabled', 'success');
+        } catch (e) {
+            this.showToast('Failed to update setting', 'error');
+        }
+    }
+
+    async loadJoinRequests() {
+        try {
+            const resp = await fetch('/api/admin/tenant/join-requests', { credentials: 'include' });
+            const requests = await resp.json();
+            this.renderJoinRequests(requests);
+        } catch (e) {
+            console.error('Failed to load join requests:', e);
+        }
+    }
+
+    renderJoinRequests(requests) {
+        const container = document.getElementById('join-requests-list');
+        if (!requests.length) {
+            container.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.875rem; padding: 1rem;">No pending requests</div>';
+            return;
+        }
+
+        container.innerHTML = requests.map(r => `
+            <div class="whitelist-item" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>${this.escapeHtml(r.email)}</strong>
+                    <span style="margin-left: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+                        ${new Date(r.created_at).toLocaleDateString()}
+                    </span>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="action-btn" onclick="adminPanel.approveJoinRequest(${r.id})" title="Approve" style="color: var(--success-color, #4A8C6F);">
+                        <i class="fas fa-check"></i>
+                    </button>
+                    <button class="action-btn delete-btn" onclick="adminPanel.rejectJoinRequest(${r.id})" title="Reject">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async approveJoinRequest(requestId) {
+        try {
+            const resp = await fetch(`/api/admin/tenant/join-requests/${requestId}/approve`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            const data = await resp.json();
+
+            if (data.success) {
+                this.showToast(data.message, 'success');
+                await this.loadJoinRequests();
+                await this.loadTeamMembers();
+            } else {
+                this.showToast(data.message, 'error');
+            }
+        } catch (e) {
+            this.showToast('Failed to approve request', 'error');
+        }
+    }
+
+    async rejectJoinRequest(requestId) {
+        if (!confirm('Reject this join request?')) return;
+
+        try {
+            const resp = await fetch(`/api/admin/tenant/join-requests/${requestId}/reject`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            const data = await resp.json();
+
+            if (data.success) {
+                this.showToast(data.message, 'success');
+                await this.loadJoinRequests();
+            } else {
+                this.showToast(data.message, 'error');
+            }
+        } catch (e) {
+            this.showToast('Failed to reject request', 'error');
+        }
     }
 
     escapeHtml(text) {

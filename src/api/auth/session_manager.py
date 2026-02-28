@@ -34,6 +34,8 @@ class Session:
         tenant_name: Active tenant display name (MT mode only)
         role: User's role in active tenant (MT mode only)
         available_tenants: List of tenants this user belongs to (MT mode only)
+        onboarding_email: Email verified during onboarding (MT, pre-tenant)
+        onboarding_verified: Whether email is verified for onboarding flow
     """
 
     session_id: str
@@ -49,6 +51,8 @@ class Session:
     tenant_name: Optional[str] = None
     role: Optional[str] = None
     available_tenants: List[Dict] = field(default_factory=list)
+    onboarding_email: Optional[str] = None
+    onboarding_verified: bool = False
 
     def authenticate(self, email: str, is_admin: bool = False):
         """

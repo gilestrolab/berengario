@@ -304,6 +304,10 @@ class Settings(BaseSettings):
         default="berengar.io",
         description="Platform domain for tenant email addresses ({slug}@{domain})",
     )
+    platform_base_url: str = Field(
+        default="https://berengar.io",
+        description="Base URL for the platform (used in invite QR codes)",
+    )
 
     # Platform Database (shared across all tenants, only used in multi-tenant mode)
     platform_db_host: str = Field(

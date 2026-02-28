@@ -115,6 +115,20 @@ class ChatApp {
                 }
             }
 
+            // Show tenant name badge in multi-tenant mode
+            if (data.tenant_name) {
+                const badge = document.getElementById('tenant-badge');
+                const nameEl = document.getElementById('tenant-name');
+                const roleEl = document.getElementById('tenant-role');
+                if (badge && nameEl) {
+                    nameEl.textContent = data.tenant_name;
+                    if (roleEl && data.role) {
+                        roleEl.textContent = data.role;
+                    }
+                    badge.style.display = 'inline-flex';
+                }
+            }
+
             return true;
         } catch (error) {
             console.error('Error checking auth:', error);

@@ -12,6 +12,7 @@ from src.platform.models import Tenant, TenantStatus, TenantUser, TenantUserRole
 from src.platform.provisioning import (
     SLUG_PATTERN,
     TenantProvisioner,
+    generate_slug,
 )
 
 
@@ -483,6 +484,54 @@ class TestTenantProvisioner:
         # Should still delete storage and drop database
         mock_storage.delete_tenant_data.assert_called_once()
         mock_db_manager.drop_tenant_database.assert_called_once()
+
+
+class TestGenerateSlug:
+    """Tests for generate_slug utility."""
+
+    def test_simple_name(self):
+        """Test slug from simple ASCII name."""
+        assert generate_slug("Acme Corp") == "acme-corp"
+
+    def test_unicode_name(self):
+        """Test slug from unicode name (transliteration)."""
+        assert generate_slug("Üniversität München") == "universitat-munchen"
+
+    def test_special_characters(self):
+        """Test slug strips special characters."""
+        assert generate_slug("Hello, World! #2024") == "hello-world-2024"
+
+    def test_multiple_spaces(self):
+        """Test slug collapses whitespace to single hyphens."""
+        assert generate_slug("Acme   Corp   Inc") == "acme-corp-inc"
+
+    def test_leading_trailing_special(self):
+        """Test slug strips leading/trailing non-alphanumeric."""
+        assert generate_slug("---Acme---") == "acme"
+
+    def test_too_short_raises(self):
+        """Test slug too short raises ValueError."""
+        with pytest.raises(ValueError, match="too short"):
+            generate_slug("!")
+
+    def test_max_length_truncation(self):
+        """Test slug is truncated to 63 characters."""
+        long_name = "A" * 100
+        slug = generate_slug(long_name)
+        assert len(slug) <= 63
+
+    def test_accented_characters(self):
+        """Test slug handles accented characters."""
+        assert generate_slug("café résumé") == "cafe-resume"
+
+    def test_numbers(self):
+        """Test slug preserves numbers."""
+        assert generate_slug("Team 42") == "team-42"
+
+    def test_empty_string_raises(self):
+        """Test empty string raises ValueError."""
+        with pytest.raises(ValueError, match="too short"):
+            generate_slug("")
 
 
 class TestSlugPattern:

@@ -7,6 +7,7 @@ across all platform components (database, storage, encryption, email).
 
 import logging
 import re
+import unicodedata
 from datetime import datetime
 from typing import Optional
 
@@ -25,6 +26,45 @@ logger = logging.getLogger(__name__)
 
 # Valid slug pattern: lowercase alphanumeric and hyphens, 2-63 chars
 SLUG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$")
+
+
+def generate_slug(name: str) -> str:
+    """
+    Generate a URL-safe slug from a human-readable name.
+
+    Handles unicode characters by transliterating to ASCII,
+    lowercases, replaces non-alphanumeric with hyphens, and
+    trims to 2-63 characters.
+
+    Args:
+        name: Human-readable name (e.g., "Acme Corp").
+
+    Returns:
+        URL-safe slug (e.g., "acme-corp").
+
+    Raises:
+        ValueError: If name produces an empty or too-short slug.
+    """
+    # Transliterate unicode to ASCII (e.g., ü→u, é→e)
+    slug = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    # Lowercase
+    slug = slug.lower()
+    # Replace non-alphanumeric with hyphens
+    slug = re.sub(r"[^a-z0-9]+", "-", slug)
+    # Strip leading/trailing hyphens
+    slug = slug.strip("-")
+    # Collapse multiple hyphens
+    slug = re.sub(r"-{2,}", "-", slug)
+    # Trim to max 63 chars
+    slug = slug[:63].rstrip("-")
+
+    if len(slug) < 2:
+        raise ValueError(
+            f"Name '{name}' produces a slug that is too short ('{slug}'). "
+            "Please provide a longer name."
+        )
+
+    return slug
 
 
 class ProvisioningError(Exception):
@@ -148,7 +188,8 @@ class TenantProvisioner:
             if existing_email:
                 raise ValueError(f"Tenant with email '{email_address}' already exists")
 
-            # Step 1: Create tenant record
+            # Step 1: Create tenant record with invite code
+            invite_code = Tenant.generate_invite_code()
             tenant = Tenant(
                 slug=slug,
                 name=name,
@@ -159,6 +200,7 @@ class TenantProvisioner:
                 email_display_name=f"{name} AI Assistant",
                 custom_prompt=custom_prompt,
                 llm_model=llm_model,
+                invite_code=invite_code,
                 db_name=db_name,
                 storage_path=storage_path,
             )

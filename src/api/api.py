@@ -382,13 +382,34 @@ app.include_router(query_router)
 app.include_router(admin_router)
 app.include_router(analytics_router)
 
-# Team management router (MT mode only)
+# Multi-tenant routers (MT mode only)
 if settings.multi_tenant and platform_db_manager:
+    from src.api.routes.onboarding import create_onboarding_router
+    from src.api.routes.tenant_admin import create_tenant_admin_router
+
     team_router = create_team_router(
         platform_db_manager=platform_db_manager,
         require_admin=require_admin,
     )
     app.include_router(team_router)
+
+    onboarding_router = create_onboarding_router(
+        platform_db_manager=platform_db_manager,
+        session_manager=session_manager,
+        get_session_id=get_session_id,
+        set_session_cookie=set_session_cookie,
+        settings=settings,
+    )
+    app.include_router(onboarding_router)
+
+    tenant_admin_router = create_tenant_admin_router(
+        platform_db_manager=platform_db_manager,
+        require_admin=require_admin,
+        session_manager=session_manager,
+        get_session_id=get_session_id,
+        settings=settings,
+    )
+    app.include_router(tenant_admin_router)
 
 
 # API Endpoints
@@ -411,11 +432,19 @@ async def root(request: Request):
     # Check authentication
     session_id = get_session_id(request)
     if not session_id:
+        if settings.multi_tenant:
+            return RedirectResponse(url="/static/landing.html", status_code=303)
         return RedirectResponse(url="/static/login.html", status_code=303)
 
     session = session_manager.get_session(session_id)
     if not session or not session.is_authenticated():
+        if settings.multi_tenant:
+            return RedirectResponse(url="/static/landing.html", status_code=303)
         return RedirectResponse(url="/static/login.html", status_code=303)
+
+    # MT onboarding: verified email but no tenant yet → redirect to onboarding
+    if settings.multi_tenant and session.onboarding_verified and not session.tenant_id:
+        return RedirectResponse(url="/static/onboarding.html", status_code=303)
 
     # User is authenticated, serve the chat interface
     index_file = static_dir / "index.html"
@@ -507,6 +536,7 @@ async def get_config():
         "instance_name": settings.instance_name,
         "instance_description": settings.instance_description,
         "organization": settings.organization,
+        "multi_tenant": settings.multi_tenant,
     }
 
 

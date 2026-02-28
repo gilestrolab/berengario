@@ -5,6 +5,7 @@ Handles OTP request, verification, logout, and auth status checking.
 """
 
 import logging
+from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
 
@@ -17,9 +18,6 @@ from src.api.models import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Create router
-router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
 
 def create_auth_router(
@@ -50,6 +48,7 @@ def create_auth_router(
     Returns:
         Configured APIRouter instance
     """
+    router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
     async def send_otp_email(email: str, otp_code: str):
         """Send OTP code via email."""
@@ -120,18 +119,10 @@ If you didn't request this code, please ignore this email.
         """
         email = request.email.lower()
 
-        # MT mode: check TenantUser table instead of file whitelists
+        # MT mode: allow any email (unknown users enter onboarding flow)
         if settings.multi_tenant and platform_db_manager:
-            tenant_memberships = _lookup_tenant_users(email)
-            if not tenant_memberships:
-                logger.warning(
-                    f"OTP request denied for email not in any tenant: {email}"
-                )
-                return AuthResponse(
-                    success=False,
-                    message="Access denied. Your email address is not authorized to use this system. "
-                    "Please contact your administrator if you believe this is an error.",
-                )
+            # In MT mode, anyone can request OTP for onboarding or login
+            pass
         else:
             # ST mode: check query whitelist
             if not query_whitelist.is_allowed(email):
@@ -210,6 +201,27 @@ If you didn't request this code, please ignore this email.
             # MT mode: look up tenant memberships and set on session
             if settings.multi_tenant and platform_db_manager:
                 tenant_memberships = _lookup_tenant_users(email)
+
+                if not tenant_memberships:
+                    # Unknown email in MT mode: set onboarding state
+                    session.authenticated = True
+                    session.email = email
+                    session.onboarding_email = email
+                    session.onboarding_verified = True
+                    session.last_activity = datetime.now()
+
+                    set_session_cookie(response, session.session_id)
+
+                    logger.info(
+                        f"MT onboarding: verified email {email}, "
+                        "no tenant membership found"
+                    )
+                    return AuthResponse(
+                        success=True,
+                        message="Email verified. Please create or join a team to continue.",
+                        email=email,
+                        requires_onboarding=True,
+                    )
 
                 # Authenticate first (admin flag set later by select_tenant)
                 session.authenticate(email, is_admin=False)
@@ -377,6 +389,7 @@ If you didn't request this code, please ignore this email.
             available_tenants=(
                 session.available_tenants if requires_selection else None
             ),
+            onboarding_verified=session.onboarding_verified,
         )
 
     return router

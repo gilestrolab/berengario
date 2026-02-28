@@ -7,6 +7,8 @@ Tests Tenant, TenantUser, and TenantEncryptionKey models.
 from datetime import datetime
 
 from src.platform.models import (
+    JoinRequest,
+    JoinRequestStatus,
     Tenant,
     TenantEncryptionKey,
     TenantStatus,
@@ -271,6 +273,169 @@ class TestTenantUser:
         assert user.has_permission(TenantUserRole.QUERIER) is True
         assert user.has_permission(TenantUserRole.TEACHER) is False
         assert user.has_permission(TenantUserRole.ADMIN) is False
+
+
+class TestTenantInviteCode:
+    """Tests for Tenant invite code generation."""
+
+    def test_generate_invite_code_length(self):
+        """Test invite code is 8 characters by default."""
+        code = Tenant.generate_invite_code()
+        assert len(code) == 8
+
+    def test_generate_invite_code_custom_length(self):
+        """Test invite code with custom length."""
+        code = Tenant.generate_invite_code(length=12)
+        assert len(code) == 12
+
+    def test_generate_invite_code_characters(self):
+        """Test invite code only uses unambiguous characters."""
+        ambiguous = set("O0I1L")
+        for _ in range(50):
+            code = Tenant.generate_invite_code()
+            assert not ambiguous.intersection(
+                code
+            ), f"Code '{code}' contains ambiguous characters"
+
+    def test_generate_invite_code_uniqueness(self):
+        """Test invite codes are unique across many generations."""
+        codes = {Tenant.generate_invite_code() for _ in range(100)}
+        # With 8 chars from 29-char alphabet, collision is extremely unlikely
+        assert len(codes) == 100
+
+    def test_tenant_invite_code_field(self):
+        """Test invite_code can be set on Tenant."""
+        tenant = Tenant(
+            slug="acme",
+            name="Acme",
+            email_address="acme@berengar.io",
+            db_name="db",
+            storage_path="path",
+            invite_code="ABCD1234",
+        )
+        assert tenant.invite_code == "ABCD1234"
+
+    def test_tenant_join_approval_required_field(self):
+        """Test join_approval_required field on Tenant."""
+        tenant = Tenant(
+            slug="acme",
+            name="Acme",
+            email_address="acme@berengar.io",
+            db_name="db",
+            storage_path="path",
+            join_approval_required=True,
+        )
+        assert tenant.join_approval_required is True
+
+    def test_tenant_to_dict_includes_invite_fields(self):
+        """Test to_dict includes invite_code and join_approval_required."""
+        from datetime import datetime
+
+        now = datetime.utcnow()
+        tenant = Tenant(
+            id="test-uuid",
+            slug="acme",
+            name="Acme",
+            status=TenantStatus.ACTIVE,
+            email_address="acme@berengar.io",
+            db_name="db",
+            storage_path="path",
+            invite_code="ABCD1234",
+            join_approval_required=True,
+            created_at=now,
+            updated_at=now,
+        )
+        data = tenant.to_dict()
+        assert data["invite_code"] == "ABCD1234"
+        assert data["join_approval_required"] is True
+
+
+class TestJoinRequestStatus:
+    """Tests for JoinRequestStatus enum."""
+
+    def test_status_values(self):
+        """Test all join request status values exist."""
+        assert JoinRequestStatus.PENDING.value == "pending"
+        assert JoinRequestStatus.APPROVED.value == "approved"
+        assert JoinRequestStatus.REJECTED.value == "rejected"
+
+    def test_status_count(self):
+        """Test there are exactly 3 statuses."""
+        assert len(JoinRequestStatus) == 3
+
+
+class TestJoinRequest:
+    """Tests for JoinRequest model."""
+
+    def test_create_join_request(self):
+        """Test creating a JoinRequest instance."""
+        req = JoinRequest(
+            email="user@example.com",
+            tenant_id="test-uuid",
+        )
+        assert req.email == "user@example.com"
+        assert req.tenant_id == "test-uuid"
+
+    def test_join_request_defaults(self):
+        """Test JoinRequest default values (in-memory)."""
+        req = JoinRequest(
+            email="user@example.com",
+            tenant_id="test-uuid",
+        )
+        # resolved_at and resolved_by should be None
+        assert req.resolved_at is None
+        assert req.resolved_by is None
+
+    def test_join_request_repr(self):
+        """Test JoinRequest string representation."""
+        req = JoinRequest(
+            id=1,
+            email="user@example.com",
+            tenant_id="test-uuid",
+            status=JoinRequestStatus.PENDING,
+        )
+        repr_str = repr(req)
+        assert "user@example.com" in repr_str
+        assert "pending" in repr_str
+
+    def test_join_request_to_dict(self):
+        """Test JoinRequest to_dict conversion."""
+        from datetime import datetime
+
+        now = datetime.utcnow()
+        req = JoinRequest(
+            id=1,
+            email="user@example.com",
+            tenant_id="test-uuid",
+            status=JoinRequestStatus.APPROVED,
+            created_at=now,
+            resolved_at=now,
+            resolved_by="admin@example.com",
+        )
+        data = req.to_dict()
+        assert data["id"] == 1
+        assert data["email"] == "user@example.com"
+        assert data["status"] == "approved"
+        assert data["resolved_by"] == "admin@example.com"
+        assert isinstance(data["created_at"], str)
+        assert isinstance(data["resolved_at"], str)
+
+    def test_join_request_to_dict_no_resolution(self):
+        """Test to_dict with unresolved request."""
+        from datetime import datetime
+
+        now = datetime.utcnow()
+        req = JoinRequest(
+            id=2,
+            email="user@example.com",
+            tenant_id="test-uuid",
+            status=JoinRequestStatus.PENDING,
+            created_at=now,
+        )
+        data = req.to_dict()
+        assert data["status"] == "pending"
+        assert data["resolved_at"] is None
+        assert data["resolved_by"] is None
 
 
 class TestTenantEncryptionKey:
