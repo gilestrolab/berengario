@@ -62,7 +62,7 @@ class Tenant(PlatformBase):
 
     Attributes:
         id: UUID primary key
-        slug: URL-safe identifier (e.g., "acme", "imperial-dols")
+        slug: URL-safe identifier (e.g., "acme", "my-team")
         name: Human-readable organization name
         description: Used in RAG system prompt
         organization: Organization name for display

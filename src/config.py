@@ -292,7 +292,7 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
     log_file: Path = Field(
-        default=Path("data/logs/dols_gpt.log"), description="Log file path"
+        default=Path("data/logs/berengario.log"), description="Log file path"
     )
 
     # Multi-Tenancy Configuration
