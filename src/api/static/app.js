@@ -67,17 +67,18 @@ class ChatApp {
             document.title = this.config.instance_name;
             document.getElementById('instance-name').textContent = this.config.instance_name;
 
-            // In MT mode, hide the instance description and organization (tenant-specific)
-            if (!this.config.multi_tenant) {
-                document.getElementById('instance-description').textContent = this.config.instance_description;
+            // Set subtitle and organization if elements exist
+            const descElement = document.getElementById('instance-description');
+            if (descElement) {
+                descElement.textContent = this.config.multi_tenant
+                    ? 'Your AI-powered knowledge base'
+                    : this.config.instance_description;
+            }
 
-                const orgElement = document.getElementById('instance-organization');
-                if (this.config.organization && orgElement) {
-                    orgElement.textContent = this.config.organization;
-                    orgElement.style.display = 'block';
-                }
-            } else {
-                document.getElementById('instance-description').textContent = 'Your AI-powered knowledge base';
+            const orgElement = document.getElementById('instance-organization');
+            if (!this.config.multi_tenant && this.config.organization && orgElement) {
+                orgElement.textContent = this.config.organization;
+                orgElement.style.display = 'block';
             }
 
             // Update welcome message if present
@@ -198,8 +199,10 @@ class ChatApp {
             const response = await fetch('/api/stats');
             const data = await response.json();
 
-            document.getElementById('kb-documents').textContent = data.unique_documents;
-            document.getElementById('kb-chunks').textContent = data.total_chunks;
+            const docsEl = document.getElementById('kb-documents');
+            const chunksEl = document.getElementById('kb-chunks');
+            if (docsEl) docsEl.textContent = data.unique_documents;
+            if (chunksEl) chunksEl.textContent = data.total_chunks;
         } catch (error) {
             console.error('Error loading stats:', error);
         }
