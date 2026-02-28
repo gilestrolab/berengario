@@ -22,15 +22,32 @@ class QueryHandler:
     Provides a wrapper around RAGEngine with additional functionality.
     """
 
-    def __init__(self, rag_engine: Optional[RAGEngine] = None):
+    def __init__(
+        self,
+        rag_engine: Optional[RAGEngine] = None,
+        tenant_context: Optional["TenantContext"] = None,  # noqa: F821
+    ):
         """
         Initialize the query handler.
 
         Args:
             rag_engine: RAG engine instance (creates new if None).
+            tenant_context: Optional tenant context for multi-tenant config.
+                When provided, passes optimization settings to QueryOptimizer.
         """
         self.rag_engine = rag_engine or RAGEngine()
-        self.query_optimizer = QueryOptimizer()
+        self.tenant_context = tenant_context
+
+        # Configure query optimizer with tenant-specific settings when available
+        ctx = self.tenant_context
+        if ctx:
+            self.query_optimizer = QueryOptimizer(
+                enabled=ctx.query_optimization_enabled,
+                model=ctx.query_optimization_model,
+            )
+        else:
+            self.query_optimizer = QueryOptimizer()
+
         logger.info("QueryHandler initialized")
 
     def process_query(

@@ -31,6 +31,9 @@ class KnowledgeBaseManager:
         self,
         db_path: Optional[Path] = None,
         collection_name: str = "dols_kb",
+        embedding_model: Optional[str] = None,
+        embedding_api_key: Optional[str] = None,
+        embedding_api_base: Optional[str] = None,
     ):
         """
         Initialize the Knowledge Base Manager.
@@ -38,6 +41,9 @@ class KnowledgeBaseManager:
         Args:
             db_path: Path to ChromaDB storage directory.
             collection_name: Name of the ChromaDB collection.
+            embedding_model: Embedding model name (default from settings).
+            embedding_api_key: API key for embeddings (default from settings).
+            embedding_api_base: API base URL for embeddings (default from settings).
         """
         self.db_path = db_path or settings.chroma_db_path
         self.collection_name = collection_name
@@ -47,9 +53,9 @@ class KnowledgeBaseManager:
 
         # Initialize embedding model (uses Naga.ac via OpenAI-compatible API)
         self.embed_model = OpenAIEmbedding(
-            model=settings.openai_embedding_model,
-            api_key=settings.openai_api_key,
-            api_base=settings.openai_api_base,
+            model=embedding_model or settings.openai_embedding_model,
+            api_key=embedding_api_key or settings.openai_api_key,
+            api_base=embedding_api_base or settings.openai_api_base,
         )
 
         # Initialize ChromaDB client
