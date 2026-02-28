@@ -595,3 +595,62 @@ class TestLoadCustomFooter:
 
         # HTML should have special characters (MIMEText handles escaping)
         assert "special chars" in html
+
+
+class TestSendReplyFromOverrides:
+    """Test send_reply from_address/from_name override parameters."""
+
+    @patch("src.email.email_sender.smtplib.SMTP")
+    def test_send_reply_with_from_overrides(self, mock_smtp):
+        """Test that from_address/from_name overrides are used in From header."""
+        sender = EmailSender(
+            smtp_server="smtp.example.com",
+            smtp_port=587,
+            smtp_user="bot@example.com",
+            smtp_password="password",
+            use_tls=True,
+            from_address="bot@example.com",
+            from_name="Default Bot",
+        )
+        mock_instance = MagicMock()
+        mock_smtp.return_value = mock_instance
+
+        result = sender.send_reply(
+            to_address="user@example.com",
+            subject="Test",
+            body_text="Hello",
+            from_address="tenant@acme.com",
+            from_name="Acme Assistant",
+        )
+
+        assert result is True
+        # Check the From header uses the override values
+        call_args = mock_instance.send_message.call_args
+        message = call_args[0][0]
+        assert message["From"] == "Acme Assistant <tenant@acme.com>"
+
+    @patch("src.email.email_sender.smtplib.SMTP")
+    def test_send_reply_without_overrides_uses_defaults(self, mock_smtp):
+        """Test that without overrides, instance defaults are used."""
+        sender = EmailSender(
+            smtp_server="smtp.example.com",
+            smtp_port=587,
+            smtp_user="bot@example.com",
+            smtp_password="password",
+            use_tls=True,
+            from_address="bot@example.com",
+            from_name="Default Bot",
+        )
+        mock_instance = MagicMock()
+        mock_smtp.return_value = mock_instance
+
+        result = sender.send_reply(
+            to_address="user@example.com",
+            subject="Test",
+            body_text="Hello",
+        )
+
+        assert result is True
+        call_args = mock_instance.send_message.call_args
+        message = call_args[0][0]
+        assert message["From"] == "Default Bot <bot@example.com>"

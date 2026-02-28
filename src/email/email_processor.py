@@ -35,6 +35,7 @@ from src.rag.tools.pending_actions import get_pending_action_manager
 
 # Lazy imports to avoid circular dependency
 if TYPE_CHECKING:
+    from src.email.tenant_email_router import TenantEmailRouter
     from src.rag.query_handler import QueryHandler
 
 logger = logging.getLogger(__name__)
@@ -96,6 +97,7 @@ class EmailProcessor:
         teach_validator: Optional[WhitelistValidator] = None,
         query_validator: Optional[WhitelistValidator] = None,
         admin_validator: Optional[WhitelistValidator] = None,
+        tenant_email_router: Optional["TenantEmailRouter"] = None,
     ):
         """
         Initialize email processor with components.
@@ -112,6 +114,7 @@ class EmailProcessor:
             teach_validator: Whitelist validator for teaching (KB ingestion)
             query_validator: Whitelist validator for querying
             admin_validator: Whitelist validator for admin access
+            tenant_email_router: Router for multi-tenant email dispatch (None=ST mode)
         """
         self.email_client = email_client or EmailClient()
         self.attachment_handler = attachment_handler or AttachmentHandler()
@@ -164,8 +167,13 @@ class EmailProcessor:
         # which is used by should_process_for_kb() to determine KB ingestion eligibility
         self.parser = parser or EmailParser(validator=self.teach_validator)
 
+        # Multi-tenant router (None in single-tenant mode)
+        self.tenant_email_router = tenant_email_router
+
+        mode = "multi-tenant" if tenant_email_router else "single-tenant"
         logger.info(
-            "EmailProcessor initialized with hierarchical whitelists (admin > teacher > querier)"
+            f"EmailProcessor initialized in {mode} mode "
+            f"with hierarchical whitelists (admin > teacher > querier)"
         )
 
     def reload_whitelists(self) -> None:
@@ -186,6 +194,9 @@ class EmailProcessor:
     ) -> ProcessingResult:
         """
         Process a single email message.
+
+        Dispatches to single-tenant or multi-tenant processing based on
+        whether a tenant_email_router was provided.
 
         Args:
             mail_message: MailMessage from imap-tools
@@ -214,7 +225,7 @@ class EmailProcessor:
                 f"(whitelisted={email.is_whitelisted}, cc'd={email.is_cced})"
             )
 
-            # Check if already processed
+            # Check if already processed (global dedup)
             if self.message_tracker.is_processed(message_id):
                 logger.info(f"Message {message_id} already processed, skipping")
                 return ProcessingResult(
@@ -223,71 +234,13 @@ class EmailProcessor:
                     action="duplicate",
                 )
 
-            # Determine action based on recipient type and check appropriate whitelist
-            if self.parser.should_process_as_query(email):
-                # Direct message (To: bot) = query - check query whitelist
-                if not self.query_validator.is_allowed(email.sender.email):
-                    logger.warning(
-                        f"Message {message_id} from {email.sender.email} rejected "
-                        f"(not in query whitelist)"
-                    )
-                    # Send rejection email to the sender
-                    self._send_rejection_email(email, "query")
-
-                    self.message_tracker.mark_processed(
-                        message_id=message_id,
-                        sender=email.sender.email,
-                        subject=email.subject,
-                        status="rejected",
-                        error_message="Sender not authorized to query",
-                    )
-                    if mark_seen:
-                        self.email_client.mark_seen(mail_message.uid)
-                    return ProcessingResult(
-                        message_id=message_id,
-                        success=False,
-                        error="Sender not authorized to query",
-                        action="rejected",
-                    )
-                result = self._process_query(email)
-            elif self.parser.should_process_for_kb(email):
-                # CC'd/BCC'd/forwarded = KB ingestion - check teach whitelist
-                if not self.teach_validator.is_allowed(email.sender.email):
-                    logger.warning(
-                        f"Message {message_id} from {email.sender.email} rejected "
-                        f"(not in teach whitelist)"
-                    )
-                    # Send rejection email to the sender
-                    self._send_rejection_email(email, "teach")
-
-                    self.message_tracker.mark_processed(
-                        message_id=message_id,
-                        sender=email.sender.email,
-                        subject=email.subject,
-                        status="rejected",
-                        error_message="Sender not authorized to teach",
-                    )
-                    if mark_seen:
-                        self.email_client.mark_seen(mail_message.uid)
-                    return ProcessingResult(
-                        message_id=message_id,
-                        success=False,
-                        error="Sender not authorized to teach",
-                        action="rejected",
-                    )
-                result = self._process_for_kb(email, mail_message)
+            # Dispatch to ST or MT processing
+            if self.tenant_email_router:
+                result = self._process_mt(email, mail_message)
             else:
-                # Should not happen, but handle gracefully
-                logger.warning(
-                    f"Message {message_id} doesn't match any processing criteria"
-                )
-                result = ProcessingResult(
-                    message_id=message_id,
-                    success=True,
-                    action="skipped",
-                )
+                result = self._process_st(email, mail_message, mark_seen)
 
-            # Mark as seen if requested
+            # Mark as seen if requested (for MT, always mark after fan-out)
             if mark_seen and result.success:
                 self.email_client.mark_seen(mail_message.uid)
 
@@ -321,22 +274,286 @@ class EmailProcessor:
                 action="error",
             )
 
+    def _process_st(
+        self,
+        email: EmailMessage,
+        mail_message: MailMessage,
+        mark_seen: bool = True,
+    ) -> ProcessingResult:
+        """
+        Single-tenant email processing (original behavior).
+
+        Uses file-based whitelists and global singletons.
+
+        Args:
+            email: Parsed EmailMessage
+            mail_message: Raw MailMessage from imap-tools
+            mark_seen: Whether to mark as seen on rejection
+
+        Returns:
+            ProcessingResult with processing outcome.
+        """
+        message_id = email.message_id
+
+        # Determine action based on recipient type and check appropriate whitelist
+        if self.parser.should_process_as_query(email):
+            # Direct message (To: bot) = query - check query whitelist
+            if not self.query_validator.is_allowed(email.sender.email):
+                logger.warning(
+                    f"Message {message_id} from {email.sender.email} rejected "
+                    f"(not in query whitelist)"
+                )
+                self._send_rejection_email(email, "query")
+                self.message_tracker.mark_processed(
+                    message_id=message_id,
+                    sender=email.sender.email,
+                    subject=email.subject,
+                    status="rejected",
+                    error_message="Sender not authorized to query",
+                )
+                if mark_seen:
+                    self.email_client.mark_seen(mail_message.uid)
+                return ProcessingResult(
+                    message_id=message_id,
+                    success=False,
+                    error="Sender not authorized to query",
+                    action="rejected",
+                )
+            return self._process_query(email)
+        elif self.parser.should_process_for_kb(email):
+            # CC'd/BCC'd/forwarded = KB ingestion - check teach whitelist
+            if not self.teach_validator.is_allowed(email.sender.email):
+                logger.warning(
+                    f"Message {message_id} from {email.sender.email} rejected "
+                    f"(not in teach whitelist)"
+                )
+                self._send_rejection_email(email, "teach")
+                self.message_tracker.mark_processed(
+                    message_id=message_id,
+                    sender=email.sender.email,
+                    subject=email.subject,
+                    status="rejected",
+                    error_message="Sender not authorized to teach",
+                )
+                if mark_seen:
+                    self.email_client.mark_seen(mail_message.uid)
+                return ProcessingResult(
+                    message_id=message_id,
+                    success=False,
+                    error="Sender not authorized to teach",
+                    action="rejected",
+                )
+            return self._process_for_kb(email, mail_message)
+        else:
+            logger.warning(
+                f"Message {message_id} doesn't match any processing criteria"
+            )
+            return ProcessingResult(
+                message_id=message_id,
+                success=True,
+                action="skipped",
+            )
+
+    def _process_mt(
+        self,
+        email: EmailMessage,
+        mail_message: MailMessage,
+    ) -> ProcessingResult:
+        """
+        Multi-tenant email processing.
+
+        Resolves sender to tenant(s) via TenantUser table, checks permissions
+        per role, and processes with tenant-specific components.
+
+        Args:
+            email: Parsed EmailMessage
+            mail_message: Raw MailMessage from imap-tools
+
+        Returns:
+            ProcessingResult (success if at least one tenant processed OK).
+        """
+        message_id = email.message_id
+        router = self.tenant_email_router
+
+        # Determine action type from email structure (tenant-independent)
+        is_query = self.parser.should_process_as_query(email)
+        is_kb = self.parser.should_process_for_kb(email)
+        action = "query" if is_query else "teach" if is_kb else None
+
+        if not action:
+            logger.warning(
+                f"MT: Message {message_id} doesn't match any processing criteria"
+            )
+            self.message_tracker.mark_processed(
+                message_id=message_id,
+                sender=email.sender.email,
+                subject=email.subject,
+                status="success",
+            )
+            return ProcessingResult(
+                message_id=message_id, success=True, action="skipped"
+            )
+
+        # Resolve sender to tenant(s)
+        tenant_mappings = router.resolve_sender(email.sender.email)
+        if not tenant_mappings:
+            logger.warning(f"MT: Sender {email.sender.email} not found in any tenant")
+            self._send_rejection_email(email, action)
+            self.message_tracker.mark_processed(
+                message_id=message_id,
+                sender=email.sender.email,
+                subject=email.subject,
+                status="rejected",
+                error_message=f"Sender not found in any tenant for {action}",
+            )
+            return ProcessingResult(
+                message_id=message_id,
+                success=False,
+                error="Sender not found in any tenant",
+                action="rejected",
+            )
+
+        # Process for each tenant where sender has permission
+        successes = 0
+        failures = 0
+
+        for mapping in tenant_mappings:
+            tenant_slug = mapping["tenant_slug"]
+            role = mapping["role"]
+
+            if not router.check_permission(role, action):
+                logger.info(
+                    f"MT: Sender {email.sender.email} has role '{role}' in "
+                    f"tenant '{tenant_slug}' — insufficient for '{action}', skipping"
+                )
+                continue
+
+            try:
+                components = router.get_components(tenant_slug)
+                ctx = components.context
+
+                if is_query:
+                    result = self._process_query_with(
+                        email=email,
+                        query_handler=components.query_handler,
+                        conv_manager=components.conversation_manager,
+                        email_sender=self.email_sender,
+                        instance_name=ctx.instance_name,
+                        organization=ctx.organization,
+                        from_address=ctx.instance_name,  # Use tenant email if available
+                        from_name=ctx.instance_name,
+                    )
+                else:
+                    result = self._process_for_kb_with(
+                        email=email,
+                        mail_message=mail_message,
+                        kb_manager=components.kb_manager,
+                        doc_processor=components.doc_processor,
+                        kb_emails_path=ctx.kb_emails_path,
+                        kb_documents_path=ctx.kb_documents_path,
+                        temp_dir=ctx.temp_dir,
+                        instance_name=ctx.instance_name,
+                        organization=ctx.organization,
+                    )
+
+                if result.success:
+                    successes += 1
+                else:
+                    failures += 1
+                    logger.warning(
+                        f"MT: Failed processing for tenant '{tenant_slug}': "
+                        f"{result.error}"
+                    )
+
+            except Exception as e:
+                failures += 1
+                logger.error(
+                    f"MT: Error processing for tenant '{tenant_slug}': {e}",
+                    exc_info=True,
+                )
+
+        # Mark processed globally (once, after fan-out)
+        status = "success" if successes > 0 else "error"
+        self.message_tracker.mark_processed(
+            message_id=message_id,
+            sender=email.sender.email,
+            subject=email.subject,
+            status=status,
+            error_message=(f"{failures} tenant(s) failed" if failures > 0 else None),
+        )
+
+        logger.info(
+            f"MT: Message {message_id} processed for "
+            f"{successes + failures} tenant(s): "
+            f"{successes} success, {failures} failed"
+        )
+
+        return ProcessingResult(
+            message_id=message_id,
+            success=successes > 0,
+            action=action,
+            error=(
+                f"{failures} tenant(s) failed"
+                if failures > 0 and successes == 0
+                else None
+            ),
+        )
+
     def _process_for_kb(
         self, email: EmailMessage, mail_message: MailMessage
     ) -> ProcessingResult:
         """
-        Process email for knowledge base ingestion.
+        Process email for KB ingestion using default (ST) components.
 
-        Extracts attachments, processes them into text chunks, and adds to KB.
-        Implements hash-based deduplication to prevent reingesting identical content:
-        - Computes SHA-256 hash of each attachment and email body
-        - Checks if hash already exists in knowledge base
-        - Skips processing if document already exists
-        - Sends acknowledgment email including duplicate count
+        Thin wrapper around _process_for_kb_with() using self.* and settings.*.
 
         Args:
             email: Parsed EmailMessage
             mail_message: Raw MailMessage for attachment extraction
+
+        Returns:
+            ProcessingResult with ingestion outcome.
+        """
+        return self._process_for_kb_with(
+            email=email,
+            mail_message=mail_message,
+            kb_manager=self.kb_manager,
+            doc_processor=self.doc_processor,
+            kb_emails_path=settings.kb_emails_path,
+            kb_documents_path=settings.kb_documents_path,
+            temp_dir=settings.email_temp_dir,
+            instance_name=settings.instance_name,
+            organization=settings.organization,
+        )
+
+    def _process_for_kb_with(
+        self,
+        email: EmailMessage,
+        mail_message: MailMessage,
+        kb_manager: KnowledgeBaseManager,
+        doc_processor: DocumentProcessor,
+        kb_emails_path: Path,
+        kb_documents_path: Path,
+        temp_dir: Path,
+        instance_name: str,
+        organization: str,
+    ) -> ProcessingResult:
+        """
+        Process email for KB ingestion with explicit component injection.
+
+        Used by both ST (via _process_for_kb wrapper) and MT (direct call
+        with tenant-specific components).
+
+        Args:
+            email: Parsed EmailMessage
+            mail_message: Raw MailMessage for attachment extraction
+            kb_manager: KnowledgeBaseManager for this tenant
+            doc_processor: DocumentProcessor for this tenant
+            kb_emails_path: Path to save email copies
+            kb_documents_path: Path to save document copies
+            temp_dir: Temporary directory for attachments
+            instance_name: Instance name for acknowledgment emails
+            organization: Organization name for acknowledgment emails
 
         Returns:
             ProcessingResult with ingestion outcome.
@@ -365,27 +582,27 @@ class EmailProcessor:
                         # Save email body to temporary text file
                         import tempfile
 
+                        temp_dir.mkdir(parents=True, exist_ok=True)
                         temp_file = tempfile.NamedTemporaryFile(
                             mode="w",
                             suffix=".txt",
                             prefix=f"email_{message_id}_",
                             delete=False,
-                            dir=str(settings.email_temp_dir),
+                            dir=str(temp_dir),
                         )
                         temp_file.write(body_text)
                         temp_file.close()
 
                         # Check if email body content already exists in KB
                         body_file_path = Path(temp_file.name)
-                        body_hash = self.doc_processor.compute_file_hash(body_file_path)
+                        body_hash = doc_processor.compute_file_hash(body_file_path)
 
-                        if self.kb_manager.document_exists(body_hash):
+                        if kb_manager.document_exists(body_hash):
                             logger.info(
                                 f"Email body content from {email.sender.email} already in KB (hash: {body_hash[:8]}...)"
                             )
 
-                            # Still persist email body for future reingestion (if not already saved)
-                            # Create descriptive filename
+                            # Still persist email body for future reingestion
                             date_str = (
                                 email.date.strftime("%Y-%m-%d")
                                 if email.date
@@ -402,7 +619,7 @@ class EmailProcessor:
                             ).strip()
                             descriptive_filename = f"Email from {sender_name} on {date_str} - {subject_clean}.txt"
 
-                            emails_dir = settings.kb_emails_path
+                            emails_dir = kb_emails_path
                             emails_dir.mkdir(parents=True, exist_ok=True)
                             persistent_path = emails_dir / descriptive_filename
 
@@ -435,19 +652,15 @@ class EmailProcessor:
                             )
 
                         # Process email body as text document
-                        # Create descriptive filename
                         date_str = (
                             email.date.strftime("%Y-%m-%d")
                             if email.date
                             else "unknown-date"
                         )
-                        sender_name = email.sender.email.split("@")[
-                            0
-                        ]  # Get name part of email
+                        sender_name = email.sender.email.split("@")[0]
                         subject_clean = (
                             email.subject[:50] if email.subject else "No Subject"
                         )
-                        # Remove invalid filename characters
                         subject_clean = "".join(
                             c
                             for c in subject_clean
@@ -455,11 +668,11 @@ class EmailProcessor:
                         ).strip()
                         descriptive_filename = f"Email from {sender_name} on {date_str} - {subject_clean}.txt"
 
-                        nodes = self.doc_processor.process_document(
+                        nodes = doc_processor.process_document(
                             file_path=Path(temp_file.name),
                             source_type="email",
                             extra_metadata={
-                                "filename": descriptive_filename,  # Override temp filename
+                                "filename": descriptive_filename,
                                 "sender": email.sender.email,
                                 "subject": email.subject,
                                 "date": str(email.date) if email.date else None,
@@ -467,7 +680,7 @@ class EmailProcessor:
                         )
 
                         # Add to knowledge base
-                        self.kb_manager.add_nodes(nodes)
+                        kb_manager.add_nodes(nodes)
                         chunks_created = len(nodes)
 
                         logger.info(
@@ -475,7 +688,7 @@ class EmailProcessor:
                         )
 
                         # Persist email body to kb/emails/ for future reingestion
-                        emails_dir = settings.kb_emails_path
+                        emails_dir = kb_emails_path
                         emails_dir.mkdir(parents=True, exist_ok=True)
 
                         persistent_path = emails_dir / descriptive_filename
@@ -500,7 +713,13 @@ class EmailProcessor:
 
                         # Send acknowledgment email to the contributor
                         if chunks_created > 0:
-                            self._send_kb_acknowledgment(email, 0, chunks_created)
+                            self._send_kb_acknowledgment(
+                                email,
+                                0,
+                                chunks_created,
+                                instance_name=instance_name,
+                                organization=organization,
+                            )
 
                         return ProcessingResult(
                             message_id=message_id,
@@ -542,14 +761,12 @@ class EmailProcessor:
             for attachment in attachments:
                 try:
                     # Compute file hash and get file modification time
-                    file_hash = self.doc_processor.compute_file_hash(
-                        attachment.filepath
-                    )
+                    file_hash = doc_processor.compute_file_hash(attachment.filepath)
                     file_stat = attachment.filepath.stat()
                     file_mtime = file_stat.st_mtime
 
                     # Check if document with same content already exists
-                    if self.kb_manager.document_exists(file_hash):
+                    if kb_manager.document_exists(file_hash):
                         logger.info(
                             f"Document {attachment.filename} already in KB (hash: {file_hash[:8]}...), skipping"
                         )
@@ -557,7 +774,7 @@ class EmailProcessor:
                         continue
 
                     # Check if document with same filename but different content exists
-                    existing_doc = self.kb_manager.get_document_by_filename(
+                    existing_doc = kb_manager.get_document_by_filename(
                         attachment.filename
                     )
                     if existing_doc:
@@ -571,10 +788,8 @@ class EmailProcessor:
                                 f"Replacing older version of {attachment.filename} "
                                 f"(old: {existing_hash[:8]}..., new: {file_hash[:8]}...)"
                             )
-                            chunks_deleted = (
-                                self.kb_manager.delete_document_by_filename(
-                                    attachment.filename
-                                )
+                            chunks_deleted = kb_manager.delete_document_by_filename(
+                                attachment.filename
                             )
                             logger.info(
                                 f"Deleted {chunks_deleted} chunks from old version"
@@ -596,7 +811,7 @@ class EmailProcessor:
                         "message_id": message_id,
                     }
 
-                    nodes = self.doc_processor.process_document(
+                    nodes = doc_processor.process_document(
                         file_path=attachment.filepath,
                         source_type="attachment",
                         extra_metadata=extra_metadata,
@@ -604,7 +819,7 @@ class EmailProcessor:
 
                     if nodes:
                         # Add to knowledge base
-                        self.kb_manager.add_nodes(nodes)
+                        kb_manager.add_nodes(nodes)
                         chunks_created += len(nodes)
                         attachments_processed += 1
                         processed_files.append(attachment)
@@ -613,7 +828,7 @@ class EmailProcessor:
                         )
 
                         # Persist attachment to kb/documents/ for future reingestion
-                        attachments_dir = settings.kb_documents_path
+                        attachments_dir = kb_documents_path
                         attachments_dir.mkdir(parents=True, exist_ok=True)
 
                         persistent_path = attachments_dir / attachment.filename
@@ -664,7 +879,12 @@ class EmailProcessor:
             # Send acknowledgment email to the contributor
             if chunks_created > 0 or duplicates_skipped > 0:
                 self._send_kb_acknowledgment(
-                    email, attachments_processed, chunks_created, duplicates_skipped
+                    email,
+                    attachments_processed,
+                    chunks_created,
+                    duplicates_skipped,
+                    instance_name=instance_name,
+                    organization=organization,
                 )
 
             return ProcessingResult(
@@ -707,10 +927,53 @@ class EmailProcessor:
 
     def _process_query(self, email: EmailMessage) -> ProcessingResult:
         """
-        Process email as a query and send automated RAG response.
+        Process email as a query using default (ST) components.
+
+        Thin wrapper around _process_query_with() using self.* and settings.*.
 
         Args:
             email: Parsed EmailMessage
+
+        Returns:
+            ProcessingResult with query outcome.
+        """
+        return self._process_query_with(
+            email=email,
+            query_handler=self.query_handler,
+            conv_manager=conversation_manager,
+            email_sender=self.email_sender,
+            instance_name=settings.instance_name,
+            organization=settings.organization,
+            from_address=settings.email_target_address,
+            from_name=settings.email_display_name,
+        )
+
+    def _process_query_with(
+        self,
+        email: EmailMessage,
+        query_handler: "QueryHandler",
+        conv_manager,
+        email_sender: EmailSender,
+        instance_name: str,
+        organization: str,
+        from_address: str,
+        from_name: str,
+    ) -> ProcessingResult:
+        """
+        Process email as a query with explicit component injection.
+
+        Used by both ST (via _process_query wrapper) and MT (direct call
+        with tenant-specific components).
+
+        Args:
+            email: Parsed EmailMessage
+            query_handler: QueryHandler to process the query
+            conv_manager: ConversationManager for thread tracking
+            email_sender: EmailSender for sending replies
+            instance_name: Instance name for email formatting
+            organization: Organization name for email formatting
+            from_address: Sender address for reply emails
+            from_name: Sender display name for reply emails
 
         Returns:
             ProcessingResult with query outcome.
@@ -721,7 +984,7 @@ class EmailProcessor:
 
         try:
             # Extract thread ID for conversation tracking
-            thread_id = conversation_manager.extract_thread_id_from_email(
+            thread_id = conv_manager.extract_thread_id_from_email(
                 message_id=email.message_id,
                 in_reply_to=email.in_reply_to,
                 references=email.references,
@@ -729,9 +992,9 @@ class EmailProcessor:
             logger.debug(f"Thread ID: {thread_id}")
 
             # Get conversation history for context
-            conversation_context = conversation_manager.format_conversation_context(
+            conversation_context = conv_manager.format_conversation_context(
                 thread_id=thread_id,
-                max_messages=10,  # Last 10 messages for context
+                max_messages=10,
             )
 
             # Extract query text from email body
@@ -753,14 +1016,13 @@ class EmailProcessor:
                     action="query",
                 )
 
-            # Check if sender is admin
+            # Check if sender is admin (ST only — MT handles permissions upstream)
             is_admin = self.admin_validator.is_allowed(email.sender.email)
             if is_admin:
                 logger.info(f"Admin user detected: {email.sender.email}")
 
-            # Check if this is a confirmation email (search anywhere in subject or body)
-            if is_admin:
-                # Search for confirmation token in subject + body
+            # Check if this is a confirmation email (ST-only feature)
+            if is_admin and not self.tenant_email_router:
                 search_text = f"{email.subject or ''} {query_text}".upper()
                 if "CONFIRM" in search_text:
                     logger.info(
@@ -772,21 +1034,21 @@ class EmailProcessor:
 
             # Process query through RAG engine with conversation context
             logger.debug(f"Querying RAG engine for message {message_id}")
-            result = self.query_handler.process_query(
+            result = query_handler.process_query(
                 query_text=query_text,
                 user_email=email.sender.email,
                 is_admin=is_admin,
-                is_email_request=True,  # Email requests require confirmation for whitelist changes
+                is_email_request=True,
                 context={
                     "message_id": message_id,
                     "subject": email.subject,
                     "date": str(email.date) if email.date else None,
-                    "conversation_history": conversation_context,  # Add conversation context
+                    "conversation_history": conversation_context,
                 },
             )
 
-            # Store user query in conversation database (after processing to capture optimization data)
-            conversation_manager.add_message(
+            # Store user query in conversation database
+            conv_manager.add_message(
                 thread_id=thread_id,
                 message_type=MessageType.QUERY,
                 content=query_text,
@@ -823,12 +1085,12 @@ class EmailProcessor:
             else:
                 reply_subject = email.subject
 
-            # Store assistant reply in conversation database first (to get message_id for feedback)
-            reply_message_id = conversation_manager.add_message(
+            # Store assistant reply in conversation database
+            reply_message_id = conv_manager.add_message(
                 thread_id=thread_id,
                 message_type=MessageType.REPLY,
                 content=result["response"],
-                sender=settings.email_target_address,
+                sender=from_address,
                 subject=reply_subject,
                 channel=ChannelType.EMAIL,
                 sources_used=result.get("sources"),
@@ -842,7 +1104,7 @@ class EmailProcessor:
             subject, plain_text, html_body = format_response_email(
                 response_text=result["response"],
                 sources=result["sources"],
-                instance_name=settings.instance_name,
+                instance_name=instance_name,
                 original_subject=email.subject,
                 message_id=reply_message_id,
             )
@@ -853,7 +1115,6 @@ class EmailProcessor:
                 logger.info(
                     f"Skipping automatic email reply - tool already sent email to {email.sender.email}"
                 )
-                # Mark as processed successfully
                 self.message_tracker.mark_processed(
                     message_id=message_id,
                     sender=email.sender.email,
@@ -871,9 +1132,9 @@ class EmailProcessor:
             if attachments:
                 logger.info(f"Including {len(attachments)} attachments in reply")
 
-            # Send reply email
+            # Send reply email with tenant identity
             logger.info(f"Sending reply to {email.sender.email}")
-            send_success = self.email_sender.send_reply(
+            send_success = email_sender.send_reply(
                 to_address=email.sender.email,
                 subject=subject,
                 body_text=plain_text,
@@ -881,6 +1142,8 @@ class EmailProcessor:
                 in_reply_to=message_id,
                 references=[message_id],
                 attachments=attachments,
+                from_address=from_address,
+                from_name=from_name,
             )
 
             if not send_success:
@@ -938,6 +1201,8 @@ class EmailProcessor:
         attachments_processed: int,
         chunks_created: int,
         duplicates_skipped: int = 0,
+        instance_name: Optional[str] = None,
+        organization: Optional[str] = None,
     ) -> None:
         """
         Send acknowledgment email after successful KB ingestion.
@@ -947,7 +1212,12 @@ class EmailProcessor:
             attachments_processed: Number of attachments successfully added
             chunks_created: Number of text chunks created
             duplicates_skipped: Number of duplicate documents skipped
+            instance_name: Override instance name (for MT mode)
+            organization: Override organization (for MT mode)
         """
+        inst_name = instance_name or settings.instance_name
+        org = organization or settings.organization
+
         try:
             # Format summary of what was added
             if attachments_processed > 0:
@@ -965,7 +1235,7 @@ class EmailProcessor:
             # Build acknowledgment message
             subject = f"Re: {email.subject}"
 
-            body_text = f"""Thank you for contributing to the {settings.instance_name} knowledge base.
+            body_text = f"""Thank you for contributing to the {inst_name} knowledge base.
 
 The following material has been successfully processed:
 - Source: {content_summary}
@@ -975,10 +1245,10 @@ The following material has been successfully processed:
 {"This content is now available for queries from authorized users." if chunks_created > 0 else "Note: All documents were already present in the knowledge base."}
 
 ---
-{settings.instance_name}
-{settings.organization}"""
+{inst_name}
+{org}"""
 
-            body_html = f"""<p>Thank you for contributing to the <strong>{settings.instance_name}</strong> knowledge base.</p>
+            body_html = f"""<p>Thank you for contributing to the <strong>{inst_name}</strong> knowledge base.</p>
 
 <p>The following material has been successfully processed:</p>
 <ul>
@@ -990,8 +1260,8 @@ The following material has been successfully processed:
 <p>{"This content is now available for queries from authorized users." if chunks_created > 0 else "Note: All documents were already present in the knowledge base."}</p>
 
 <hr>
-<p><em>{settings.instance_name}</em><br>
-<em>{settings.organization}</em></p>"""
+<p><em>{inst_name}</em><br>
+<em>{org}</em></p>"""
 
             # Send acknowledgment
             self.email_sender.send_reply(
@@ -1009,58 +1279,69 @@ The following material has been successfully processed:
                 f"Failed to send KB acknowledgment to {email.sender.email}: {e}"
             )
 
-    def _send_rejection_email(self, email: EmailMessage, rejection_type: str) -> None:
+    def _send_rejection_email(
+        self,
+        email: EmailMessage,
+        rejection_type: str,
+        instance_name: Optional[str] = None,
+        organization: Optional[str] = None,
+    ) -> None:
         """
         Send rejection email to non-whitelisted sender.
 
         Args:
             email: Original EmailMessage that was rejected
             rejection_type: Type of rejection ("query" or "teach")
+            instance_name: Override instance name (for MT mode)
+            organization: Override organization (for MT mode)
         """
+        inst_name = instance_name or settings.instance_name
+        org = organization or settings.organization
+
         try:
             subject = f"Re: {email.subject}"
 
             if rejection_type == "query":
-                body_text = f"""Thank you for your message to {settings.instance_name}.
+                body_text = f"""Thank you for your message to {inst_name}.
 
 Unfortunately, your email address ({email.sender.email}) is not authorized to query the knowledge base.
 
-If you believe you should have access, please contact the administrator at {settings.organization}.
+If you believe you should have access, please contact the administrator at {org}.
 
 ---
-{settings.instance_name}
-{settings.organization}"""
+{inst_name}
+{org}"""
 
-                body_html = f"""<p>Thank you for your message to <strong>{settings.instance_name}</strong>.</p>
+                body_html = f"""<p>Thank you for your message to <strong>{inst_name}</strong>.</p>
 
 <p>Unfortunately, your email address (<code>{email.sender.email}</code>) is not authorized to query the knowledge base.</p>
 
-<p>If you believe you should have access, please contact the administrator at <em>{settings.organization}</em>.</p>
+<p>If you believe you should have access, please contact the administrator at <em>{org}</em>.</p>
 
 <hr>
-<p><em>{settings.instance_name}</em><br>
-<em>{settings.organization}</em></p>"""
+<p><em>{inst_name}</em><br>
+<em>{org}</em></p>"""
 
             else:  # rejection_type == "teach"
-                body_text = f"""Thank you for your message to {settings.instance_name}.
+                body_text = f"""Thank you for your message to {inst_name}.
 
 Unfortunately, your email address ({email.sender.email}) is not authorized to add content to the knowledge base.
 
-If you believe you should have access, please contact the administrator at {settings.organization}.
+If you believe you should have access, please contact the administrator at {org}.
 
 ---
-{settings.instance_name}
-{settings.organization}"""
+{inst_name}
+{org}"""
 
-                body_html = f"""<p>Thank you for your message to <strong>{settings.instance_name}</strong>.</p>
+                body_html = f"""<p>Thank you for your message to <strong>{inst_name}</strong>.</p>
 
 <p>Unfortunately, your email address (<code>{email.sender.email}</code>) is not authorized to add content to the knowledge base.</p>
 
-<p>If you believe you should have access, please contact the administrator at <em>{settings.organization}</em>.</p>
+<p>If you believe you should have access, please contact the administrator at <em>{org}</em>.</p>
 
 <hr>
-<p><em>{settings.instance_name}</em><br>
-<em>{settings.organization}</em></p>"""
+<p><em>{inst_name}</em><br>
+<em>{org}</em></p>"""
 
             # Send rejection message
             self.email_sender.send_reply(
