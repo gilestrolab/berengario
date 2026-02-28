@@ -148,6 +148,7 @@ if settings.multi_tenant:
 
     logger.info("Multi-tenant mode enabled. Initializing platform components...")
     platform_db_manager = TenantDBManager()
+    platform_db_manager.init_platform_db()
     storage_backend = create_storage_backend()
     component_factory = TenantComponentFactory(
         storage_backend=storage_backend,
@@ -432,14 +433,10 @@ async def root(request: Request):
     # Check authentication
     session_id = get_session_id(request)
     if not session_id:
-        if settings.multi_tenant:
-            return RedirectResponse(url="/static/landing.html", status_code=303)
         return RedirectResponse(url="/static/login.html", status_code=303)
 
     session = session_manager.get_session(session_id)
     if not session or not session.is_authenticated():
-        if settings.multi_tenant:
-            return RedirectResponse(url="/static/landing.html", status_code=303)
         return RedirectResponse(url="/static/login.html", status_code=303)
 
     # MT onboarding: verified email but no tenant yet → redirect to onboarding

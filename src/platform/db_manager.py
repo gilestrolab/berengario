@@ -306,7 +306,10 @@ class TenantDBManager:
             Tenant model or None if not found.
         """
         with self.get_platform_session() as session:
-            return session.query(Tenant).filter(Tenant.slug == slug).first()
+            tenant = session.query(Tenant).filter(Tenant.slug == slug).first()
+            if tenant:
+                session.expunge(tenant)
+            return tenant
 
     def get_tenant_by_email(self, email_address: str) -> Optional[Tenant]:
         """
@@ -319,11 +322,14 @@ class TenantDBManager:
             Tenant model or None if not found.
         """
         with self.get_platform_session() as session:
-            return (
+            tenant = (
                 session.query(Tenant)
                 .filter(Tenant.email_address == email_address)
                 .first()
             )
+            if tenant:
+                session.expunge(tenant)
+            return tenant
 
     def get_active_tenants(self) -> list:
         """
@@ -335,9 +341,12 @@ class TenantDBManager:
         with self.get_platform_session() as session:
             from src.platform.models import TenantStatus
 
-            return (
+            tenants = (
                 session.query(Tenant).filter(Tenant.status == TenantStatus.ACTIVE).all()
             )
+            for t in tenants:
+                session.expunge(t)
+            return tenants
 
     def test_platform_connection(self) -> bool:
         """

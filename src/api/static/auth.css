@@ -50,8 +50,9 @@
 }
 
 .auth-logo {
-    width: 120px;
+    width: 180px;
     height: auto;
+    object-fit: contain;
 }
 
 @keyframes bounce {
@@ -293,47 +294,42 @@
 }
 
 /* Landing Page */
-.landing-container {
-    max-width: 500px;
-}
-
 .landing-actions {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
 }
 
-.landing-card {
+/* Choice cards (onboarding wizard: join vs create) */
+.choice-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.choice-card {
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 1rem 1.25rem;
+    padding: 1.25rem;
     border: 2px solid var(--border-color);
     border-radius: 0.5rem;
-    text-decoration: none;
+    background: var(--surface);
     color: inherit;
-    transition: var(--transition);
+    text-align: left;
     cursor: pointer;
+    transition: var(--transition);
+    font-family: inherit;
 }
 
-.landing-card:hover {
+.choice-card:hover {
     border-color: var(--primary-color);
     background: rgba(122, 92, 62, 0.04);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-.landing-card-subtle {
-    border-color: transparent;
-    background: rgba(0, 0, 0, 0.02);
-}
-
-.landing-card-subtle:hover {
-    border-color: var(--border-color);
-    background: rgba(122, 92, 62, 0.04);
-}
-
-.landing-card-icon {
+.choice-card i {
     width: 40px;
     height: 40px;
     display: flex;
@@ -346,34 +342,18 @@
     flex-shrink: 0;
 }
 
-.landing-card-content {
-    flex: 1;
-}
-
-.landing-card-content h3 {
+.choice-card h3 {
     font-size: 1rem;
     font-weight: 600;
     color: var(--text-primary);
     margin: 0 0 0.25rem 0;
 }
 
-.landing-card-content p {
+.choice-card p {
     font-size: 0.8rem;
     color: var(--text-secondary);
     margin: 0;
     line-height: 1.4;
-}
-
-.landing-card-arrow {
-    color: var(--text-secondary);
-    font-size: 0.75rem;
-    opacity: 0.5;
-    transition: var(--transition);
-}
-
-.landing-card:hover .landing-card-arrow {
-    opacity: 1;
-    color: var(--primary-color);
 }
 
 /* Onboarding Wizard */

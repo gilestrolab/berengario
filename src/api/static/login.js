@@ -29,11 +29,27 @@ class LoginPage {
         try {
             const response = await fetch('/api/config');
             const config = await response.json();
+            this.multiTenant = config.multi_tenant || false;
 
             // Update page title and headers
             document.title = `Login - ${config.instance_name}`;
             document.getElementById('instance-name').textContent = config.instance_name;
-            document.getElementById('instance-description').textContent = config.instance_description;
+
+            if (this.multiTenant) {
+                document.getElementById('instance-description').textContent = 'Your AI-powered knowledge base';
+                document.getElementById('st-footer').style.display = 'none';
+                document.getElementById('mt-footer').style.display = 'block';
+
+                // If ?code=XYZ from QR invite, redirect to onboarding
+                const params = new URLSearchParams(window.location.search);
+                const code = params.get('code');
+                if (code) {
+                    window.location.href = `/static/onboarding.html?code=${encodeURIComponent(code)}`;
+                    return;
+                }
+            } else {
+                document.getElementById('instance-description').textContent = config.instance_description;
+            }
         } catch (error) {
             console.error('Error loading config:', error);
         }

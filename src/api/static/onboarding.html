@@ -22,12 +22,10 @@
             <!-- Progress Dots -->
             <div class="wizard-progress" id="wizard-progress"></div>
 
-            <!-- CREATE ACCOUNT FLOW -->
-
             <!-- Step: Email -->
             <div class="wizard-step" id="step-email">
-                <h2>Enter your email</h2>
-                <p class="step-description">We'll send you a verification code.</p>
+                <h2>Create your account</h2>
+                <p class="step-description">Enter your email to get started.</p>
                 <form id="email-form" class="auth-form">
                     <div class="form-group">
                         <label for="email" class="form-label">Email Address</label>
@@ -62,7 +60,25 @@
                 </form>
             </div>
 
-            <!-- Step: Invite Code (join flow only) -->
+            <!-- Step: Choose path — join existing or start new -->
+            <div class="wizard-step" id="step-choice">
+                <h2>What would you like to do?</h2>
+                <p class="step-description">You can join a team or start your own.</p>
+                <div class="choice-cards">
+                    <button class="choice-card" id="choice-join">
+                        <i class="fas fa-users"></i>
+                        <h3>Join an existing team</h3>
+                        <p>I have an invite code from a team admin</p>
+                    </button>
+                    <button class="choice-card" id="choice-create">
+                        <i class="fas fa-plus-circle"></i>
+                        <h3>Start a new team</h3>
+                        <p>Set up a fresh workspace</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step: Invite Code (join path) -->
             <div class="wizard-step" id="step-code">
                 <h2>Enter invite code</h2>
                 <p class="step-description">Your team admin should have given you an invite code.</p>
@@ -85,7 +101,24 @@
                 </div>
             </div>
 
-            <!-- Step: Tenant Details (create flow) -->
+            <!-- Step: Join Confirmation -->
+            <div class="wizard-step" id="step-join">
+                <h2>Join team</h2>
+                <p class="step-description">You're about to join:</p>
+                <div class="team-info-card">
+                    <div class="team-name" id="join-team-name"></div>
+                    <div class="team-approval" id="join-team-approval"></div>
+                </div>
+                <button class="auth-button" id="join-btn">
+                    <span class="button-text">Join Team</span>
+                    <span class="button-spinner" style="display:none;">
+                        <svg class="spinner" viewBox="0 0 24 24"><circle class="spinner-circle" cx="12" cy="12" r="10"></circle></svg>
+                    </span>
+                </button>
+                <div class="auth-message error" id="join-error" style="display:none;"></div>
+            </div>
+
+            <!-- Step: Tenant Details (create path) -->
             <div class="wizard-step" id="step-details">
                 <h2>Set up your team</h2>
                 <p class="step-description">Configure your new team workspace.</p>
@@ -116,23 +149,6 @@
                 </form>
             </div>
 
-            <!-- Step: Join Confirmation (join flow) -->
-            <div class="wizard-step" id="step-join">
-                <h2>Join team</h2>
-                <p class="step-description">You're about to join:</p>
-                <div class="team-info-card">
-                    <div class="team-name" id="join-team-name"></div>
-                    <div class="team-approval" id="join-team-approval"></div>
-                </div>
-                <button class="auth-button" id="join-btn">
-                    <span class="button-text">Join Team</span>
-                    <span class="button-spinner" style="display:none;">
-                        <svg class="spinner" viewBox="0 0 24 24"><circle class="spinner-circle" cx="12" cy="12" r="10"></circle></svg>
-                    </span>
-                </button>
-                <div class="auth-message error" id="join-error" style="display:none;"></div>
-            </div>
-
             <!-- Step: Pending Approval -->
             <div class="wizard-step" id="step-pending">
                 <div class="pending-message">
@@ -140,7 +156,7 @@
                     <h3>Request Submitted</h3>
                     <p>Your request to join has been sent to the team admin. You'll be able to access the team once approved.</p>
                     <div style="margin-top: 1.5rem;">
-                        <a href="/static/landing.html" class="auth-button" style="display:inline-flex;width:auto;padding:0.75rem 2rem;text-decoration:none;">Back to Home</a>
+                        <a href="/static/login.html" class="auth-button" style="display:inline-flex;width:auto;padding:0.75rem 2rem;text-decoration:none;">Back to Home</a>
                     </div>
                 </div>
             </div>
@@ -156,7 +172,9 @@
 
             <!-- Footer -->
             <div class="auth-footer" style="margin-top: 1.5rem;">
-                <a href="/static/landing.html" class="auth-link"><i class="fas fa-arrow-left"></i> Back to home</a>
+                <p class="auth-footer-text">
+                    Already have an account? <a href="/static/login.html" class="auth-link">Login</a>
+                </p>
             </div>
         </div>
     </div>

@@ -1,13 +1,13 @@
 /**
  * Onboarding wizard for multi-tenant mode.
  *
- * Handles both Create Account and Join Team flows.
- * Uses URL params: ?mode=create|join and ?code=XYZ
+ * Unified flow: Email → OTP → Choice (join or create) → branch.
+ * If ?code=XYZ is present (from QR invite), skips choice and goes
+ * straight to join flow after OTP.
  */
 
 class OnboardingPage {
     constructor() {
-        this.mode = null; // 'create' or 'join'
         this.email = null;
         this.inviteCode = null;
         this.teamName = null;
@@ -41,36 +41,45 @@ class OnboardingPage {
 
     parseParams() {
         const params = new URLSearchParams(window.location.search);
-        this.mode = params.get('mode') || 'create';
         this.inviteCode = params.get('code') || null;
     }
 
     setupSteps() {
-        if (this.mode === 'create') {
-            this.steps = ['step-email', 'step-otp', 'step-details', 'step-success'];
-        } else {
-            // Join flow: code first, then email/otp, then join
-            if (this.inviteCode) {
-                // Pre-filled code: validate, then email, otp, join
-                this.steps = ['step-code', 'step-email', 'step-otp', 'step-join', 'step-success'];
-            } else {
-                this.steps = ['step-code', 'step-email', 'step-otp', 'step-join', 'step-success'];
-            }
-        }
+        // Unified flow: email → otp → choice → (branch)
+        // The choice step dynamically inserts the right next steps
+        this.steps = ['step-email', 'step-otp', 'step-choice', 'step-success'];
         this.renderProgress();
         this.showStep(0);
 
-        // Pre-fill invite code if provided
-        if (this.inviteCode && this.mode === 'join') {
+        // If invite code from QR, pre-fill it
+        if (this.inviteCode) {
             document.getElementById('invite-code').value = this.inviteCode;
         }
+    }
+
+    /**
+     * Switch to the join branch: choice → code → join → success
+     */
+    switchToJoinPath() {
+        this.steps = ['step-email', 'step-otp', 'step-choice', 'step-code', 'step-join', 'step-success'];
+        this.showStep(this.steps.indexOf('step-code'));
+    }
+
+    /**
+     * Switch to the create branch: choice → details → success
+     */
+    switchToCreatePath() {
+        this.steps = ['step-email', 'step-otp', 'step-choice', 'step-details', 'step-success'];
+        this.showStep(this.steps.indexOf('step-details'));
     }
 
     renderProgress() {
         const container = document.getElementById('wizard-progress');
         container.innerHTML = '';
-        // Don't count success step in progress
-        const visibleSteps = this.steps.length - 1;
+        // Don't count success/pending steps in progress dots
+        const visibleSteps = this.steps.filter(
+            s => s !== 'step-success' && s !== 'step-pending'
+        ).length;
         for (let i = 0; i < visibleSteps; i++) {
             const dot = document.createElement('div');
             dot.className = 'wizard-dot';
@@ -104,16 +113,20 @@ class OnboardingPage {
             const data = await resp.json();
 
             if (data.authenticated && data.onboarding_verified) {
-                // Already verified — skip email/OTP steps
+                // Already verified — skip email/OTP, go to choice
                 this.email = data.email;
-                if (this.mode === 'create') {
-                    this.showStep(this.steps.indexOf('step-details'));
-                } else if (this.inviteCode) {
-                    // Auto-validate the pre-filled code
-                    await this.validateCode(this.inviteCode);
-                    if (this.teamName) {
+                if (this.inviteCode) {
+                    // Pre-filled code from QR: skip choice, validate and go to join
+                    const valid = await this.validateCode(this.inviteCode);
+                    if (valid) {
+                        this.steps = ['step-email', 'step-otp', 'step-code', 'step-join', 'step-success'];
+                        document.getElementById('join-team-name').textContent = this.teamName;
+                        document.getElementById('join-team-approval').textContent =
+                            this.requiresApproval ? 'Admin approval required' : 'Open — you can join immediately';
                         this.showStep(this.steps.indexOf('step-join'));
                     }
+                } else {
+                    this.showStep(this.steps.indexOf('step-choice'));
                 }
             } else if (data.authenticated && !data.onboarding_verified && data.tenant_id) {
                 // Fully authenticated with tenant — go to main
@@ -137,6 +150,15 @@ class OnboardingPage {
             await this.verifyOTP();
         });
 
+        // Choice buttons
+        document.getElementById('choice-join')?.addEventListener('click', () => {
+            this.switchToJoinPath();
+        });
+
+        document.getElementById('choice-create')?.addEventListener('click', () => {
+            this.switchToCreatePath();
+        });
+
         // Code form
         document.getElementById('code-form')?.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -144,6 +166,10 @@ class OnboardingPage {
             const valid = await this.validateCode(code);
             if (valid) {
                 this.inviteCode = code;
+                // Populate join confirmation
+                document.getElementById('join-team-name').textContent = this.teamName;
+                document.getElementById('join-team-approval').textContent =
+                    this.requiresApproval ? 'Admin approval required' : 'Open — you can join immediately';
                 this.nextStep();
             }
         });
@@ -237,14 +263,18 @@ class OnboardingPage {
             const data = await resp.json();
 
             if (data.success) {
-                if (this.mode === 'create') {
-                    this.nextStep(); // → step-details
+                if (this.inviteCode) {
+                    // Came with invite code from QR — skip choice, go to join
+                    const valid = await this.validateCode(this.inviteCode);
+                    if (valid) {
+                        this.steps = ['step-email', 'step-otp', 'step-code', 'step-join', 'step-success'];
+                        document.getElementById('join-team-name').textContent = this.teamName;
+                        document.getElementById('join-team-approval').textContent =
+                            this.requiresApproval ? 'Admin approval required' : 'Open — you can join immediately';
+                        this.showStep(this.steps.indexOf('step-join'));
+                    }
                 } else {
-                    this.nextStep(); // → step-join
-                    // Populate join info
-                    document.getElementById('join-team-name').textContent = this.teamName;
-                    document.getElementById('join-team-approval').textContent =
-                        this.requiresApproval ? 'Admin approval required' : 'Open — you can join immediately';
+                    this.nextStep(); // → step-choice
                 }
             } else {
                 this.showError('otp-error', data.message);
@@ -275,7 +305,7 @@ class OnboardingPage {
                 this.teamName = data.tenant_name;
                 this.requiresApproval = data.requires_approval;
 
-                // Show team info
+                // Show team info on code step
                 document.getElementById('team-info').style.display = 'block';
                 document.getElementById('team-name').textContent = data.tenant_name;
                 document.getElementById('team-approval').textContent =
@@ -301,7 +331,6 @@ class OnboardingPage {
             return;
         }
 
-        // Generate slug locally (simple version)
         const slug = name
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
@@ -314,7 +343,6 @@ class OnboardingPage {
         document.getElementById('slug-preview').style.display = 'block';
         document.getElementById('slug-display').textContent = slug;
 
-        // Debounce slug check
         clearTimeout(this.slugTimeout);
         this.slugTimeout = setTimeout(() => this.checkSlug(slug), 400);
     }
@@ -407,10 +435,6 @@ class OnboardingPage {
                     this.showStep(this.steps.indexOf('step-success'));
                     setTimeout(() => { window.location.href = '/'; }, 1500);
                 } else if (data.pending_approval) {
-                    this.showStep(this.steps.indexOf('step-pending') !== -1
-                        ? this.steps.indexOf('step-pending')
-                        : this.steps.length - 1);
-                    // Show pending step (insert if not in steps)
                     document.getElementById('step-pending').classList.add('active');
                     document.querySelectorAll('.wizard-step:not(#step-pending)').forEach(
                         el => el.classList.remove('active'));

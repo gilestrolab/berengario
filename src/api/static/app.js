@@ -66,13 +66,18 @@ class ChatApp {
             // Update page title and headers
             document.title = this.config.instance_name;
             document.getElementById('instance-name').textContent = this.config.instance_name;
-            document.getElementById('instance-description').textContent = this.config.instance_description;
 
-            // Update organization if available
-            const orgElement = document.getElementById('instance-organization');
-            if (this.config.organization && orgElement) {
-                orgElement.textContent = this.config.organization;
-                orgElement.style.display = 'block';
+            // In MT mode, hide the instance description and organization (tenant-specific)
+            if (!this.config.multi_tenant) {
+                document.getElementById('instance-description').textContent = this.config.instance_description;
+
+                const orgElement = document.getElementById('instance-organization');
+                if (this.config.organization && orgElement) {
+                    orgElement.textContent = this.config.organization;
+                    orgElement.style.display = 'block';
+                }
+            } else {
+                document.getElementById('instance-description').textContent = 'Your AI-powered knowledge base';
             }
 
             // Update welcome message if present
@@ -81,7 +86,7 @@ class ChatApp {
             if (welcomeTitle) {
                 welcomeTitle.textContent = `Welcome to ${this.config.instance_name}`;
             }
-            if (welcomeDescription && this.config.instance_description) {
+            if (welcomeDescription && this.config.instance_description && !this.config.multi_tenant) {
                 welcomeDescription.textContent = this.config.instance_description;
             }
         } catch (error) {

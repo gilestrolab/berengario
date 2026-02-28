@@ -19,7 +19,7 @@ COPY pyproject.toml ./
 
 # Install Python dependencies (including MariaDB support)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e ".[mariadb]"
+    pip install --no-cache-dir -e ".[mariadb,multitenant]"
 
 # ============================================================================
 # Base stage - Common setup for both dev and production
@@ -71,7 +71,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install package with dev dependencies
-RUN pip install --no-cache-dir -e ".[dev,mariadb]"
+RUN pip install --no-cache-dir -e ".[dev,mariadb,multitenant]"
 
 # Switch to non-root user
 USER berengario
@@ -88,8 +88,8 @@ CMD ["python", "run_email_service.py"]
 # ============================================================================
 FROM base AS production
 
-# Install the package (production dependencies only)
-RUN pip install --no-cache-dir -e ".[mariadb]"
+# Install the package (production and multi-tenancy dependencies)
+RUN pip install --no-cache-dir -e ".[mariadb,multitenant]"
 
 # Switch to non-root user
 USER berengario

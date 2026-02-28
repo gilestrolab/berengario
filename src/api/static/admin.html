@@ -1716,6 +1716,241 @@
                 min-height: 40px;
             }
         }
+
+        /* === Team Selects, Badges, Buttons === */
+        .team-select {
+            padding: 0.375rem 0.625rem;
+            font-size: 0.8125rem;
+            font-family: inherit;
+            font-weight: 500;
+            border: 1.5px solid var(--border-color, #D5C9B8);
+            border-radius: 0.375rem;
+            background: var(--surface, #fff);
+            color: var(--text-primary, #3E3831);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238C8279'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            padding-right: 1.5rem;
+        }
+
+        .team-select:hover {
+            border-color: var(--primary-color, #7A5C3E);
+        }
+
+        .team-select:focus {
+            outline: none;
+            border-color: var(--primary-color, #7A5C3E);
+            box-shadow: 0 0 0 2px rgba(122, 92, 62, 0.12);
+        }
+
+        .team-select-lg {
+            padding: 0.5rem 2rem 0.5rem 0.75rem;
+            font-size: 0.875rem;
+        }
+
+        .role-badge {
+            display: inline-block;
+            padding: 0.125rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .role-admin {
+            background: rgba(122, 92, 62, 0.12);
+            color: var(--primary-color, #7A5C3E);
+        }
+
+        .role-teacher {
+            background: rgba(74, 140, 111, 0.12);
+            color: #3D7A5C;
+        }
+
+        .role-querier {
+            background: rgba(90, 130, 160, 0.12);
+            color: #4A7A9B;
+        }
+
+        .team-member-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.625rem 0.75rem;
+            border-bottom: 1px solid var(--border-color, #E8E0D5);
+        }
+
+        .team-member-row:last-child {
+            border-bottom: none;
+        }
+
+        .team-member-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            min-width: 0;
+        }
+
+        .team-member-email {
+            font-weight: 500;
+            color: var(--text-primary, #3E3831);
+            font-size: 0.875rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .team-member-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        .btn-remove-member {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.75rem;
+            height: 1.75rem;
+            border: none;
+            border-radius: 0.375rem;
+            background: none;
+            color: var(--text-secondary, #8C8279);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.8125rem;
+        }
+
+        .btn-remove-member:hover {
+            background: rgba(163, 66, 58, 0.1);
+            color: #A3423A;
+        }
+
+        /* === Team / Invite Section === */
+        .section-description {
+            margin-bottom: 1rem;
+            color: var(--text-secondary, #8C8279);
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        .invite-code-row {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .invite-code {
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: 0.25rem;
+            padding: 0.625rem 1.25rem;
+            background: rgba(122, 92, 62, 0.07);
+            border: 1px solid rgba(122, 92, 62, 0.15);
+            border-radius: 0.5rem;
+            color: var(--text-primary, #3E3831);
+            font-family: 'Courier New', monospace;
+        }
+
+        .invite-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .invite-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 0.875rem;
+            background: var(--surface, #fff);
+            border: 1.5px solid var(--border-color, #D5C9B8);
+            border-radius: 0.5rem;
+            color: var(--text-secondary, #8C8279);
+            font-size: 0.8125rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .invite-btn i {
+            font-size: 0.9375rem;
+        }
+
+        .invite-btn:hover {
+            background: rgba(122, 92, 62, 0.06);
+            border-color: var(--primary-color, #7A5C3E);
+            color: var(--primary-color, #7A5C3E);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        }
+
+        .invite-btn:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+
+        .qr-container {
+            display: none;
+            text-align: center;
+            margin: 1rem 0;
+            padding: 1.25rem;
+            background: #fff;
+            border: 1px solid var(--border-color, #D5C9B8);
+            border-radius: 0.75rem;
+        }
+
+        .qr-container.visible {
+            display: block;
+        }
+
+        .qr-image {
+            max-width: 220px;
+            border-radius: 0.5rem;
+        }
+
+        .approval-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            cursor: pointer;
+        }
+
+        .approval-toggle input[type="checkbox"] {
+            width: 1rem;
+            height: 1rem;
+            accent-color: var(--primary-color, #7A5C3E);
+        }
+
+        .toggle-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary, #8C8279);
+        }
+
+        @media (max-width: 600px) {
+            .invite-code-row {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .invite-btn span {
+                display: none;
+            }
+            .invite-btn {
+                padding: 0.5rem;
+            }
+            .invite-btn i {
+                font-size: 1.1rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1740,24 +1975,35 @@
         <div id="team-tab" class="tab-content">
             <!-- Invite Code Section -->
             <div class="whitelist-section">
-                <h3><i class="fas fa-link"></i> Invite Link</h3>
-                <p style="margin-bottom: 1rem; color: var(--text-secondary, #8C8279); font-size: 0.875rem;">
-                    Share this code or QR to invite new members
-                </p>
-                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-                    <code id="invite-code-display" style="font-size: 1.5rem; font-weight: bold; letter-spacing: 0.2rem; padding: 0.5rem 1rem; background: rgba(122,92,62,0.08); border-radius: 0.5rem;">---</code>
-                    <button class="action-btn" id="copy-invite-btn" title="Copy code"><i class="fas fa-copy"></i></button>
-                    <button class="action-btn" id="regenerate-invite-btn" title="Generate new code"><i class="fas fa-sync-alt"></i></button>
-                    <button class="action-btn" id="show-qr-btn" title="Show QR code"><i class="fas fa-qrcode"></i></button>
+                <h3><i class="fas fa-envelope-open-text"></i> Invite Code</h3>
+                <p class="section-description">Share this code or QR to invite new members to your team.</p>
+
+                <div class="invite-code-row">
+                    <code id="invite-code-display" class="invite-code">---</code>
+                    <div class="invite-actions">
+                        <button class="invite-btn" id="copy-invite-btn" title="Copy invite code">
+                            <i class="far fa-clone"></i>
+                            <span>Copy</span>
+                        </button>
+                        <button class="invite-btn" id="regenerate-invite-btn" title="Generate new code">
+                            <i class="fas fa-redo-alt"></i>
+                            <span>New Code</span>
+                        </button>
+                        <button class="invite-btn" id="show-qr-btn" title="Show QR code">
+                            <i class="fas fa-qrcode"></i>
+                            <span>QR Code</span>
+                        </button>
+                    </div>
                 </div>
-                <div id="qr-container" style="display:none; text-align:center; margin: 1rem 0;">
-                    <img id="qr-image" alt="Invite QR Code" style="max-width: 200px; border-radius: 0.5rem;">
+
+                <div id="qr-container" class="qr-container">
+                    <img id="qr-image" alt="Invite QR Code" class="qr-image">
                 </div>
-                <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
-                    <label style="font-size: 0.875rem; color: var(--text-secondary);">
-                        <input type="checkbox" id="join-approval-toggle"> Require admin approval to join
-                    </label>
-                </div>
+
+                <label class="approval-toggle">
+                    <input type="checkbox" id="join-approval-toggle">
+                    <span class="toggle-label">Require admin approval to join</span>
+                </label>
             </div>
 
             <!-- Team Members Section -->
@@ -1765,12 +2011,12 @@
                 <h3><i class="fas fa-users"></i> Team Members</h3>
                 <div class="whitelist-controls">
                     <input type="email" id="team-member-email" placeholder="email@example.com" class="whitelist-input">
-                    <select id="team-member-role" style="padding: 0.5rem; border: 1px solid var(--border, #D5C9B8); border-radius: 4px;">
+                    <select id="team-member-role" class="team-select team-select-lg">
                         <option value="querier">Querier</option>
                         <option value="teacher">Teacher</option>
                         <option value="admin">Admin</option>
                     </select>
-                    <button class="action-btn" id="add-team-member-btn"><i class="fas fa-plus"></i> Add</button>
+                    <button class="invite-btn" id="add-team-member-btn"><i class="fas fa-user-plus"></i> <span>Add</span></button>
                 </div>
                 <div id="team-members-list" class="whitelist-list" style="margin-top: 1rem;">
                     <div style="color: var(--text-secondary); font-size: 0.875rem; padding: 1rem;">Loading...</div>
@@ -2207,6 +2453,8 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="/static/admin.js?v=20251111-3"></script>
+    <script src="/static/admin.js?v=20260228-2"></script>
+    <script src="/static/admin-usage.js?v=20260228-2"></script>
+    <script src="/static/admin-feedback.js?v=20260228-2"></script>
 </body>
 </html>

@@ -9,7 +9,7 @@ import io
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from src.api.models import (
@@ -47,9 +47,8 @@ def create_tenant_admin_router(
     )
 
     @router.get("/invite")
-    async def get_invite_info(session=None):
+    async def get_invite_info(admin_session=Depends(require_admin)):
         """Get invite code and join settings for the current tenant."""
-        admin_session = await require_admin(session)
 
         from src.platform.models import Tenant
 
@@ -69,9 +68,8 @@ def create_tenant_admin_router(
             }
 
     @router.post("/invite/regenerate")
-    async def regenerate_invite_code(session=None):
+    async def regenerate_invite_code(admin_session=Depends(require_admin)):
         """Generate a new invite code, invalidating the old one."""
-        admin_session = await require_admin(session)
 
         from src.platform.models import Tenant
 
@@ -98,10 +96,9 @@ def create_tenant_admin_router(
     @router.put("/settings")
     async def update_tenant_settings(
         body: TenantSettingsRequest,
-        session=None,
+        admin_session=Depends(require_admin),
     ):
         """Update tenant join settings."""
-        admin_session = await require_admin(session)
 
         from src.platform.models import Tenant
 
@@ -128,9 +125,8 @@ def create_tenant_admin_router(
             )
 
     @router.get("/join-requests")
-    async def list_join_requests(session=None):
+    async def list_join_requests(admin_session=Depends(require_admin)):
         """List pending join requests for the current tenant."""
-        admin_session = await require_admin(session)
 
         from src.platform.models import JoinRequest, JoinRequestStatus
 
@@ -148,14 +144,16 @@ def create_tenant_admin_router(
             return [r.to_dict() for r in requests]
 
     @router.post("/join-requests/{request_id}/approve")
-    async def approve_join_request(request_id: int, session=None):
+    async def approve_join_request(
+        request_id: int,
+        admin_session=Depends(require_admin),
+    ):
         """
         Approve a join request, creating a TenantUser.
 
         Args:
             request_id: Join request ID to approve.
         """
-        admin_session = await require_admin(session)
 
         from src.platform.models import (
             JoinRequest,
@@ -207,14 +205,16 @@ def create_tenant_admin_router(
             )
 
     @router.post("/join-requests/{request_id}/reject")
-    async def reject_join_request(request_id: int, session=None):
+    async def reject_join_request(
+        request_id: int,
+        admin_session=Depends(require_admin),
+    ):
         """
         Reject a join request.
 
         Args:
             request_id: Join request ID to reject.
         """
-        admin_session = await require_admin(session)
 
         from src.platform.models import JoinRequest, JoinRequestStatus
 
@@ -252,14 +252,13 @@ def create_tenant_admin_router(
             )
 
     @router.get("/invite/qr")
-    async def get_invite_qr(session=None):
+    async def get_invite_qr(admin_session=Depends(require_admin)):
         """
         Generate a QR code PNG for the tenant invite link.
 
         Returns a PNG image containing a QR code that points to
         the landing page with the invite code pre-filled.
         """
-        admin_session = await require_admin(session)
 
         from src.platform.models import Tenant
 
@@ -288,8 +287,13 @@ def create_tenant_admin_router(
                 f"?mode=join&code={tenant.invite_code}"
             )
 
-            # Generate QR code
-            qr = qrcode.QRCode(version=1, box_size=10, border=4)
+            # Generate QR code with minimal complexity for short URLs
+            qr = qrcode.QRCode(
+                version=None,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=8,
+                border=2,
+            )
             qr.add_data(invite_url)
             qr.make(fit=True)
             img = qr.make_image(fill_color="black", back_color="white")
