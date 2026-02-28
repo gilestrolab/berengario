@@ -12,40 +12,49 @@ Berengario is a flexible infrastructure that combines document processing, vecto
 
 ## Features
 
-- 📄 **Multi-format Document Processing**: PDF, DOCX, TXT, CSV support
-- 🔍 **Semantic Search**: ChromaDB vector database for efficient retrieval
-- 🤖 **LLM Integration**: OpenAI-compatible API support (OpenAI, Naga.ac, etc.)
-- 📧 **Email Integration**:
-  - IMAP inbox monitoring with SSL/TLS
+- **Multi-format Document Processing**: PDF, DOCX, TXT, CSV, XLS, XLSX support
+- **Document Enhancement**: LLM-based enhancement for structured data (CSV/Excel) — converts tables to narrative text and generates Q&A pairs for improved RAG retrieval
+- **Semantic Search**: ChromaDB vector database for efficient retrieval
+- **Query Optimization**: Automatic query rewriting, expansion, and context-aware enhancement for better retrieval accuracy
+- **LLM Integration**: OpenAI-compatible API support (OpenAI, Naga.ac, OpenRouter)
+- **Function Calling / Tool System**: Calendar event creation, CSV/JSON export, web search, database queries, whitelist management
+- **Web Crawling**: Ingest content from URLs directly into the knowledge base
+- **Email Integration**:
+  - IMAP inbox monitoring with SSL/TLS and STARTTLS
   - Automatic KB updates from CC'd/forwarded emails
   - Automated RAG-powered email replies
   - SMTP email sending with HTML formatting
   - Customizable email format (text, markdown, or HTML)
   - Custom email footers
-  - Email whitelist for security
+  - Dual whitelists for security (teach vs query permissions)
   - Configurable forwarded email detection
   - Message tracking and deduplication
-- 🌐 **Web Interface**:
+- **Web Interface**:
   - Modern chat interface with real-time query processing
   - OTP-based passwordless authentication via email
   - Session management with configurable timeout
   - Source citations and attachment downloads
   - Conversation history persistence
+  - Response feedback system (thumbs up/down with comments)
   - Mobile-responsive design
   - Dynamic branding from environment variables
-- 🔧 **Admin Panel**:
+- **Admin Panel**:
   - Whitelist management (queriers, teachers, admins)
   - Document browser with view/download/delete
+  - Query optimization analytics (optimization rate, expansion ratio)
+  - Source document usage analytics (citation counts, relevance scores)
+  - Response feedback analytics
   - Data backup with email notifications
   - Audit logging for all admin actions
   - Role-based access control
-- ⚙️ **Instance Configuration**: Deploy multiple customized instances
+- **Instance Configuration**: Deploy multiple customized instances
   - Custom system prompts for AI behavior tuning
   - Instance-specific branding and naming
   - Dynamic frontend customization from .env
-- 🔄 **Auto-monitoring**: Watch folders for automatic document updates
-- 📊 **Source Citations**: All responses include source references
-- 🗄️ **Flexible Storage**: SQLite or MariaDB for email tracking
+- **Multi-Tenancy** (optional): Isolated per-tenant databases, storage, and email routing
+- **Auto-monitoring**: Watch folders for automatic document updates
+- **Source Citations**: All responses include source references
+- **Flexible Storage**: SQLite or MariaDB for tracking; local filesystem or S3/MinIO for documents
 
 ## Quick Start
 
@@ -66,7 +75,7 @@ cp .env.example .env
 docker-compose up -d
 
 # View logs
-docker-compose logs -f berengario
+docker-compose logs -f berengario-web
 ```
 
 Docker images are automatically built and published to GitHub Container Registry:
@@ -74,13 +83,6 @@ Docker images are automatically built and published to GitHub Container Registry
 ```bash
 # Pull latest image
 docker pull ghcr.io/gilestrolab/berengar.io:latest
-
-# Run with docker
-docker run -d \
-  --name berengario \
-  --env-file .env \
-  -v $(pwd)/data:/app/data \
-  ghcr.io/gilestrolab/berengar.io:latest
 ```
 
 #### Option 2: Local Installation
@@ -104,9 +106,9 @@ Copy `.env.example` to `.env` and configure your instance:
 
 ```bash
 # Instance Configuration (customize for your deployment)
-INSTANCE_NAME=MyAssistant
+INSTANCE_NAME=Berengario
 INSTANCE_DESCRIPTION=AI assistant for my organization
-ORGANIZATION=My Organization Name
+ORGANIZATION=My Organization
 
 # API Configuration
 OPENAI_API_KEY=your-api-key-here
@@ -119,7 +121,7 @@ OPENAI_API_BASE=https://api.openai.com/v1  # or https://api.naga.ac/v1
 
 ```bash
 # Run web service with Docker Compose
-docker-compose -f docker-compose.mariadb.yml up -d
+docker-compose up -d
 
 # Access the web interface at http://localhost:8000
 # Login with your whitelisted email to receive an OTP code
@@ -129,9 +131,10 @@ The web interface provides:
 - **Authentication**: OTP-based passwordless login via email
 - **Chat Interface**: Real-time queries with source citations
 - **Conversation History**: Persistent session management
-- **Attachments**: Download generated files (calendar events, etc.)
+- **Attachments**: Download generated files (calendar events, CSV exports, etc.)
+- **Feedback**: Rate responses with thumbs up/down and comments
 - **Dynamic Branding**: Instance name and description from .env
-- **Admin Panel**: Whitelist and document management (for admin users)
+- **Admin Panel**: Whitelist, document, analytics, and backup management (for admin users)
 
 #### CLI Administration Tool
 
@@ -169,13 +172,6 @@ docker exec berengario-web berengario-cli version              # Show version an
 docker exec berengario-web berengario-cli info                 # Show detailed configuration
 ```
 
-**Features:**
-- Colorized output with progress bars
-- Interactive confirmations for destructive operations
-- Pretty-printed tables for list commands
-- Comprehensive help text (`berengario-cli help` or `berengario-cli <command> --help`)
-- Replaces scripts folder with unified interface
-
 **Tip:** For easier access, you can create a shell alias:
 ```bash
 alias berengario="docker exec berengario-web berengario-cli"
@@ -204,8 +200,10 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 ### Core Components
 
 1. **Document Processing** (`src/document_processing/`)
-   - Multi-format parser (PDF, DOCX, TXT, CSV)
+   - Multi-format parser (PDF, DOCX, TXT, CSV, XLS, XLSX)
+   - LLM-based enhancement for structured data (CSV/Excel)
    - Intelligent chunking with overlap
+   - Web crawling for URL ingestion
    - File monitoring for auto-updates
 
 2. **Knowledge Base** (`src/document_processing/kb_manager.py`)
@@ -214,39 +212,39 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
    - Efficient semantic search
 
 3. **RAG Engine** (`src/rag/`)
-   - LlamaIndex query engine
-   - Customizable prompts per instance
+   - LlamaIndex query engine with customizable prompts
+   - Query optimization (expansion, rewriting, context-aware enhancement)
+   - Function calling / tool system (calendar, export, web search, database, whitelist)
    - Source citation
 
 4. **Email Integration** (`src/email/`)
    - IMAP client with SSL/TLS and STARTTLS support
    - SMTP email sender with TLS encryption
    - Email parser with HTML-to-text conversion
-   - Whitelist validation with domain wildcards
+   - Dual whitelist validation with domain wildcards
    - Attachment handler with file type validation
+   - Conversation manager with Q&A tracking
    - Message tracking (SQLite/MariaDB)
    - Email service daemon with auto-reconnection
-   - Automated RAG-powered query responses
-   - Professional HTML + plain text email formatting
-   - Email threading support (In-Reply-To, References headers)
-   - Configurable forwarded email detection
-   - Processing rules: Direct emails → RAG Query + Reply, CC/BCC/Forwarded → KB ingestion
+   - Tenant email routing (multi-tenancy)
 
 5. **Web API** (`src/api/`)
-   - FastAPI REST endpoints for queries and configuration
-   - OTP-based authentication system
-   - Session management with configurable timeout
-   - Cookie-based authentication
-   - Protected routes with authentication middleware
-   - Real-time query processing
-   - Conversation history management
-   - Attachment handling and downloads
-   - Modern chat interface with responsive design
-   - Admin panel with role-based access control
-   - Whitelist management (queriers, teachers, admins)
-   - Document browser with view/download/delete
-   - Data backup with email notifications
-   - Audit logging for admin actions
+   - FastAPI REST endpoints organized into modular routes
+   - OTP-based authentication system with session management
+   - Admin panel with analytics dashboard
+   - Response feedback collection
+   - Tenant onboarding flow (multi-tenancy)
+
+6. **Platform Layer** (`src/platform/`) — Multi-tenancy
+   - Tenant provisioning and lifecycle management
+   - Per-tenant database isolation (TenantDBManager)
+   - Storage abstraction (local filesystem or S3/MinIO)
+   - Envelope encryption (master key encrypts per-tenant keys)
+   - Component factory and resolver for DI
+
+7. **CLI** (`src/cli/`)
+   - Unified administration tool (Typer + Rich)
+   - Knowledge base, database, and backup commands
 
 ### Tech Stack
 
@@ -255,7 +253,9 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 - **ChromaDB**: Vector database
 - **FastAPI**: Web API and authentication
 - **Uvicorn**: ASGI web server
-- **OpenAI-compatible APIs**: Naga.ac, OpenAI, etc.
+- **SQLAlchemy**: Database ORM (SQLite/MariaDB)
+- **Typer + Rich**: CLI framework
+- **OpenAI-compatible APIs**: Naga.ac, OpenAI, OpenRouter
 
 ## Configuration Options
 
@@ -263,42 +263,68 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `INSTANCE_NAME` | Name of your assistant | `DoLS-GPT` |
+| `INSTANCE_NAME` | Name of your assistant | `Berengario` |
 | `INSTANCE_DESCRIPTION` | Purpose description | `AI assistant for...` |
-| `ORGANIZATION` | Organization name | `Imperial College` |
+| `ORGANIZATION` | Organization name | `My Organization` |
 | `WEB_BASE_URL` | Base URL for web interface | `http://localhost:8000` |
 
 ### API Settings
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OPENAI_API_KEY` | API key for LLM/embeddings | Required |
-| `OPENAI_API_BASE` | API endpoint URL | `https://api.openai.com/v1` |
+| `OPENAI_API_KEY` | API key for embeddings | Required |
+| `OPENAI_API_BASE` | Embedding API endpoint URL | `https://api.openai.com/v1` |
 | `OPENAI_EMBEDDING_MODEL` | Embedding model | `text-embedding-3-small` |
+| `OPENROUTER_API_KEY` | API key for LLM queries | Required |
+| `OPENROUTER_API_BASE` | LLM API endpoint URL | `https://openrouter.ai/api/v1` |
 | `OPENROUTER_MODEL` | LLM model name | `anthropic/claude-3.5-sonnet` |
 
 ### Document Settings
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DOCUMENTS_PATH` | Path to documents folder | `data/documents` |
+| `DOCUMENTS_PATH` | Path to documents folder | `data/kb/documents` |
+| `KB_DOCUMENTS_PATH` | KB documents storage | `data/kb/documents` |
+| `KB_EMAILS_PATH` | KB email content storage | `data/kb/emails` |
+| `CHROMA_DB_PATH` | Vector database path | `data/chroma_db` |
 | `CHUNK_SIZE` | Text chunk size | `1024` |
 | `CHUNK_OVERLAP` | Chunk overlap | `200` |
 | `TOP_K_RETRIEVAL` | Number of chunks to retrieve | `5` |
+| `SIMILARITY_THRESHOLD` | Minimum similarity score | `0.7` |
+
+### Document Enhancement Settings
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DOC_ENHANCEMENT_ENABLED` | Enable LLM enhancement for CSV/Excel | `true` |
+| `DOC_ENHANCEMENT_MODEL` | Model for enhancement | Same as `OPENROUTER_MODEL` |
+| `DOC_ENHANCEMENT_MAX_TOKENS` | Max tokens for enhancement | `4000` |
+| `DOC_ENHANCEMENT_TYPES` | Enhancement types: `narrative`, `qa` | `narrative,qa` |
+
+### Query Optimization Settings
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `QUERY_OPTIMIZATION_ENABLED` | Enable automatic query optimization | `true` |
+| `QUERY_OPTIMIZATION_MODEL` | Model for optimization | Same as `OPENROUTER_MODEL` |
+| `QUERY_OPTIMIZATION_MAX_TOKENS` | Max tokens for optimization | `500` |
+| `QUERY_OPTIMIZATION_TEMPERATURE` | Temperature (lower = more consistent) | `0.3` |
+| `QUERY_OPTIMIZATION_TIMEOUT` | API timeout in seconds | `10` |
 
 ### Email Settings
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `EMAIL_TARGET_ADDRESS` | Bot's email address | Required |
-| `EMAIL_DISPLAY_NAME` | Bot's display name in emails | Required |
-| `IMAP_SERVER` | IMAP server address | `imap.gmail.com` |
+| `EMAIL_DISPLAY_NAME` | Bot's display name in emails | `Berengario` |
+| `IMAP_SERVER` | IMAP server address | Required |
 | `IMAP_PORT` | IMAP port (993 SSL, 143 STARTTLS) | `993` |
-| `SMTP_SERVER` | SMTP server address | `smtp.gmail.com` |
+| `SMTP_SERVER` | SMTP server address | Required |
 | `SMTP_PORT` | SMTP port (587 STARTTLS, 465 SSL) | `587` |
-| `SMTP_USER` | SMTP username | Same as email address |
+| `SMTP_USER` | SMTP username | Same as IMAP user |
 | `SMTP_PASSWORD` | SMTP password | Required |
 | `SMTP_USE_TLS` | Use STARTTLS encryption | `true` |
+| `EMAIL_CHECK_INTERVAL` | Polling frequency in seconds | `300` |
 | `EMAIL_TEACH_WHITELIST_FILE` | Who can add to KB (teach) | `data/config/allowed_teachers.txt` |
 | `EMAIL_TEACH_WHITELIST_ENABLED` | Enable teaching whitelist | `true` |
 | `EMAIL_QUERY_WHITELIST_FILE` | Who can query KB | `data/config/allowed_queriers.txt` |
@@ -320,8 +346,8 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `WEB_SESSION_TIMEOUT` | Session timeout in seconds | `86400` (24 hours) |
-| `WEB_HOST` | Web server host | `0.0.0.0` |
-| `WEB_PORT` | Web server port | `8000` |
+| `API_HOST` | Web server host | `0.0.0.0` |
+| `API_PORT` | Web server port | `8000` |
 
 **Authentication:** Web interface uses OTP-based passwordless authentication. Users must be whitelisted in `EMAIL_QUERY_WHITELIST_FILE` to access the web interface.
 
@@ -331,7 +357,14 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 |----------|-------------|---------|
 | `RAG_CUSTOM_PROMPT_FILE` | Custom system prompt additions (optional) | None |
 
-See [`.env.example`](.env.example) for complete configuration options.
+### Logging
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LOG_LEVEL` | Log level (DEBUG, INFO, WARNING, ERROR) | `INFO` |
+| `LOG_FILE` | Log file path | `data/logs/berengario.log` |
+
+See [`.env.example`](.env.example) for complete configuration options including multi-tenancy settings.
 
 ## Development
 
@@ -340,72 +373,135 @@ See [`.env.example`](.env.example) for complete configuration options.
 ```
 RAGInbox/
 ├── .github/
-│   └── workflows/                 # CI/CD pipelines
-│       ├── ci.yml                 # Testing and linting
-│       ├── docker.yml             # Docker build and publish
-│       └── release.yml            # Release automation
+│   └── workflows/                        # CI/CD pipelines
+│       ├── ci.yml                        # Testing and linting
+│       ├── docker.yml                    # Docker build and publish
+│       └── release.yml                   # Release automation
 ├── src/
-│   ├── config.py                  # Configuration management
-│   ├── demo_phase1.py            # CLI interface
+│   ├── config.py                         # Pydantic Settings configuration
 │   ├── document_processing/
-│   │   ├── document_processor.py # Document parsing
-│   │   ├── kb_manager.py         # Vector DB operations
-│   │   └── file_watcher.py       # File monitoring
+│   │   ├── document_processor.py         # Multi-format parser (PDF, DOCX, TXT, CSV, XLS, XLSX)
+│   │   ├── enhancement_processor.py      # LLM enhancement for structured data
+│   │   ├── kb_manager.py                 # ChromaDB vector storage
+│   │   ├── file_watcher.py               # File monitoring for auto-updates
+│   │   ├── description_generator.py      # Auto-generate document descriptions
+│   │   └── web_crawler.py                # URL content ingestion
 │   ├── rag/
-│   │   ├── rag_engine.py         # Query engine
-│   │   └── query_handler.py      # Query processing
-│   ├── email/                     # Email integration (Phase 2 & 3)
-│   │   ├── email_client.py        # IMAP inbox monitoring
-│   │   ├── email_sender.py        # SMTP email sending
-│   │   ├── email_parser.py        # Email parsing
-│   │   └── ...
-│   └── api/                        # Web interface (Phase 4)
-│       ├── api.py                  # FastAPI endpoints
-│       ├── admin/                  # Admin panel modules
-│       │   ├── whitelist_manager.py # Whitelist management
-│       │   ├── document_manager.py  # Document management
-│       │   ├── backup_manager.py    # Data backup
-│       │   └── audit_logger.py      # Admin audit logging
-│       └── static/                 # Frontend files
-│           ├── index.html          # Chat interface
-│           ├── login.html          # Login page
-│           ├── verify.html         # OTP verification
-│           ├── admin.html          # Admin panel
-│           ├── app.js              # Chat app logic
-│           ├── login.js            # Login logic
-│           ├── verify.js           # Verification logic
-│           ├── admin.js            # Admin panel logic
-│           ├── style.css           # Chat interface styles
-│           └── auth.css            # Authentication styles
-├── tests/                         # Unit tests
-├── data/                          # All persistent data (Docker volumes)
-│   ├── documents/                 # Source documents (watched folder)
-│   ├── chroma_db/                 # Vector database storage
-│   ├── config/                    # Configuration files
-│   │   ├── allowed_teachers.txt   # Teaching whitelist
-│   │   ├── allowed_queriers.txt   # Query whitelist
-│   │   ├── allowed_admins.txt     # Admin whitelist
-│   │   ├── custom_prompt.txt      # Custom system prompt (optional)
-│   │   └── email_footer.txt       # Custom email footer (optional)
-│   ├── logs/                      # Application logs
-│   │   ├── dols_gpt.log           # Main log file
-│   │   └── admin_audit.log        # Admin actions audit log
-│   ├── backups/                   # Data backups (ZIP files)
-│   ├── temp_attachments/          # Temporary email attachments
-│   └── message_tracker.db         # Email processing tracking
-├── docs/                          # Documentation
-│   ├── QUICKSTART.md              # Quick start guide
-│   ├── DATA_STRUCTURE.md          # Data directory structure
-│   ├── EMAIL_PROCESSING_RULES.md  # Email processing logic
-│   └── ...                        # See docs/README.md for full list
-├── Dockerfile                     # Production container image
-├── docker-compose.yml             # Docker Compose configuration
-├── .dockerignore                  # Docker build exclusions
-├── pyproject.toml                 # Package configuration
-├── .env.example                   # Environment configuration template
-├── PLANNING.md                    # Architecture documentation
-├── TASK.md                        # Task tracking
-└── README.md                      # This file
+│   │   ├── rag_engine.py                 # LlamaIndex query engine
+│   │   ├── query_handler.py              # High-level query processing
+│   │   ├── query_optimizer.py            # LLM-based query optimization
+│   │   ├── example_questions.py          # Example question generation
+│   │   ├── topic_clustering.py           # Topic clustering
+│   │   └── tools/                        # Function calling system
+│   │       ├── base.py                   # Tool registry and base classes
+│   │       ├── tool_executor.py          # Tool execution engine
+│   │       ├── context.py                # Execution context management
+│   │       ├── pending_actions.py        # Pending action tracking
+│   │       ├── calendar_tools.py         # Calendar event creation (.ics)
+│   │       ├── export_tools.py           # CSV, JSON, text file export
+│   │       ├── web_search_tools.py       # Web search via DuckDuckGo
+│   │       ├── rag_tools.py              # Knowledge base search
+│   │       ├── database_tools.py         # Conversation history and analytics queries
+│   │       └── whitelist_tools.py        # Whitelist management (admin only)
+│   ├── email/
+│   │   ├── email_client.py               # IMAP client (SSL/TLS, STARTTLS)
+│   │   ├── email_parser.py               # Header/body parsing, forwarding detection
+│   │   ├── email_sender.py               # SMTP sending (HTML/Markdown/Text)
+│   │   ├── attachment_handler.py          # Attachment extraction and validation
+│   │   ├── email_processor.py            # Pipeline orchestration
+│   │   ├── email_service.py              # Background daemon with auto-reconnection
+│   │   ├── conversation_manager.py       # Message history with Q&A tracking
+│   │   ├── message_tracker.py            # Deduplication tracking
+│   │   ├── whitelist_validator.py         # Dual whitelist validation
+│   │   ├── db_manager.py                 # Database abstraction (SQLite/MariaDB)
+│   │   ├── db_models.py                  # SQLAlchemy models
+│   │   └── tenant_email_router.py        # Multi-tenant email routing
+│   ├── api/
+│   │   ├── api.py                        # FastAPI app initialization
+│   │   ├── models.py                     # Request/response models
+│   │   ├── auth/                         # Authentication
+│   │   │   ├── dependencies.py           # FastAPI dependency injection
+│   │   │   ├── otp_manager.py            # One-time password handling
+│   │   │   └── session_manager.py        # Session management
+│   │   ├── admin/                        # Admin panel utilities
+│   │   │   ├── whitelist_manager.py      # Whitelist management
+│   │   │   ├── document_manager.py       # Document management
+│   │   │   ├── backup_manager.py         # Data backup
+│   │   │   └── audit_logger.py           # Admin audit logging
+│   │   ├── routes/                       # API endpoint routes
+│   │   │   ├── auth.py                   # Authentication endpoints
+│   │   │   ├── query.py                  # Query/RAG endpoints
+│   │   │   ├── conversations.py          # Conversation history
+│   │   │   ├── admin.py                  # Admin endpoints
+│   │   │   ├── analytics.py              # Analytics dashboard
+│   │   │   ├── feedback.py               # Response feedback
+│   │   │   ├── onboarding.py             # Tenant onboarding flow
+│   │   │   ├── team.py                   # Team management (MT)
+│   │   │   └── tenant_admin.py           # Tenant admin (MT)
+│   │   └── static/                       # Frontend files
+│   │       ├── index.html                # Chat interface
+│   │       ├── app.js                    # Chat app logic
+│   │       ├── login.html / login.js     # Login page
+│   │       ├── verify.html / verify.js   # OTP verification
+│   │       ├── admin.html / admin.js     # Admin panel
+│   │       ├── admin-usage.js            # Usage analytics
+│   │       ├── admin-feedback.js         # Feedback analytics
+│   │       ├── feedback.html / feedback.js # Feedback interface
+│   │       ├── onboarding.html / onboarding.js # Tenant onboarding
+│   │       ├── style.css                 # Chat styles
+│   │       └── auth.css                  # Authentication styles
+│   ├── platform/                         # Multi-tenancy platform layer
+│   │   ├── models.py                     # Tenant, TenantUser, TenantEncryptionKey models
+│   │   ├── tenant_context.py             # TenantContext configuration bundle
+│   │   ├── db_manager.py                 # Per-tenant database engine management
+│   │   ├── storage.py                    # Storage backend ABC (Local/S3)
+│   │   ├── encryption.py                 # Envelope encryption (MEK/TEK)
+│   │   ├── provisioning.py               # Tenant provisioning with rollback
+│   │   ├── component_factory.py          # Per-tenant component creation
+│   │   ├── component_resolver.py         # ST/MT routing bridge
+│   │   └── db_session_adapter.py         # Database session adapter
+│   └── cli/
+│       ├── main.py                       # CLI entry point (Typer)
+│       ├── utils.py                      # CLI utilities (Rich formatting)
+│       └── commands/                     # CLI command implementations
+│           ├── kb.py                     # Knowledge base commands
+│           ├── db.py                     # Database commands
+│           └── backup.py                 # Backup commands
+├── tests/                                # Pytest test suite
+├── data/                                 # All persistent data (Docker volumes)
+│   ├── kb/                               # Knowledge base storage
+│   │   ├── documents/                    # Source documents (watched folder)
+│   │   ├── emails/                       # Email-ingested content
+│   │   └── archive/                      # Archived documents
+│   ├── chroma_db/                        # Vector database storage
+│   ├── config/                           # Configuration files
+│   │   ├── allowed_teachers.txt          # Teaching whitelist
+│   │   ├── allowed_queriers.txt          # Query whitelist
+│   │   ├── allowed_admins.txt            # Admin whitelist
+│   │   ├── custom_prompt.txt             # Custom system prompt (optional)
+│   │   └── email_footer.txt              # Custom email footer (optional)
+│   ├── logs/                             # Application logs
+│   │   ├── berengario.log                # Main log file
+│   │   └── admin_audit.log               # Admin actions audit log
+│   ├── backups/                          # Data backups (ZIP files)
+│   ├── temp_attachments/                 # Temporary email attachments
+│   ├── tenants/                          # Per-tenant data (multi-tenancy)
+│   └── message_tracker.db                # Email processing tracking (SQLite)
+├── docs/                                 # Documentation
+│   ├── QUICKSTART.md                     # Quick start guide
+│   ├── CLI.md                            # CLI usage documentation
+│   ├── DATA_STRUCTURE.md                 # Data directory structure
+│   ├── DATABASE_DESIGN.md                # Database schema
+│   ├── EMAIL_PROCESSING_RULES.md         # Email processing logic
+│   ├── MULTI_TENANCY.md                  # Multi-tenancy deployment guide
+│   ├── PRE_COMMIT_HOOK.md                # Pre-commit hook documentation
+│   └── EMAIL_AUTH_ISSUE.md               # Office 365 auth troubleshooting
+├── Dockerfile                            # Multi-stage build (production + dev)
+├── docker-compose.yml                    # Docker Compose configuration
+├── pyproject.toml                        # Package configuration
+├── .env.example                          # Environment configuration template
+├── PLANNING.md                           # Architecture documentation
+└── README.md                             # This file
 ```
 
 ### Email Integration
@@ -422,7 +518,7 @@ Berengario includes comprehensive email integration for automatic knowledge base
 - Teaching whitelist (`allowed_teachers.txt`) - who can add content via CC/BCC/forwarding
 - Query whitelist (`allowed_queriers.txt`) - who can ask questions and get RAG replies
 - Users can be in one list, both lists, or neither
-- Support for domain wildcards (`@imperial.ac.uk`)
+- Support for domain wildcards (`@example.com`)
 - File-based configuration for easy management
 
 **Query Response Features:**
@@ -438,7 +534,7 @@ Berengario includes comprehensive email integration for automatic knowledge base
 **KB Ingestion Features:**
 - IMAP inbox monitoring (SSL/TLS and STARTTLS)
 - SMTP email sending with TLS encryption
-- Attachment processing (PDF, DOCX, TXT, CSV)
+- Attachment processing (PDF, DOCX, TXT, CSV, XLS, XLSX)
 - Email body processing when no attachments
 - Message tracking and deduplication
 - Background service daemon with auto-reconnection
@@ -497,15 +593,21 @@ Berengario includes a comprehensive admin panel for managing your instance:
    - Delete documents from the knowledge base
    - See document metadata (type, source, hash)
 
-3. **Data Backup**
+3. **Analytics Dashboard**
+   - Query optimization analytics (optimization rate, average expansion ratio, before/after samples)
+   - Source document usage analytics (citation counts, average relevance scores)
+   - Response feedback analytics (satisfaction rates, comment analysis)
+   - Time range filtering (7 days, 30 days, 90 days, all time)
+
+4. **Data Backup**
    - Create full backups of the data directory
    - Backups created asynchronously (non-blocking)
    - Email notification with download link when complete
    - List and download previous backups
    - Automatic cleanup (keeps last 5, deletes older than 7 days)
-   - Backup files named with instance: `dols_gpt_backup_YYYYMMDD_HHMMSS.zip`
+   - Backup files named with instance: `berengario_backup_YYYYMMDD_HHMMSS.zip`
 
-4. **Audit Logging**
+5. **Audit Logging**
    - All admin actions logged to `data/logs/admin_audit.log`
    - Includes user, action, timestamp, and outcome
    - Helps track changes and troubleshoot issues
@@ -552,7 +654,7 @@ Replace the default email footer with your own branding:
 
 2. Edit `data/config/email_footer.txt` with your custom text:
    ```
-   This response was generated by DoLS-GPT, your AI assistant.
+   This response was generated by Berengario, your AI assistant.
 
    For more information:
    - Documentation: https://example.com/docs
@@ -604,29 +706,45 @@ All persistent data is stored under `data/` for easy Docker volume mounting. See
 
 ### Running Tests
 
+All tests should be run inside the Docker dev container to ensure a consistent environment:
+
 ```bash
-# Run all tests
-pytest tests/ -v
+# Run all tests (auto-starts dev container)
+docker-compose run --rm berengario-dev pytest tests/ -v
 
-# Run specific test suites
-pytest tests/test_email_parser.py -v       # Email parsing tests
-pytest tests/test_email_sender.py -v       # Email sender tests (Phase 3)
-pytest tests/test_phase3_integration.py -v # Phase 3 integration tests
-pytest tests/test_document_processor.py -v # Document processing tests
-pytest tests/test_kb_manager.py -v         # Knowledge base tests
+# Run specific test file
+docker-compose run --rm berengario-dev pytest tests/test_email_parser.py -v
 
-# Current status: 246 of 252 tests passing (Phase 3 complete)
+# Run tests matching a pattern
+docker-compose run --rm berengario-dev pytest tests/ -v -k "email"
+
+# Run with coverage report
+docker-compose run --rm berengario-dev pytest tests/ -v --cov=src --cov-report=term-missing
 ```
+
+See the project's [CLAUDE.md](.claude/CLAUDE.md) for full Docker testing workflow details.
 
 ### Code Quality
 
+Berengario includes a pre-commit hook that automatically runs before each commit:
+
+1. **Black** - Code formatting
+2. **Ruff** - Linting
+3. **Pytest** - Full test suite in Docker
+
 ```bash
 # Format with Black
-black src/ tests/
+docker-compose run --rm berengario-dev black src/ tests/
 
 # Lint with Ruff
+docker-compose run --rm berengario-dev ruff check src/ tests/ --fix
+
+# Or use local tools if installed
+black src/ tests/
 ruff check src/ tests/
 ```
+
+See [`docs/PRE_COMMIT_HOOK.md`](docs/PRE_COMMIT_HOOK.md) for pre-commit hook documentation.
 
 ### CI/CD Pipeline
 
@@ -678,47 +796,12 @@ git push origin v1.0.0
 
 ## Roadmap
 
-- [x] **Phase 1**: Core RAG with document processing ✓
-- [x] **Phase 2**: Email inbox integration ✓
-  - IMAP client with SSL/TLS support
-  - Email parsing and whitelist validation
-  - Attachment extraction and KB ingestion
-  - Message tracking and deduplication
-  - Email service daemon
-  - Configurable forwarded email detection
-- [x] **Phase 3**: Email query handler (automated replies) ✓
-  - SMTP email sender with TLS support
-  - RAG-powered query processing
-  - Professional HTML + plain text email formatting
-  - Source citations in responses
-  - Email threading support
-  - Integration with EmailProcessor
-- [x] **Phase 4**: Web frontend with chat interface ✓
-  - FastAPI REST API with authentication
-  - OTP-based passwordless authentication via email
-  - Modern chat interface with real-time queries
-  - Session management with configurable timeout
-  - Conversation history persistence
-  - Source citations and attachment downloads
-  - Mobile-responsive design
-  - Dynamic branding from environment variables
-  - Admin panel with whitelist and document management
-  - Data backup functionality with email notifications
-  - Audit logging for administrative actions
-- [x] **Phase 5**: Docker deployment and CI/CD ✓
-  - Multi-stage Dockerfile for production
-  - Docker Compose with optional MariaDB
-  - Multi-platform builds (amd64, arm64)
-  - GitHub Actions CI/CD pipeline
-  - Automated testing and linting
-  - Container registry publishing
-- [x] **Phase 6**: Multi-tenancy ✓
-  - Per-tenant database and storage isolation
-  - S3/MinIO storage backend support
-  - Optional per-tenant encryption
-  - Tenant provisioning and onboarding UI
-  - Team management with role-based access
-  - Email routing per tenant
+- [x] **Phase 1**: Core RAG with document processing
+- [x] **Phase 2**: Email inbox integration (IMAP, parsing, attachments, tracking)
+- [x] **Phase 3**: Email query handler (SMTP, RAG replies, HTML formatting)
+- [x] **Phase 4**: Web frontend (authentication, chat, admin, analytics, feedback)
+- [x] **Phase 5**: Docker deployment and CI/CD
+- [x] **Phase 6**: Multi-tenancy (per-tenant isolation, S3 storage, encryption, team management)
 
 ## Multi-Tenancy
 
@@ -766,18 +849,19 @@ MIT License - see LICENSE file for details.
 Comprehensive documentation is available in the [`docs/`](docs/) directory:
 
 - **[QUICKSTART.md](docs/QUICKSTART.md)** - Quick start guide
+- **[CLI.md](docs/CLI.md)** - CLI administration tool documentation
 - **[DATA_STRUCTURE.md](docs/DATA_STRUCTURE.md)** - Data directory structure and Docker volumes
 - **[EMAIL_PROCESSING_RULES.md](docs/EMAIL_PROCESSING_RULES.md)** - Email processing logic and decision tree
 - **[DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md)** - Database abstraction layer (SQLite/MariaDB)
 - **[MULTI_TENANCY.md](docs/MULTI_TENANCY.md)** - Multi-tenancy deployment guide
+- **[PRE_COMMIT_HOOK.md](docs/PRE_COMMIT_HOOK.md)** - Pre-commit hook setup and troubleshooting
 - **[EMAIL_AUTH_ISSUE.md](docs/EMAIL_AUTH_ISSUE.md)** - Office 365 authentication troubleshooting
-- **[PHASE2_PLAN.md](docs/PHASE2_PLAN.md)** - Phase 2 implementation architecture
 
 ## Support
 
-- 📖 [Documentation](docs/)
-- 🐛 [Issue Tracker](https://github.com/gilestrolab/berengar.io/issues)
-- 💬 [Discussions](https://github.com/gilestrolab/berengar.io/discussions)
+- [Documentation](docs/)
+- [Issue Tracker](https://github.com/gilestrolab/berengar.io/issues)
+- [Discussions](https://github.com/gilestrolab/berengar.io/discussions)
 
 ## Credits
 
