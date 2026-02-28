@@ -170,11 +170,13 @@ class QueryHandler:
             Formatted email body text.
         """
         if not result["success"]:
+            from src.config import settings
+
             return (
                 "I apologize, but I encountered an error processing your query.\n\n"
                 f"Error: {result.get('error', 'Unknown error')}\n\n"
                 "Please try rephrasing your question or contact support if the issue persists.\n\n"
-                "Best regards,\nDoLS GPT"
+                f"Best regards,\n{settings.instance_name}"
             )
 
         return self.rag_engine.format_response_for_email(result)

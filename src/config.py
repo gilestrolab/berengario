@@ -88,10 +88,10 @@ class Settings(BaseSettings):
         default=300, description="Seconds between email checks"
     )
     email_target_address: str = Field(
-        ..., description="Target email address (dols.gpt@...)"
+        ..., description="Target email address for the bot"
     )
     email_display_name: str = Field(
-        default="DoLS GPT assistant", description="Display name for sent emails"
+        default="Berengario", description="Display name for sent emails"
     )
     email_temp_dir: Path = Field(
         default=Path("data/temp_attachments"),
