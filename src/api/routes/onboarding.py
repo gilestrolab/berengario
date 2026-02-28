@@ -28,6 +28,7 @@ def create_onboarding_router(
     get_session_id,
     set_session_cookie,
     settings,
+    key_manager=None,
 ):
     """
     Create onboarding router for multi-tenant self-service.
@@ -38,6 +39,7 @@ def create_onboarding_router(
         get_session_id: Function to extract session ID from request.
         set_session_cookie: Function to set session cookie.
         settings: Application settings.
+        key_manager: DatabaseKeyManager for per-tenant encryption (optional).
 
     Returns:
         Configured APIRouter instance.
@@ -95,6 +97,7 @@ def create_onboarding_router(
             provisioner = TenantProvisioner(
                 db_manager=platform_db_manager,
                 storage=storage,
+                key_manager=key_manager,
             )
 
             tenant = provisioner.create_tenant(

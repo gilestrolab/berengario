@@ -95,12 +95,12 @@ class EmailService:
         from src.email.tenant_email_router import TenantEmailRouter
         from src.platform.component_factory import TenantComponentFactory
         from src.platform.db_manager import TenantDBManager
-        from src.platform.storage import LocalStorageBackend
+        from src.platform.storage import create_storage_backend
 
         logger.info("Creating multi-tenant EmailProcessor...")
 
         db_manager = TenantDBManager()
-        storage_backend = LocalStorageBackend()
+        storage_backend = create_storage_backend()
         component_factory = TenantComponentFactory(
             storage_backend=storage_backend,
             db_manager=db_manager,
@@ -110,7 +110,10 @@ class EmailService:
             component_factory=component_factory,
         )
 
-        processor = EmailProcessor(tenant_email_router=router)
+        processor = EmailProcessor(
+            tenant_email_router=router,
+            storage_backend=storage_backend,
+        )
         logger.info("Multi-tenant EmailProcessor created successfully")
         return processor
 

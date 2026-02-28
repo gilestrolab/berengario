@@ -98,6 +98,7 @@ class EmailProcessor:
         query_validator: Optional[WhitelistValidator] = None,
         admin_validator: Optional[WhitelistValidator] = None,
         tenant_email_router: Optional["TenantEmailRouter"] = None,
+        storage_backend=None,
     ):
         """
         Initialize email processor with components.
@@ -115,6 +116,7 @@ class EmailProcessor:
             query_validator: Whitelist validator for querying
             admin_validator: Whitelist validator for admin access
             tenant_email_router: Router for multi-tenant email dispatch (None=ST mode)
+            storage_backend: StorageBackend for MT file archival (None=local filesystem)
         """
         self.email_client = email_client or EmailClient()
         self.attachment_handler = attachment_handler or AttachmentHandler()
@@ -167,8 +169,9 @@ class EmailProcessor:
         # which is used by should_process_for_kb() to determine KB ingestion eligibility
         self.parser = parser or EmailParser(validator=self.teach_validator)
 
-        # Multi-tenant router (None in single-tenant mode)
+        # Multi-tenant router and storage (None in single-tenant mode)
         self.tenant_email_router = tenant_email_router
+        self.storage_backend = storage_backend
 
         mode = "multi-tenant" if tenant_email_router else "single-tenant"
         logger.info(
@@ -454,6 +457,8 @@ class EmailProcessor:
                         temp_dir=ctx.temp_dir,
                         instance_name=ctx.instance_name,
                         organization=ctx.organization,
+                        storage_backend=self.storage_backend,
+                        tenant_slug=ctx.tenant_slug,
                     )
 
                 if result.success:
@@ -499,6 +504,48 @@ class EmailProcessor:
             ),
         )
 
+    def _archive_file(
+        self,
+        source_path: Path,
+        dest_dir: Path,
+        dest_filename: str,
+        storage_backend=None,
+        tenant_slug: Optional[str] = None,
+        storage_key_prefix: str = "",
+    ) -> None:
+        """
+        Archive a file to permanent storage (StorageBackend or local filesystem).
+
+        In MT mode with a storage_backend, uses put() to store in tenant namespace.
+        In ST mode (no storage_backend), copies to local dest_dir via shutil.
+
+        Args:
+            source_path: Path to the source file.
+            dest_dir: Local destination directory (used in ST/local mode).
+            dest_filename: Destination filename.
+            storage_backend: StorageBackend instance (None=local filesystem).
+            tenant_slug: Tenant identifier (required when storage_backend is set).
+            storage_key_prefix: Key prefix for storage (e.g., "kb/emails/").
+        """
+        if storage_backend and tenant_slug:
+            storage_backend.put(
+                tenant_slug,
+                f"{storage_key_prefix}{dest_filename}",
+                source_path.read_bytes(),
+            )
+            logger.info(
+                f"Archived {dest_filename} to storage backend "
+                f"({tenant_slug}/{storage_key_prefix}{dest_filename})"
+            )
+        else:
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest = dest_dir / dest_filename
+            if not dest.exists():
+                import shutil
+
+                shutil.copy2(source_path, dest)
+                logger.info(f"Archived {dest_filename} to {dest}")
+
     def _process_for_kb(
         self, email: EmailMessage, mail_message: MailMessage
     ) -> ProcessingResult:
@@ -537,6 +584,8 @@ class EmailProcessor:
         temp_dir: Path,
         instance_name: str,
         organization: str,
+        storage_backend=None,
+        tenant_slug: Optional[str] = None,
     ) -> ProcessingResult:
         """
         Process email for KB ingestion with explicit component injection.
@@ -554,6 +603,8 @@ class EmailProcessor:
             temp_dir: Temporary directory for attachments
             instance_name: Instance name for acknowledgment emails
             organization: Organization name for acknowledgment emails
+            storage_backend: StorageBackend for MT file archival (None=local)
+            tenant_slug: Tenant identifier for storage (None=ST mode)
 
         Returns:
             ProcessingResult with ingestion outcome.
@@ -619,17 +670,14 @@ class EmailProcessor:
                             ).strip()
                             descriptive_filename = f"Email from {sender_name} on {date_str} - {subject_clean}.txt"
 
-                            emails_dir = kb_emails_path
-                            emails_dir.mkdir(parents=True, exist_ok=True)
-                            persistent_path = emails_dir / descriptive_filename
-
-                            if not persistent_path.exists():
-                                import shutil
-
-                                shutil.copy2(body_file_path, persistent_path)
-                                logger.info(
-                                    f"Saved duplicate email body to {persistent_path} for future reingestion"
-                                )
+                            self._archive_file(
+                                source_path=body_file_path,
+                                dest_dir=kb_emails_path,
+                                dest_filename=descriptive_filename,
+                                storage_backend=storage_backend,
+                                tenant_slug=tenant_slug,
+                                storage_key_prefix="kb/emails/",
+                            )
 
                             # Clean up temp file
                             body_file_path.unlink(missing_ok=True)
@@ -688,15 +736,13 @@ class EmailProcessor:
                         )
 
                         # Persist email body to kb/emails/ for future reingestion
-                        emails_dir = kb_emails_path
-                        emails_dir.mkdir(parents=True, exist_ok=True)
-
-                        persistent_path = emails_dir / descriptive_filename
-                        import shutil
-
-                        shutil.copy2(Path(temp_file.name), persistent_path)
-                        logger.info(
-                            f"Saved email body to {persistent_path} for future reingestion"
+                        self._archive_file(
+                            source_path=Path(temp_file.name),
+                            dest_dir=kb_emails_path,
+                            dest_filename=descriptive_filename,
+                            storage_backend=storage_backend,
+                            tenant_slug=tenant_slug,
+                            storage_key_prefix="kb/emails/",
                         )
 
                         # Clean up temp file
@@ -828,27 +874,35 @@ class EmailProcessor:
                         )
 
                         # Persist attachment to kb/documents/ for future reingestion
-                        attachments_dir = kb_documents_path
-                        attachments_dir.mkdir(parents=True, exist_ok=True)
-
-                        persistent_path = attachments_dir / attachment.filename
-                        # If file already exists, append timestamp to avoid overwriting
-                        if persistent_path.exists():
-                            from datetime import datetime
-
-                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                            stem = persistent_path.stem
-                            suffix = persistent_path.suffix
-                            persistent_path = (
-                                attachments_dir / f"{stem}_{timestamp}{suffix}"
+                        if storage_backend and tenant_slug:
+                            # MT mode: use storage backend directly
+                            self._archive_file(
+                                source_path=attachment.filepath,
+                                dest_dir=kb_documents_path,
+                                dest_filename=attachment.filename,
+                                storage_backend=storage_backend,
+                                tenant_slug=tenant_slug,
+                                storage_key_prefix="kb/documents/",
                             )
+                        else:
+                            # ST mode: local filesystem with collision handling
+                            kb_documents_path.mkdir(parents=True, exist_ok=True)
+                            persistent_path = kb_documents_path / attachment.filename
+                            if persistent_path.exists():
+                                from datetime import datetime
 
-                        import shutil
+                                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                                stem = persistent_path.stem
+                                suffix = persistent_path.suffix
+                                persistent_path = (
+                                    kb_documents_path / f"{stem}_{timestamp}{suffix}"
+                                )
+                            import shutil
 
-                        shutil.copy2(attachment.filepath, persistent_path)
-                        logger.info(
-                            f"Saved attachment to {persistent_path} for future reingestion"
-                        )
+                            shutil.copy2(attachment.filepath, persistent_path)
+                            logger.info(
+                                f"Saved attachment to {persistent_path} for future reingestion"
+                            )
 
                     else:
                         logger.warning(f"No chunks created from {attachment.filename}")
@@ -917,11 +971,13 @@ class EmailProcessor:
 
         finally:
             # Archive attachments to permanent documents folder before cleanup
+            # In MT mode with storage_backend, archival is done inline above
             if attachments:
-                logger.info(
-                    f"Archiving {len(attachments)} attachments to documents folder"
-                )
-                self.attachment_handler.archive_attachments(attachments)
+                if not (storage_backend and tenant_slug):
+                    logger.info(
+                        f"Archiving {len(attachments)} attachments to documents folder"
+                    )
+                    self.attachment_handler.archive_attachments(attachments)
                 # Cleanup temp files after archival
                 self.attachment_handler.cleanup_attachments(attachments)
 

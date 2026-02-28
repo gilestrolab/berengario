@@ -139,6 +139,8 @@ backup_manager = BackupManager()
 # Multi-tenant initialization
 platform_db_manager = None
 component_resolver = None
+storage_backend = None
+key_manager = None
 
 if settings.multi_tenant:
     from src.platform.component_factory import TenantComponentFactory
@@ -158,6 +160,14 @@ if settings.multi_tenant:
         multi_tenant=True,
         component_factory=component_factory,
     )
+
+    # Initialize encryption key manager if master key is configured
+    if settings.master_encryption_key:
+        from src.platform.encryption import DatabaseKeyManager
+
+        key_manager = DatabaseKeyManager()
+        logger.info("DatabaseKeyManager initialized (MEK configured)")
+
     logger.info("Multi-tenant platform components initialized")
 
 # Setup static files directory (needed by feedback router)
@@ -367,6 +377,7 @@ admin_router = create_admin_router(
     settings=settings,
     require_admin=require_admin,
     component_resolver=component_resolver,
+    storage_backend=storage_backend,
 )
 
 analytics_router = create_analytics_router(
@@ -400,6 +411,7 @@ if settings.multi_tenant and platform_db_manager:
         get_session_id=get_session_id,
         set_session_cookie=set_session_cookie,
         settings=settings,
+        key_manager=key_manager,
     )
     app.include_router(onboarding_router)
 

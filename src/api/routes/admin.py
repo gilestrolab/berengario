@@ -42,6 +42,7 @@ def create_admin_router(
     settings,
     require_admin,
     component_resolver=None,
+    storage_backend=None,
 ):
     """
     Create admin router with dependency injection.
@@ -595,23 +596,39 @@ def create_admin_router(
 
                 logger.info(f"Saved uploaded file to: {temp_file_path}")
 
-                # Save permanent copy to kb/documents/ first
-                documents_dir = settings.kb_documents_path
-                documents_dir.mkdir(parents=True, exist_ok=True)
+                # Save permanent copy to kb/documents/
+                # In MT mode with storage_backend, resolve tenant-specific path
+                if storage_backend and component_resolver and session.tenant_slug:
+                    components = component_resolver.resolve(session)
+                    documents_dir = components.context.kb_documents_path
+                else:
+                    documents_dir = settings.kb_documents_path
 
-                # Check if file already exists
-                permanent_path = documents_dir / file.filename
                 final_filename = file.filename
-                if permanent_path.exists():
-                    # Add timestamp to avoid overwriting
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    name_parts = file.filename.rsplit(".", 1)
-                    final_filename = f"{name_parts[0]}_{timestamp}.{name_parts[1]}"
-                    permanent_path = documents_dir / final_filename
 
-                # Copy to permanent location
-                shutil.copy2(temp_file_path, permanent_path)
-                logger.info(f"Saved permanent copy to: {permanent_path}")
+                if storage_backend and session.tenant_slug:
+                    # MT mode: archive via storage backend
+                    storage_backend.put(
+                        session.tenant_slug,
+                        f"kb/documents/{final_filename}",
+                        content,
+                    )
+                    permanent_path = documents_dir / final_filename
+                    logger.info(
+                        f"Archived upload to storage backend "
+                        f"({session.tenant_slug}/kb/documents/{final_filename})"
+                    )
+                else:
+                    # ST mode: local filesystem with collision handling
+                    documents_dir.mkdir(parents=True, exist_ok=True)
+                    permanent_path = documents_dir / file.filename
+                    if permanent_path.exists():
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        name_parts = file.filename.rsplit(".", 1)
+                        final_filename = f"{name_parts[0]}_{timestamp}.{name_parts[1]}"
+                        permanent_path = documents_dir / final_filename
+                    shutil.copy2(temp_file_path, permanent_path)
+                    logger.info(f"Saved permanent copy to: {permanent_path}")
 
                 # Process document with correct metadata
                 # Note: Use permanent path and filename in metadata
