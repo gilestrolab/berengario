@@ -34,6 +34,8 @@ def rag_search(query: str, top_k: int = 5) -> Dict[str, Any]:
     try:
         from src.document_processing.kb_manager import KnowledgeBaseManager
 
+        from .context import get_kb_manager
+
         # Validate parameters
         if not query or not query.strip():
             raise ValueError("Search query cannot be empty")
@@ -44,8 +46,8 @@ def rag_search(query: str, top_k: int = 5) -> Dict[str, Any]:
 
         logger.info(f"Searching knowledge base: '{query}' (top_k={top_k})")
 
-        # Get KB manager and query engine
-        kb_manager = KnowledgeBaseManager()
+        # Use context KB manager (MT mode) or create default (ST mode)
+        kb_manager = get_kb_manager() or KnowledgeBaseManager()
         query_engine = kb_manager.get_query_engine(top_k=top_k)
 
         # Execute query

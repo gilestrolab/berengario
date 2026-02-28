@@ -712,6 +712,34 @@ git push origin v1.0.0
   - GitHub Actions CI/CD pipeline
   - Automated testing and linting
   - Container registry publishing
+- [x] **Phase 6**: Multi-tenancy ✓
+  - Per-tenant database and storage isolation
+  - S3/MinIO storage backend support
+  - Optional per-tenant encryption
+  - Tenant provisioning and onboarding UI
+  - Team management with role-based access
+  - Email routing per tenant
+
+## Multi-Tenancy
+
+Berengario can run in multi-tenant mode, serving multiple organizations from a single deployment with fully isolated data. Each tenant gets its own database, document storage, ChromaDB collection, and email routing.
+
+Key capabilities:
+- **Isolated tenants** — separate databases, document stores, and ChromaDB per tenant
+- **Storage backends** — local filesystem (default) or S3/MinIO for object storage
+- **Encryption** — optional per-tenant envelope encryption with a master key
+- **Team management** — invite codes, join requests, and role-based access (owner, admin, member)
+- **Email routing** — automatic per-tenant email address mapping
+
+Minimal configuration to enable:
+
+```env
+MULTI_TENANT=true
+PLATFORM_DB_HOST=mariadb
+PLATFORM_DB_PASSWORD=your_password
+```
+
+See [`docs/MULTI_TENANCY.md`](docs/MULTI_TENANCY.md) for the full deployment guide.
 
 ## API Providers
 
@@ -741,6 +769,7 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 - **[DATA_STRUCTURE.md](docs/DATA_STRUCTURE.md)** - Data directory structure and Docker volumes
 - **[EMAIL_PROCESSING_RULES.md](docs/EMAIL_PROCESSING_RULES.md)** - Email processing logic and decision tree
 - **[DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md)** - Database abstraction layer (SQLite/MariaDB)
+- **[MULTI_TENANCY.md](docs/MULTI_TENANCY.md)** - Multi-tenancy deployment guide
 - **[EMAIL_AUTH_ISSUE.md](docs/EMAIL_AUTH_ISSUE.md)** - Office 365 authentication troubleshooting
 - **[PHASE2_PLAN.md](docs/PHASE2_PLAN.md)** - Phase 2 implementation architecture
 

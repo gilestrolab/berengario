@@ -49,6 +49,11 @@ services:
       DB_NAME: berengario
       DB_USER: berengario
       DB_PASSWORD: test_password
+      # Multi-tenancy: platform DB uses same MariaDB server
+      PLATFORM_DB_HOST: mariadb
+      PLATFORM_DB_PORT: 3306
+      PLATFORM_DB_USER: berengario
+      PLATFORM_DB_PASSWORD: test_password
 
     volumes:
       - ./src:/app/src  # Mount src for live code changes
@@ -61,6 +66,7 @@ services:
       - ./data/config:/app/data/config
       - ./data/temp_attachments:/app/data/temp_attachments
       - ./data/backups:/app/data/backups
+      - ./data/tenants:/app/data/tenants  # Multi-tenancy: per-tenant data
 
     depends_on:
       mariadb:
@@ -83,6 +89,8 @@ services:
       - .env
 
     # Override DB settings for MariaDB
+    # Multi-tenancy settings are loaded from .env file.
+    # See .env.example for MULTI_TENANT, PLATFORM_DB_*, STORAGE_BACKEND, etc.
     environment:
       DB_TYPE: mariadb
       DB_HOST: mariadb
@@ -90,6 +98,11 @@ services:
       DB_NAME: berengario
       DB_USER: berengario
       DB_PASSWORD: test_password
+      # Multi-tenancy: platform DB uses same MariaDB server
+      PLATFORM_DB_HOST: mariadb
+      PLATFORM_DB_PORT: 3306
+      PLATFORM_DB_USER: berengario
+      PLATFORM_DB_PASSWORD: test_password
       GIT_BRANCH: ${GIT_BRANCH:-unknown}
       GIT_COMMIT: ${GIT_COMMIT:-unknown}
 
@@ -104,6 +117,7 @@ services:
       - ./data/config:/app/data/config
       - ./data/temp_attachments:/app/data/temp_attachments
       - ./data/backups:/app/data/backups  # Mount backups for persistence
+      - ./data/tenants:/app/data/tenants  # Multi-tenancy: per-tenant data
 
     depends_on:
       mariadb:
@@ -142,6 +156,8 @@ services:
       - .env
 
     # Override DB settings for MariaDB
+    # Multi-tenancy settings are loaded from .env file.
+    # See .env.example for MULTI_TENANT, PLATFORM_DB_*, STORAGE_BACKEND, etc.
     environment:
       DB_TYPE: mariadb
       DB_HOST: mariadb
@@ -149,6 +165,11 @@ services:
       DB_NAME: berengario
       DB_USER: berengario
       DB_PASSWORD: test_password
+      # Multi-tenancy: platform DB uses same MariaDB server
+      PLATFORM_DB_HOST: mariadb
+      PLATFORM_DB_PORT: 3306
+      PLATFORM_DB_USER: berengario
+      PLATFORM_DB_PASSWORD: test_password
       GIT_BRANCH: ${GIT_BRANCH:-unknown}
       GIT_COMMIT: ${GIT_COMMIT:-unknown}
 
@@ -163,6 +184,7 @@ services:
       - ./data/config:/app/data/config
       - ./data/temp_attachments:/app/data/temp_attachments
       - ./data/backups:/app/data/backups  # Mount backups for persistence
+      - ./data/tenants:/app/data/tenants  # Multi-tenancy: per-tenant data
 
     ports:
       - "8090:8000"  # Web interface port (host:container)

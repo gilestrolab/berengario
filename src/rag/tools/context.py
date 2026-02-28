@@ -7,7 +7,7 @@ This replaces the global dictionary pattern with proper context isolation.
 
 import logging
 from contextvars import ContextVar
-from typing import Dict
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +15,14 @@ logger = logging.getLogger(__name__)
 _user_email: ContextVar[str] = ContextVar("user_email", default="unknown")
 _is_admin: ContextVar[bool] = ContextVar("is_admin", default=False)
 _is_email_request: ContextVar[bool] = ContextVar("is_email_request", default=False)
+_kb_manager: ContextVar[Optional[Any]] = ContextVar("kb_manager", default=None)
 
 
 def set_tool_context(
-    user_email: str, is_admin: bool, is_email_request: bool = False
+    user_email: str,
+    is_admin: bool,
+    is_email_request: bool = False,
+    kb_manager: Optional[Any] = None,
 ) -> None:
     """
     Set the context for tool execution (called before tool execution).
@@ -30,10 +34,12 @@ def set_tool_context(
         user_email: Email of the user making the request
         is_admin: Whether the user is an admin
         is_email_request: Whether this request is from email (requires confirmation)
+        kb_manager: Optional KnowledgeBaseManager instance (for MT per-tenant KB)
     """
     _user_email.set(user_email)
     _is_admin.set(is_admin)
     _is_email_request.set(is_email_request)
+    _kb_manager.set(kb_manager)
     logger.debug(
         f"Tool context set: user={user_email}, admin={is_admin}, email={is_email_request}"
     )
@@ -67,6 +73,7 @@ def clear_tool_context() -> None:
     _user_email.set("unknown")
     _is_admin.set(False)
     _is_email_request.set(False)
+    _kb_manager.set(None)
     logger.debug("Tool context cleared")
 
 
@@ -100,3 +107,8 @@ def is_admin() -> bool:
 def is_email_request() -> bool:
     """Check if the current request is from email."""
     return _is_email_request.get()
+
+
+def get_kb_manager() -> Optional[Any]:
+    """Get the current context's KnowledgeBaseManager (None in ST mode)."""
+    return _kb_manager.get()

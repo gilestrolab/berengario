@@ -90,11 +90,12 @@ class QueryHandler:
             if not query_text or not query_text.strip():
                 raise ValueError("Query text cannot be empty")
 
-            # Set tool context for admin-only tools
+            # Set tool context for admin-only tools and MT KB routing
             set_tool_context(
                 user_email=user_email or "unknown",
                 is_admin=is_admin,
                 is_email_request=is_email_request,
+                kb_manager=self.rag_engine.kb_manager,
             )
 
             try:
