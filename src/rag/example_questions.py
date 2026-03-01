@@ -14,8 +14,13 @@ from src.rag.rag_engine import RAGEngine
 
 logger = logging.getLogger(__name__)
 
-# Path to store generated questions
-EXAMPLE_QUESTIONS_FILE = Path("data/config/example_questions.json")
+# Default path for single-tenant mode
+DEFAULT_QUESTIONS_FILE = Path("data/config/example_questions.json")
+
+
+def _resolve_file(file_path: Optional[Path] = None) -> Path:
+    """Resolve the example questions file path (defaults to ST path)."""
+    return file_path or DEFAULT_QUESTIONS_FILE
 
 
 def generate_example_questions(
@@ -106,19 +111,23 @@ Generate the {count} questions now:"""
         raise
 
 
-def save_example_questions(questions: List[str]) -> None:
+def save_example_questions(
+    questions: List[str], file_path: Optional[Path] = None
+) -> None:
     """
     Save example questions to file.
 
     Args:
         questions: List of question strings to save.
+        file_path: Path to save to (defaults to ST path; pass tenant path in MT mode).
 
     Raises:
         Exception: If saving fails.
     """
+    target = _resolve_file(file_path)
     try:
         # Ensure directory exists
-        EXAMPLE_QUESTIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        target.parent.mkdir(parents=True, exist_ok=True)
 
         # Save as JSON
         data = {
@@ -127,21 +136,22 @@ def save_example_questions(questions: List[str]) -> None:
             "count": len(questions),
         }
 
-        with open(EXAMPLE_QUESTIONS_FILE, "w", encoding="utf-8") as f:
+        with open(target, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-        logger.info(
-            f"Saved {len(questions)} example questions to {EXAMPLE_QUESTIONS_FILE}"
-        )
+        logger.info(f"Saved {len(questions)} example questions to {target}")
 
     except Exception as e:
         logger.error(f"Error saving example questions: {e}")
         raise
 
 
-def load_example_questions() -> Dict:
+def load_example_questions(file_path: Optional[Path] = None) -> Dict:
     """
     Load example questions from file.
+
+    Args:
+        file_path: Path to load from (defaults to ST path; pass tenant path in MT mode).
 
     Returns:
         Dictionary containing:
@@ -153,14 +163,13 @@ def load_example_questions() -> Dict:
         FileNotFoundError: If questions file doesn't exist.
         Exception: If loading fails.
     """
+    target = _resolve_file(file_path)
     try:
-        if not EXAMPLE_QUESTIONS_FILE.exists():
-            logger.warning(
-                f"Example questions file not found: {EXAMPLE_QUESTIONS_FILE}"
-            )
+        if not target.exists():
+            logger.warning(f"Example questions file not found: {target}")
             raise FileNotFoundError("Example questions not generated yet")
 
-        with open(EXAMPLE_QUESTIONS_FILE, "r", encoding="utf-8") as f:
+        with open(target, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         logger.info(f"Loaded {data.get('count', 0)} example questions")
@@ -174,7 +183,9 @@ def load_example_questions() -> Dict:
 
 
 def generate_and_save_example_questions(
-    rag_engine: Optional[RAGEngine] = None, count: int = 15
+    rag_engine: Optional[RAGEngine] = None,
+    count: int = 15,
+    file_path: Optional[Path] = None,
 ) -> Dict:
     """
     Generate and save example questions in one operation.
@@ -182,6 +193,7 @@ def generate_and_save_example_questions(
     Args:
         rag_engine: RAG engine instance (creates new if None).
         count: Number of questions to generate.
+        file_path: Path to save to (defaults to ST path; pass tenant path in MT mode).
 
     Returns:
         Dictionary with saved questions data.
@@ -190,6 +202,8 @@ def generate_and_save_example_questions(
         Exception: If generation or saving fails.
     """
     from datetime import datetime
+
+    target = _resolve_file(file_path)
 
     # Generate questions
     questions = generate_example_questions(rag_engine, count)
@@ -202,8 +216,8 @@ def generate_and_save_example_questions(
     }
 
     # Save with timestamp
-    EXAMPLE_QUESTIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(EXAMPLE_QUESTIONS_FILE, "w", encoding="utf-8") as f:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with open(target, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
     logger.info(f"Generated and saved {len(questions)} example questions")

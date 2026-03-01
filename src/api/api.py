@@ -507,16 +507,41 @@ async def admin_panel(request: Request):
     raise HTTPException(status_code=404, detail="Admin panel not found")
 
 
+def _try_resolve_tenant(request: Request):
+    """
+    Try to resolve tenant components from the current session.
+
+    Returns TenantComponents if in MT mode and user has a tenant selected,
+    otherwise None (falls back to ST defaults).
+    """
+    if not component_resolver:
+        return None
+    try:
+        session_id = get_session_id(request)
+        if not session_id:
+            return None
+        session = session_manager.get_session(session_id)
+        if not session or not session.is_authenticated():
+            return None
+        return component_resolver.resolve(session)
+    except Exception:
+        return None
+
+
 @app.get("/api/stats", response_model=StatsResponse)
-async def get_stats():
+async def get_stats(request: Request):
     """
     Get knowledge base statistics.
+
+    Tenant-aware: returns tenant-specific stats when a tenant session exists.
 
     Returns:
         StatsResponse with KB stats
     """
     try:
-        stats = query_handler.get_stats()
+        components = _try_resolve_tenant(request)
+        qh = components.query_handler if components else query_handler
+        stats = qh.get_stats()
         # Extract just filenames from document dicts
         documents = stats.get("documents", [])
         document_names = [
@@ -534,13 +559,24 @@ async def get_stats():
 
 
 @app.get("/api/config")
-async def get_config():
+async def get_config(request: Request):
     """
     Get public instance configuration.
+
+    Tenant-aware: returns tenant-specific name/description when session exists.
 
     Returns:
         Instance name, description, and organization
     """
+    components = _try_resolve_tenant(request)
+    if components:
+        ctx = components.context
+        return {
+            "instance_name": ctx.instance_name,
+            "instance_description": ctx.instance_description,
+            "organization": ctx.organization,
+            "multi_tenant": settings.multi_tenant,
+        }
     return {
         "instance_name": settings.instance_name,
         "instance_description": settings.instance_description,
@@ -550,11 +586,11 @@ async def get_config():
 
 
 @app.get("/api/example-questions")
-async def get_example_questions():
+async def get_example_questions(request: Request):
     """
     Get example questions for the knowledge base.
 
-    Public endpoint - no authentication required.
+    Tenant-aware: loads tenant-specific questions when session exists.
 
     Returns:
         Dictionary with:
@@ -565,7 +601,15 @@ async def get_example_questions():
     try:
         from src.rag.example_questions import load_example_questions
 
-        result = load_example_questions()
+        # Resolve tenant-specific path if available
+        questions_path = None
+        components = _try_resolve_tenant(request)
+        if components:
+            ctx = components.context
+            tenant_config = ctx.documents_path.parent / "config"
+            questions_path = tenant_config / "example_questions.json"
+
+        result = load_example_questions(file_path=questions_path)
         return result
 
     except FileNotFoundError:

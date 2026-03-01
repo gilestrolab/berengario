@@ -12,7 +12,6 @@ from llama_index.core.schema import TextNode
 from openai import OpenAI
 
 from src.config import settings
-from src.email.db_manager import db_manager
 from src.email.db_models import DocumentDescription
 
 logger = logging.getLogger(__name__)
@@ -26,14 +25,28 @@ class DescriptionGenerator:
     first few chunks of each document.
     """
 
-    def __init__(self):
-        """Initialize the description generator with LLM client."""
+    def __init__(self, db_manager=None):
+        """
+        Initialize the description generator with LLM client.
+
+        Args:
+            db_manager: Database manager with get_session() method.
+                When None, uses the global default db_manager (ST mode).
+                In MT mode, pass a TenantDBSessionAdapter for tenant isolation.
+        """
         # Use OpenRouter for LLM calls
         self.client = OpenAI(
             base_url=settings.openrouter_api_base,
             api_key=settings.openrouter_api_key,
         )
         self.model = settings.openrouter_model
+
+        if db_manager is not None:
+            self._db_manager = db_manager
+        else:
+            from src.email.db_manager import db_manager as default_db_manager
+
+            self._db_manager = default_db_manager
 
         logger.info("DescriptionGenerator initialized")
 
@@ -119,7 +132,7 @@ Provide only the 2-sentence summary, nothing else:"""
         Returns:
             Created or updated DocumentDescription object
         """
-        with db_manager.get_session() as session:
+        with self._db_manager.get_session() as session:
             # Check if description already exists
             existing = (
                 session.query(DocumentDescription)
@@ -199,7 +212,7 @@ Provide only the 2-sentence summary, nothing else:"""
         Returns:
             DocumentDescription object or None if not found
         """
-        with db_manager.get_session() as session:
+        with self._db_manager.get_session() as session:
             return (
                 session.query(DocumentDescription)
                 .filter(DocumentDescription.file_path == file_path)
@@ -213,7 +226,7 @@ Provide only the 2-sentence summary, nothing else:"""
         Returns:
             List of DocumentDescription objects
         """
-        with db_manager.get_session() as session:
+        with self._db_manager.get_session() as session:
             descriptions = session.query(DocumentDescription).all()
             # Convert to dicts to avoid detached instance issues
             return [

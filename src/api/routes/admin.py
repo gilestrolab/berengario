@@ -83,6 +83,28 @@ def create_admin_router(
             return component_resolver.resolve(session).query_handler
         return query_handler
 
+    def _get_desc_gen(session):
+        """Get a DescriptionGenerator scoped to the correct tenant DB."""
+        from src.document_processing.description_generator import DescriptionGenerator
+
+        if component_resolver:
+            components = component_resolver.resolve(session)
+            # Reuse the tenant's conversation_manager.db_manager for DB access
+            tenant_db = getattr(components.conversation_manager, "db_manager", None)
+            if tenant_db:
+                return DescriptionGenerator(db_manager=tenant_db)
+        return DescriptionGenerator()
+
+    def _get_questions_path(session):
+        """Get tenant-scoped example questions file path (None = ST default)."""
+        if component_resolver:
+            components = component_resolver.resolve(session)
+            ctx = components.context
+            # Store in tenant's config directory alongside other tenant config
+            tenant_config = ctx.documents_path.parent / "config"
+            return tenant_config / "example_questions.json"
+        return None
+
     # ============================================================================
     # Whitelist Management
     # ============================================================================
@@ -319,11 +341,8 @@ def create_admin_router(
             List of document descriptions
         """
         try:
-            from src.document_processing.description_generator import (
-                description_generator,
-            )
-
-            descriptions = description_generator.get_all_descriptions()
+            desc_gen = _get_desc_gen(session)
+            descriptions = desc_gen.get_all_descriptions()
             logger.info(
                 f"Admin {session.email} retrieved {len(descriptions)} document descriptions"
             )
@@ -654,9 +673,7 @@ def create_admin_router(
 
                     # Generate and save document description
                     try:
-                        from src.document_processing.description_generator import (
-                            description_generator,
-                        )
+                        desc_gen = _get_desc_gen(session)
 
                         # Use relative path from project root
                         relative_path = str(permanent_path)
@@ -665,7 +682,7 @@ def create_admin_router(
                                 5:
                             ]  # Remove '/app/' prefix in Docker
 
-                        description_generator.generate_and_save(
+                        desc_gen.generate_and_save(
                             file_path=relative_path,
                             filename=final_filename,
                             chunks=nodes,
@@ -1460,9 +1477,11 @@ def create_admin_router(
 
             logger.info(f"Admin {session.email} requested example question generation")
 
-            # Generate and save questions
+            # Generate and save questions (tenant-scoped path in MT mode)
             result = generate_and_save_example_questions(
-                rag_engine=_get_qh(session).rag_engine, count=15
+                rag_engine=_get_qh(session).rag_engine,
+                count=15,
+                file_path=_get_questions_path(session),
             )
 
             # Log to audit trail
