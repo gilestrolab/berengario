@@ -26,6 +26,7 @@ class QueryHandler:
         self,
         rag_engine: Optional[RAGEngine] = None,
         tenant_context: Optional["TenantContext"] = None,  # noqa: F821
+        conversation_manager: Optional[object] = None,
     ):
         """
         Initialize the query handler.
@@ -34,9 +35,12 @@ class QueryHandler:
             rag_engine: RAG engine instance (creates new if None).
             tenant_context: Optional tenant context for multi-tenant config.
                 When provided, passes optimization settings to QueryOptimizer.
+            conversation_manager: Optional ConversationManager for MT per-tenant DB.
+                Injected into tool context so database_tools use the correct tenant's data.
         """
         self.rag_engine = rag_engine or RAGEngine()
         self.tenant_context = tenant_context
+        self.conversation_manager = conversation_manager
 
         # Configure query optimizer with tenant-specific settings when available
         ctx = self.tenant_context
@@ -90,12 +94,13 @@ class QueryHandler:
             if not query_text or not query_text.strip():
                 raise ValueError("Query text cannot be empty")
 
-            # Set tool context for admin-only tools and MT KB routing
+            # Set tool context for admin-only tools and MT KB/DB routing
             set_tool_context(
                 user_email=user_email or "unknown",
                 is_admin=is_admin,
                 is_email_request=is_email_request,
                 kb_manager=self.rag_engine.kb_manager,
+                conversation_manager=self.conversation_manager,
             )
 
             try:

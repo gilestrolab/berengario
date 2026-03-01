@@ -248,18 +248,20 @@ class TenantComponentFactory:
             tenant_context=ctx,
         )
 
-        # 4. QueryHandler with tenant context
-        query_handler = QueryHandler(
-            rag_engine=rag_engine,
-            tenant_context=ctx,
-        )
-
-        # 5. ConversationManager with tenant-specific DB
+        # 4. ConversationManager with tenant-specific DB (built before QueryHandler
+        #    so it can be injected into tool context for database_tools)
         if ctx.tenant_db_name and self._db_manager:
             adapter = TenantDBSessionAdapter(self._db_manager, ctx.tenant_db_name)
             conv_manager = ConversationManager(db_manager=adapter)
         else:
             conv_manager = ConversationManager()
+
+        # 5. QueryHandler with tenant context + conversation manager
+        query_handler = QueryHandler(
+            rag_engine=rag_engine,
+            tenant_context=ctx,
+            conversation_manager=conv_manager,
+        )
 
         return TenantComponents(
             context=ctx,

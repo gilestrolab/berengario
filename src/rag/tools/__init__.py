@@ -9,6 +9,7 @@ from .base import Tool, ToolParameter, ToolRegistry, get_registry
 from .calendar_tools import create_calendar_event, create_calendar_from_data
 from .context import (
     clear_tool_context,
+    get_conversation_manager,
     get_kb_manager,
     get_tool_context,
     get_user_email,
@@ -43,6 +44,7 @@ __all__ = [
     "add_to_query_whitelist",
     "add_to_teach_whitelist",
     "clear_tool_context",
+    "get_conversation_manager",
     "get_kb_manager",
     "get_tool_context",
     "get_user_email",
