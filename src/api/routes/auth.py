@@ -387,7 +387,9 @@ If you didn't request this code, please ignore this email.
             role=session.role,
             requires_tenant_selection=requires_selection,
             available_tenants=(
-                session.available_tenants if requires_selection else None
+                session.available_tenants
+                if session.available_tenants and len(session.available_tenants) > 1
+                else None
             ),
             onboarding_verified=session.onboarding_verified,
         )

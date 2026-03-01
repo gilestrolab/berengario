@@ -23,6 +23,7 @@ class ChatApp {
         this.currentConversationId = null; // Currently active conversation
         this.conversations = []; // List of conversations
         this.searchTimeout = null; // For debouncing search
+        this.availableTenants = null; // MT: tenants the user can switch to
 
         this.init();
     }
@@ -106,6 +107,17 @@ class ChatApp {
                 return false;
             }
 
+            // MT: if user needs to pick a tenant, show selector and block init
+            if (data.requires_tenant_selection && data.available_tenants) {
+                this.showTenantSelector(data.available_tenants);
+                return false; // Block app init until tenant is selected
+            }
+
+            // Store available tenants for switching later
+            if (data.available_tenants && data.available_tenants.length > 1) {
+                this.availableTenants = data.available_tenants;
+            }
+
             // Store and display user email
             this.userEmail = data.email;
             if (this.userEmailSpan && this.userEmail) {
@@ -132,6 +144,15 @@ class ChatApp {
                         roleEl.textContent = data.role;
                     }
                     badge.style.display = 'inline-flex';
+
+                    // Make badge clickable if user can switch tenants
+                    if (this.availableTenants && this.availableTenants.length > 1) {
+                        badge.setAttribute('data-switchable', 'true');
+                        badge.title = 'Click to switch team';
+                        badge.addEventListener('click', () => {
+                            this.showTenantSelector(this.availableTenants);
+                        });
+                    }
                 }
             }
 
@@ -983,6 +1004,51 @@ class ChatApp {
         document.body.classList.toggle('sidebar-open');
     }
 
+    // ====================================
+    // Tenant Selection Methods
+    // ====================================
+
+    showTenantSelector(tenants) {
+        const modal = document.getElementById('tenant-select-modal');
+        const cardsContainer = document.getElementById('tenant-select-cards');
+        if (!modal || !cardsContainer) return;
+
+        cardsContainer.innerHTML = tenants.map(t => `
+            <div class="tenant-card" data-tenant-id="${t.tenant_id}" onclick="window._chatApp.selectTenant('${t.tenant_id}')">
+                <div class="tenant-card-info">
+                    <span class="tenant-card-name">${this.escapeHtml(t.tenant_name)}</span>
+                    <span class="tenant-card-role">${this.escapeHtml(t.role)}</span>
+                </div>
+                <span class="tenant-card-arrow"><i class="fas fa-chevron-right"></i></span>
+            </div>
+        `).join('');
+
+        modal.style.display = 'flex';
+    }
+
+    async selectTenant(tenantId) {
+        try {
+            const response = await fetch('/api/auth/select-tenant', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ tenant_id: tenantId }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Reload page to reinitialize with selected tenant
+                window.location.reload();
+            } else {
+                alert(data.detail || 'Failed to select team. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error selecting tenant:', error);
+            alert('Network error. Please try again.');
+        }
+    }
+
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -1079,5 +1145,5 @@ class ChatApp {
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    new ChatApp();
+    window._chatApp = new ChatApp();
 });
