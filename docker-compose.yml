@@ -212,6 +212,56 @@ services:
     networks:
       - berengario-network
 
+  # Platform Admin (multi-tenant management panel)
+  # Only starts when explicitly requested with: docker-compose --profile multitenant up
+  berengario-admin:
+    profiles: ["multitenant"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: berengario-admin
+    restart: unless-stopped
+    command: python run_platform_admin.py
+
+    env_file:
+      - .env
+
+    environment:
+      DB_TYPE: mariadb
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_NAME: berengario
+      DB_USER: berengario
+      DB_PASSWORD: test_password
+      PLATFORM_DB_HOST: mariadb
+      PLATFORM_DB_PORT: 3306
+      PLATFORM_DB_USER: berengario
+      PLATFORM_DB_PASSWORD: test_password
+
+    volumes:
+      - ./src:/app/src
+      - ./.git:/app/.git:ro
+      - ./data/tenants:/app/data/tenants
+      - ./data/logs:/app/data/logs
+
+    ports:
+      - "8091:8000"
+
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/platform/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    networks:
+      - berengario-network
+
   # MinIO Object Storage (S3-compatible, for multi-tenant file storage)
   # Only starts when explicitly requested with: docker-compose --profile multitenant up
   minio:

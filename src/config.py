@@ -341,6 +341,12 @@ class Settings(BaseSettings):
         description="Prefix for per-tenant S3 buckets",
     )
 
+    # Platform Admin
+    platform_admin_emails: str = Field(
+        default="",
+        description="Comma-separated emails allowed to access platform admin panel",
+    )
+
     # Encryption (per-tenant data encryption)
     master_encryption_key: str = Field(
         default="",
@@ -442,6 +448,19 @@ class Settings(BaseSettings):
         if v_lower not in valid_backends:
             raise ValueError(f"Storage backend must be one of {valid_backends}")
         return v_lower
+
+    def get_platform_admin_emails(self) -> list[str]:
+        """
+        Get list of platform admin emails.
+
+        Returns:
+            List of lowercase, stripped email addresses.
+        """
+        return [
+            e.strip().lower()
+            for e in self.platform_admin_emails.split(",")
+            if e.strip()
+        ]
 
     def get_platform_database_url(self) -> str:
         """

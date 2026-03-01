@@ -31,3 +31,10 @@
 ### Import ordering in lazy imports (Ruff I001)
 - **Problem**: Lazy imports inside methods still need to follow isort ordering (alphabetical by module path).
 - **Fix**: `from src.email.*` before `from src.platform.*` (e → p alphabetically).
+
+## 2026-03-01: Phase 5 Platform Admin
+
+### Avoid importing src.config in tests when data/ dirs may not be writable
+- **Problem**: `from src.config import settings` triggers `settings.ensure_directories()` at module level, which creates `data/kb/documents` etc. In Docker containers where data/ is root-owned, this causes `PermissionError`.
+- **Fix**: For tests that don't need `settings`, avoid import chains that reach `src.config`. For example, import `OTPManager` directly from the module file instead of through `src.api.auth.__init__` (which re-exports SessionManager → settings). Or use a SimpleOTPManager test double.
+- **Broader pattern**: Module-level side effects (like `ensure_directories()`) should be deferred or guarded.

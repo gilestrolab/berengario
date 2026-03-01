@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Admin - Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        /* Top bar */
+        .topbar {
+            background: #1e293b;
+            border-bottom: 1px solid #334155;
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .topbar-left { display: flex; align-items: center; gap: 0.75rem; }
+        .topbar-left .icon {
+            width: 32px; height: 32px;
+            background: #7c3aed;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+        .topbar h1 { font-size: 1rem; font-weight: 600; }
+        .topbar-right { display: flex; align-items: center; gap: 1rem; }
+        .topbar-email { color: #94a3b8; font-size: 0.85rem; }
+        .btn-sm {
+            padding: 0.4rem 0.8rem;
+            background: #334155;
+            color: #e2e8f0;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-sm:hover { background: #475569; }
+
+        /* Layout */
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 0;
+        }
+        .tab {
+            padding: 0.6rem 1.2rem;
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: all 0.2s;
+        }
+        .tab:hover { color: #e2e8f0; }
+        .tab.active { color: #a78bfa; border-bottom-color: #7c3aed; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Cards */
+        .card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+
+        /* Stats row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+        }
+        .stat-value { font-size: 1.5rem; font-weight: 700; color: #a78bfa; }
+        .stat-label { font-size: 0.8rem; color: #94a3b8; margin-top: 0.25rem; }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 0.7rem 0.75rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { color: #94a3b8; font-size: 0.8rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+        td { font-size: 0.9rem; }
+        tr:hover td { background: rgba(124, 58, 237, 0.05); }
+        tr { cursor: pointer; }
+
+        /* Badges */
+        .badge {
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .badge-active { background: rgba(34,197,94,0.15); color: #4ade80; }
+        .badge-suspended { background: rgba(234,179,8,0.15); color: #facc15; }
+        .badge-provisioning { background: rgba(59,130,246,0.15); color: #93c5fd; }
+
+        /* Buttons */
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-primary { background: #7c3aed; color: white; }
+        .btn-primary:hover { background: #6d28d9; }
+        .btn-warning { background: #d97706; color: white; }
+        .btn-warning:hover { background: #b45309; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-success { background: #059669; color: white; }
+        .btn-success:hover { background: #047857; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Action bar */
+        .action-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+
+        /* Detail panel */
+        .detail-panel {
+            display: none;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .detail-panel.visible { display: block; }
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .detail-header h2 { margin-bottom: 0; }
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .detail-item label { display: block; font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; }
+        .detail-item span { font-size: 0.9rem; }
+        .detail-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+
+        /* Forms */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.visible { display: flex; }
+        .modal {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 1.5rem;
+            width: 100%;
+            max-width: 500px;
+        }
+        .modal h3 { font-size: 1.1rem; margin-bottom: 1rem; }
+        .form-group { margin-bottom: 0.75rem; }
+        .form-group label { display: block; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 0.3rem; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 0.6rem 0.75rem;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            color: #e2e8f0;
+            font-size: 0.9rem;
+            outline: none;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: #7c3aed;
+        }
+        .form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
+
+        /* Health indicators */
+        .health-indicator {
+            display: inline-block;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            margin-right: 0.4rem;
+        }
+        .health-ok { background: #4ade80; }
+        .health-bad { background: #f87171; }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            z-index: 200;
+            display: none;
+        }
+        .toast.success { background: #065f46; color: #a7f3d0; border: 1px solid #059669; }
+        .toast.error { background: #7f1d1d; color: #fca5a5; border: 1px solid #dc2626; }
+        .toast.visible { display: block; }
+    </style>
+</head>
+<body>
+    <!-- Top bar -->
+    <div class="topbar">
+        <div class="topbar-left">
+            <div class="icon">&#x1f6e1;</div>
+            <h1>Platform Admin</h1>
+        </div>
+        <div class="topbar-right">
+            <span class="topbar-email" id="admin-email"></span>
+            <button class="btn-sm" id="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" data-tab="tenants">Tenants</button>
+            <button class="tab" data-tab="health">Health</button>
+        </div>
+
+        <!-- Tenants Tab -->
+        <div class="tab-content active" id="tab-tenants">
+            <div class="stats-row" id="tenant-stats"></div>
+
+            <!-- Detail Panel -->
+            <div class="detail-panel" id="detail-panel"></div>
+
+            <!-- Tenant Table -->
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Slug</th>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Org</th>
+                            <th>Users</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tenants-body">
+                        <tr><td colspan="6" style="text-align:center;color:#64748b;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Health Tab -->
+        <div class="tab-content" id="tab-health">
+            <div id="health-content">
+                <p style="color:#64748b;">Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div class="modal-overlay" id="add-user-modal">
+        <div class="modal">
+            <h3>Add User to <span id="au-tenant-name"></span></h3>
+            <form id="add-user-form">
+                <div class="form-group">
+                    <label for="au-email">Email *</label>
+                    <input type="email" id="au-email" required placeholder="user@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="au-role">Role</label>
+                    <select id="au-role">
+                        <option value="querier">Querier</option>
+                        <option value="teacher">Teacher</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-sm" id="cancel-add-user">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script src="/static/platform-admin.js"></script>
+</body>
+</html>
