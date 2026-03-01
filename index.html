@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Berengario — Just put Berengario in CC</title>
+    <meta name="description" content="Berengario is a RAG-powered knowledge assistant that learns from your emails and documents. Just CC it to teach, email it to ask.">
+    <link rel="icon" type="image/png" href="assets/berengario_owl.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="nav" id="nav">
+    <div class="nav-inner">
+        <a href="#" class="nav-brand">
+            <img src="assets/berengario_owl.png" alt="Berengario" class="nav-logo">
+            <span class="nav-title">Berengario</span>
+        </a>
+        <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+            <span></span><span></span><span></span>
+        </button>
+        <div class="nav-links" id="nav-links">
+            <a href="#how-it-works">How it Works</a>
+            <a href="#use-cases">Use Cases</a>
+            <a href="#features">Features</a>
+            <a href="#pricing">Pricing</a>
+            <a href="https://github.com/gilestrolab/berengario" class="btn btn-outline btn-sm">GitHub</a>
+        </div>
+    </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+    <div class="container">
+        <img src="assets/berengario_owl.png" alt="" class="hero-owl">
+        <h1>Your team's knowledge,<br>one email away.</h1>
+        <p class="hero-tagline">Just put Berengario in CC.</p>
+        <p class="hero-sub">
+            Berengario is a RAG-powered assistant that learns from your emails and documents.
+            Teach it by putting it in CC. Ask it anything by sending an email.
+            Get a sourced answer in under a minute.
+        </p>
+        <div class="hero-cta">
+            <a href="#how-it-works" class="btn btn-primary">See how it works</a>
+            <a href="https://github.com/gilestrolab/berengario" class="btn btn-ghost">View on GitHub</a>
+        </div>
+    </div>
+</section>
+
+<!-- How it Works -->
+<section class="section" id="how-it-works">
+    <div class="container">
+        <h2>How it Works</h2>
+        <p class="section-sub">Three steps. No training required. No new software to learn.</p>
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h3>Put Berengario in CC</h3>
+                <p>CC Berengario on any email or forward it a document. It reads attachments, parses the content, and adds everything to your team's knowledge base — silently, in the background.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <h3>Send it a question</h3>
+                <p>Write Berengario an email like you'd write a colleague. "What's the protocol for X?" or "Where do I find the policy on Y?" — plain language, no special syntax.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <h3>Get your answer</h3>
+                <p>Berengario replies within a minute with a clear, sourced answer drawn from everything your team has ever shared with it. Like a PA who's read every document.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Email Demo -->
+<section class="section section-alt" id="email-demo">
+    <div class="container">
+        <h2>See it in action</h2>
+        <p class="section-sub">Teaching and querying happen entirely through email — the interface everyone already uses.</p>
+        <div class="demo-grid">
+            <!-- Teaching email -->
+            <div class="email-mock">
+                <div class="email-header">
+                    <div class="email-dot red"></div>
+                    <div class="email-dot yellow"></div>
+                    <div class="email-dot green"></div>
+                    <span class="email-title">Teaching — just CC</span>
+                </div>
+                <div class="email-body">
+                    <div class="email-field"><strong>From:</strong> researcher@lab.ac.uk</div>
+                    <div class="email-field"><strong>To:</strong> team@lab.ac.uk</div>
+                    <div class="email-field"><strong>CC:</strong> <span class="highlight">berengario@lab.ac.uk</span></div>
+                    <div class="email-field"><strong>Subject:</strong> Updated Western Blot Protocol v3</div>
+                    <div class="email-divider"></div>
+                    <p>Hi all, attached is the updated Western Blot protocol with the new antibody dilutions we discussed.</p>
+                    <div class="email-attachment">
+                        <span class="attachment-icon">&#128206;</span> western_blot_v3.pdf
+                    </div>
+                </div>
+            </div>
+            <!-- Query + Reply -->
+            <div class="email-mock">
+                <div class="email-header">
+                    <div class="email-dot red"></div>
+                    <div class="email-dot yellow"></div>
+                    <div class="email-dot green"></div>
+                    <span class="email-title">Querying — just email</span>
+                </div>
+                <div class="email-body">
+                    <div class="email-field"><strong>From:</strong> new_postdoc@lab.ac.uk</div>
+                    <div class="email-field"><strong>To:</strong> berengario@lab.ac.uk</div>
+                    <div class="email-field"><strong>Subject:</strong> Western blot antibody dilutions?</div>
+                    <div class="email-divider"></div>
+                    <p>Hi, what antibody dilutions should I use for the Western Blot?</p>
+                    <div class="email-divider"></div>
+                    <div class="email-reply">
+                        <div class="email-field"><strong>From:</strong> berengario@lab.ac.uk</div>
+                        <p>According to the Western Blot Protocol v3, the recommended antibody dilutions are:</p>
+                        <p><strong>Primary antibody:</strong> 1:1000 in 5% BSA/TBST<br>
+                        <strong>Secondary antibody:</strong> 1:5000 in 5% milk/TBST</p>
+                        <p class="email-source">Source: western_blot_v3.pdf (updated Feb 2026)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Use Cases -->
+<section class="section" id="use-cases">
+    <div class="container">
+        <h2>Built for teams that run on email</h2>
+        <p class="section-sub">Berengario works wherever knowledge gets buried in inboxes and shared drives.</p>
+        <div class="cases-grid">
+            <div class="case-card">
+                <div class="case-icon">&#129514;</div>
+                <h3>Research Laboratory</h3>
+                <p>Protocols, SOPs, safety docs, equipment manuals, supplier info — everything a lab accumulates over years, instantly searchable.</p>
+                <p class="case-example">"Your postdoc asks about the Western Blot protocol at 11pm — Berengario answers instantly."</p>
+            </div>
+            <div class="case-card">
+                <div class="case-icon">&#127979;</div>
+                <h3>University Department</h3>
+                <p>Teaching practices, exam policies, room booking procedures, HR guidelines, committee minutes — the institutional knowledge that usually lives in one person's head.</p>
+                <p class="case-example">"New lecturers get answers to admin questions without waiting for a reply from the office."</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features -->
+<section class="section section-alt" id="features">
+    <div class="container">
+        <h2>Features</h2>
+        <p class="section-sub">Everything you need to build and query a team knowledge base.</p>
+        <div class="features-grid">
+            <div class="feature">
+                <div class="feature-icon">&#128196;</div>
+                <h4>Multi-format documents</h4>
+                <p>PDF, DOCX, TXT, CSV, XLS, XLSX — just attach and send.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">&#128488;</div>
+                <h4>Web interface</h4>
+                <p>Chat-style web UI with conversation history and source citations.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">&#128736;</div>
+                <h4>Admin panel</h4>
+                <p>Manage documents, monitor queries, view analytics, control whitelists.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">&#128269;</div>
+                <h4>Query optimization</h4>
+                <p>LLM-based query rewriting for better retrieval accuracy.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">&#9889;</div>
+                <h4>Document enhancement</h4>
+                <p>Automatic narrative expansion and Q&A generation for structured data.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">&#128279;</div>
+                <h4>Web crawling</h4>
+                <p>Ingest content from URLs — send a link, Berengario reads the page.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">&#128197;</div>
+                <h4>Function calling</h4>
+                <p>Calendar event creation and export formatting via natural language.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">&#128221;</div>
+                <h4>Custom prompts</h4>
+                <p>Per-instance system prompts, email footers, and response formats.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Pricing -->
+<section class="section" id="pricing">
+    <div class="container">
+        <h2>Simple, usage-based pricing</h2>
+        <p class="section-sub">Pay for what you use — queries and storage. Unlimited users, AI costs, email hosting, and maintenance all included.</p>
+        <div class="pricing-trial">
+            <strong>Try before you commit:</strong> every account starts with 3 months free on the Department tier — 10,000 queries and 50 GB. No card required.
+        </div>
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <div class="pricing-tier">Lite</div>
+                <div class="pricing-price">&pound;240<span>/yr</span></div>
+                <div class="pricing-period">&pound;20 / month, billed annually</div>
+                <ul class="pricing-features">
+                    <li>500 queries / month</li>
+                    <li>2 GB documents</li>
+                    <li>Unlimited users</li>
+                    <li>Email &amp; web interface</li>
+                    <li>Email support</li>
+                </ul>
+                <a href="https://ask.berengar.io" class="btn btn-outline">Get started</a>
+            </div>
+            <div class="pricing-card pricing-featured">
+                <div class="pricing-badge">Most popular</div>
+                <div class="pricing-tier">Team</div>
+                <div class="pricing-price">&pound;588<span>/yr</span></div>
+                <div class="pricing-period">&pound;49 / month, billed annually</div>
+                <ul class="pricing-features">
+                    <li>2,000 queries / month</li>
+                    <li>10 GB documents</li>
+                    <li>Unlimited users</li>
+                    <li>Email &amp; web interface</li>
+                    <li>Priority support</li>
+                </ul>
+                <a href="https://ask.berengar.io" class="btn btn-primary">Get started</a>
+            </div>
+            <div class="pricing-card">
+                <div class="pricing-tier">Department</div>
+                <div class="pricing-price">&pound;1,788<span>/yr</span></div>
+                <div class="pricing-period">&pound;149 / month, billed annually</div>
+                <ul class="pricing-features">
+                    <li>10,000 queries / month</li>
+                    <li>50 GB documents</li>
+                    <li>Unlimited users</li>
+                    <li>Email &amp; web interface</li>
+                    <li>Dedicated support</li>
+                </ul>
+                <a href="https://ask.berengar.io" class="btn btn-outline">Get started</a>
+            </div>
+        </div>
+        <p class="pricing-note">Need more? <a href="mailto:giorgio@gilest.ro?subject=Berengario%20Custom%20plan">Get in touch</a> for custom volumes.<br>All hosted plans include setup, maintenance, backups, and a 3-month free trial.</p>
+    </div>
+</section>
+
+<!-- Hosted vs Self-hosted -->
+<section class="section section-alt" id="hosted-vs-self">
+    <div class="container">
+        <h2>Let us handle the hard parts</h2>
+        <p class="section-sub">Berengario is open source — you can always self-host. But there's more to it than <code>docker-compose up</code>.</p>
+        <div class="comparison-grid">
+            <div class="comparison-card comparison-hosted">
+                <h3>Hosted by us</h3>
+                <p class="comparison-tagline">You send emails. We handle the rest.</p>
+                <ul class="comparison-list">
+                    <li class="included">AI API accounts and costs included</li>
+                    <li class="included">Email server configured and maintained</li>
+                    <li class="included">Data privacy and GDPR compliance handled</li>
+                    <li class="included">Automatic backups and updates</li>
+                    <li class="included">Monitoring, uptime, and support</li>
+                </ul>
+                <a href="#pricing" class="btn btn-primary">See plans</a>
+            </div>
+            <div class="comparison-card comparison-self">
+                <h3>Self-hosted</h3>
+                <p class="comparison-tagline">Full control. Full responsibility.</p>
+                <ul class="comparison-list">
+                    <li class="yourself">Set up and pay for your own LLM API keys</li>
+                    <li class="yourself">Configure IMAP/SMTP email access</li>
+                    <li class="yourself">Ensure data privacy compliance for your org</li>
+                    <li class="yourself">Manage your own backups and updates</li>
+                    <li class="yourself">Monitor and maintain your deployment</li>
+                </ul>
+                <a href="https://github.com/gilestrolab/berengario" class="btn btn-outline">View on GitHub</a>
+            </div>
+        </div>
+        <p class="comparison-note">Self-hosting is free and unlimited under the MIT licence. No restrictions, no phone-home, no catch.</p>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+    <div class="container footer-inner">
+        <div class="footer-brand">
+            <img src="assets/berengario_owl.png" alt="" class="footer-logo">
+            <span>Berengario</span>
+        </div>
+        <div class="footer-links">
+            <a href="https://github.com/gilestrolab/berengario">GitHub</a>
+            <a href="https://github.com/gilestrolab/berengario/issues">Issues</a>
+            <a href="https://lab.gilest.ro">Gilestro Lab</a>
+        </div>
+        <div class="footer-links footer-legal">
+            <a href="/terms">Terms</a>
+            <a href="/privacy">Privacy</a>
+            <a href="/aup">Acceptable Use</a>
+            <a href="/dpa">DPA</a>
+        </div>
+        <p class="footer-copy">&copy; 2026 Gilestro Lab. MIT License.</p>
+    </div>
+</footer>
+
+<script>
+// Mobile nav toggle
+const toggle = document.getElementById('nav-toggle');
+const links = document.getElementById('nav-links');
+toggle.addEventListener('click', () => {
+    links.classList.toggle('open');
+    toggle.classList.toggle('open');
+});
+
+// Close mobile nav on link click
+links.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => {
+        links.classList.remove('open');
+        toggle.classList.remove('open');
+    });
+});
+
+// Sticky nav background on scroll
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 40);
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Processing Agreement — Berengario</title>
+    <meta name="description" content="Data Processing Agreement for the Berengario hosted service.">
+    <link rel="icon" type="image/png" href="assets/berengario_owl.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="nav scrolled" id="nav">
+    <div class="nav-inner">
+        <a href="/" class="nav-brand">
+            <img src="assets/berengario_owl.png" alt="Berengario" class="nav-logo">
+            <span class="nav-title">Berengario</span>
+        </a>
+        <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+            <span></span><span></span><span></span>
+        </button>
+        <div class="nav-links" id="nav-links">
+            <a href="/#how-it-works">How it Works</a>
+            <a href="/#use-cases">Use Cases</a>
+            <a href="/#features">Features</a>
+            <a href="/#pricing">Pricing</a>
+            <a href="https://github.com/gilestrolab/berengario" class="btn btn-outline btn-sm">GitHub</a>
+        </div>
+    </div>
+</nav>
+
+<section class="section section-legal">
+    <div class="container">
+        <div class="legal">
+            <h1>Data Processing Agreement</h1>
+            <p class="legal-updated">Last updated: 1 March 2026</p>
+
+            <p>This Data Processing Agreement ("DPA") forms part of the <a href="/terms">Terms of Service</a> between the Customer ("Controller") and Giorgio Gilestro operating as Berengario ("Processor"). It governs the processing of personal data by the Processor on behalf of the Controller in connection with the Berengario hosted service ("Service").</p>
+            <p>This DPA is entered into to ensure compliance with the UK General Data Protection Regulation (UK GDPR) and the Data Protection Act 2018, in particular Article 28 of the UK GDPR.</p>
+
+            <h2>1. Definitions</h2>
+            <ul>
+                <li><strong>"Personal Data"</strong> means any information relating to an identified or identifiable natural person, as processed by the Service on behalf of the Controller.</li>
+                <li><strong>"Processing"</strong> means any operation performed on Personal Data, including collection, recording, storage, retrieval, use, disclosure, or deletion.</li>
+                <li><strong>"Sub-processor"</strong> means any third party engaged by the Processor to process Personal Data on behalf of the Controller.</li>
+                <li><strong>"Data Breach"</strong> means a breach of security leading to the accidental or unlawful destruction, loss, alteration, unauthorised disclosure of, or access to Personal Data.</li>
+            </ul>
+
+            <h2>2. Scope of Processing</h2>
+
+            <h3>2.1 Subject Matter</h3>
+            <p>The Processor processes Personal Data to provide the Service, which includes document ingestion, knowledge base management, AI-powered query answering, and email integration.</p>
+
+            <h3>2.2 Categories of Personal Data</h3>
+            <p>The following categories of Personal Data may be processed:</p>
+            <ul>
+                <li>Email addresses and contact information (of Users and email correspondents)</li>
+                <li>Email content (headers, body text, attachments)</li>
+                <li>Document content uploaded to the Knowledge Base</li>
+                <li>Query text and AI-generated responses</li>
+                <li>Usage logs and metadata</li>
+            </ul>
+
+            <h3>2.3 Categories of Data Subjects</h3>
+            <ul>
+                <li>The Controller's employees and authorised Users</li>
+                <li>Individuals whose data appears in documents or emails processed by the Service</li>
+            </ul>
+
+            <h3>2.4 Duration</h3>
+            <p>Processing continues for the duration of the Terms of Service. Upon termination, Section 10 of this DPA applies.</p>
+
+            <h2>3. Obligations of the Processor</h2>
+            <p>The Processor shall:</p>
+            <ol>
+                <li>Process Personal Data only on documented instructions from the Controller, including with regard to transfers to third countries, unless required by law.</li>
+                <li>Ensure that persons authorised to process Personal Data are bound by appropriate confidentiality obligations.</li>
+                <li>Implement appropriate technical and organisational security measures as described in Section 6.</li>
+                <li>Comply with the conditions for engaging Sub-processors as described in Section 5.</li>
+                <li>Assist the Controller in responding to data subject requests as described in Section 8.</li>
+                <li>Assist the Controller in ensuring compliance with obligations relating to security, breach notification, data protection impact assessments, and prior consultation.</li>
+                <li>At the Controller's choice, delete or return all Personal Data upon termination as described in Section 10.</li>
+                <li>Make available to the Controller all information necessary to demonstrate compliance with Article 28 obligations and allow for audits as described in Section 9.</li>
+                <li>Immediately inform the Controller if, in the Processor's opinion, an instruction infringes the UK GDPR or other data protection provisions.</li>
+            </ol>
+
+            <h2>4. Obligations of the Controller</h2>
+            <p>The Controller shall:</p>
+            <ol>
+                <li>Ensure that there is a lawful basis for processing Personal Data through the Service.</li>
+                <li>Provide clear and documented instructions for the processing of Personal Data.</li>
+                <li>Ensure that data subjects have been informed about the processing in accordance with Articles 13 and 14 of the UK GDPR.</li>
+                <li>Comply with the <a href="/aup">Acceptable Use Policy</a>, including restrictions on special category data.</li>
+            </ol>
+
+            <h2>5. Sub-processors</h2>
+
+            <h3>5.1 Authorised Sub-processors</h3>
+            <p>The Controller provides general written authorisation for the Processor to engage Sub-processors. The current list of Sub-processors is:</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sub-processor</th>
+                        <th>Purpose</th>
+                        <th>Location</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>OpenRouter Inc.</td>
+                        <td>LLM inference for query answering, query optimisation, and document enhancement</td>
+                        <td>United States</td>
+                    </tr>
+                    <tr>
+                        <td>OpenAI LLC</td>
+                        <td>Text embeddings for vector search</td>
+                        <td>United States</td>
+                    </tr>
+                    <tr>
+                        <td>Paddle.com Market Limited</td>
+                        <td>Payment processing and invoicing</td>
+                        <td>United Kingdom</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>5.2 Notification of Changes</h3>
+            <p>The Processor shall notify the Controller at least <strong>30 days</strong> in advance of any intended addition or replacement of Sub-processors, providing the Controller with an opportunity to object.</p>
+            <p>If the Controller objects to a new Sub-processor on reasonable grounds relating to data protection, the parties shall discuss the concern in good faith. If no resolution is reached, the Controller may terminate the Terms of Service.</p>
+
+            <h3>5.3 Sub-processor Obligations</h3>
+            <p>The Processor shall ensure that each Sub-processor is bound by data protection obligations no less protective than those in this DPA.</p>
+
+            <h2>6. Security Measures</h2>
+            <p>The Processor implements the following technical and organisational measures to ensure a level of security appropriate to the risk (Article 32 UK GDPR):</p>
+
+            <h3>6.1 Technical Measures</h3>
+            <ul>
+                <li><strong>Encryption in transit</strong>: All data transmitted between the Controller and the Service is encrypted using TLS 1.2 or higher.</li>
+                <li><strong>Encryption at rest</strong>: Stored data is encrypted using AES-256 or equivalent. Each tenant's data is encrypted with its own unique private key (envelope encryption), ensuring that one tenant's data can never be decrypted using another tenant's key.</li>
+                <li><strong>Tenant isolation</strong>: Each Controller's data is stored in a separate database, ensuring logical separation from other tenants.</li>
+                <li><strong>Access controls</strong>: Role-based access controls with authentication required for all service components.</li>
+                <li><strong>Backups</strong>: Regular encrypted backups with tested recovery procedures.</li>
+                <li><strong>Monitoring</strong>: System monitoring and logging for security events.</li>
+            </ul>
+
+            <h3>6.2 Organisational Measures</h3>
+            <ul>
+                <li><strong>Confidentiality</strong>: All personnel with access to Personal Data are bound by confidentiality obligations.</li>
+                <li><strong>Least privilege</strong>: Access to Personal Data is limited to those who require it for their role.</li>
+                <li><strong>Incident response</strong>: Documented procedures for identifying, reporting, and responding to security incidents.</li>
+            </ul>
+
+            <h2>7. Data Breach Notification</h2>
+            <p>In the event of a Data Breach involving the Controller's Personal Data:</p>
+            <ol>
+                <li>The Processor shall notify the Controller <strong>without undue delay</strong> and in any event within <strong>72 hours</strong> of becoming aware of the breach.</li>
+                <li>The notification shall include:
+                    <ul>
+                        <li>A description of the nature of the breach, including the categories and approximate number of data subjects and records affected.</li>
+                        <li>The name and contact details of the point of contact for further information.</li>
+                        <li>A description of the likely consequences of the breach.</li>
+                        <li>A description of the measures taken or proposed to address the breach and mitigate its effects.</li>
+                    </ul>
+                </li>
+                <li>The Processor shall cooperate with the Controller and take reasonable steps to assist in the investigation, mitigation, and remediation of the breach.</li>
+            </ol>
+
+            <h2>8. Data Subject Requests</h2>
+            <p>The Processor shall:</p>
+            <ol>
+                <li>Promptly notify the Controller if it receives a request from a data subject to exercise their rights under the UK GDPR (access, rectification, erasure, portability, restriction, or objection).</li>
+                <li>Not respond to the data subject directly, unless instructed by the Controller.</li>
+                <li>Provide the Controller with reasonable assistance in fulfilling data subject requests, taking into account the nature of the processing.</li>
+                <li>Provide technical capabilities to support data export (portability) and deletion (erasure) upon request.</li>
+            </ol>
+
+            <h2>9. Audit Rights</h2>
+            <p>The Processor shall make available to the Controller all information necessary to demonstrate compliance with the obligations in this DPA and Article 28 of the UK GDPR.</p>
+            <p>The Processor shall allow for and contribute to audits, including inspections, conducted by the Controller or an auditor mandated by the Controller, subject to:</p>
+            <ul>
+                <li>Reasonable advance notice (at least 30 days, except in the case of a Data Breach or regulatory investigation).</li>
+                <li>Audits being conducted during normal business hours and in a manner that minimises disruption to the Processor's operations.</li>
+                <li>The auditor being bound by appropriate confidentiality obligations.</li>
+                <li>A maximum of one audit per 12-month period, unless required by a supervisory authority or triggered by a Data Breach.</li>
+            </ul>
+
+            <h2>10. Data Return and Deletion</h2>
+            <p>Upon termination of the Terms of Service, at the Controller's choice:</p>
+            <ol>
+                <li><strong>Data return</strong>: The Processor shall provide the Controller with a complete export of their data in a structured, commonly used, and machine-readable format. The Controller shall have at least 30 days to request and complete the export.</li>
+                <li><strong>Data deletion</strong>: After the export period (or immediately if the Controller requests deletion), the Processor shall delete all Personal Data from its systems, including backups, within 90 days.</li>
+                <li><strong>Certification</strong>: Upon request, the Processor shall provide written confirmation that deletion has been completed.</li>
+            </ol>
+            <p>The Processor may retain Personal Data to the extent required by applicable law, provided that the Processor ensures confidentiality and processes such data only for the purpose required by law.</p>
+
+            <h2>11. International Transfers</h2>
+            <p>Where Personal Data is transferred to Sub-processors outside the United Kingdom, the Processor shall ensure that appropriate safeguards are in place, including:</p>
+            <ul>
+                <li>The UK-US Data Bridge (UK extension of the EU-US Data Privacy Framework), where the recipient is certified.</li>
+                <li>Standard Contractual Clauses (SCCs) approved by the ICO, incorporated into agreements with Sub-processors.</li>
+            </ul>
+            <p>The Processor shall inform the Controller of any transfer of Personal Data to a third country and the safeguards in place.</p>
+
+            <h2>12. Liability</h2>
+            <p>Each party's liability under this DPA is subject to the limitations and exclusions set out in the Terms of Service.</p>
+
+            <h2>13. Governing Law</h2>
+            <p>This DPA is governed by and construed in accordance with the laws of England and Wales.</p>
+
+            <h2>14. Contact</h2>
+            <p>For any questions about this DPA:</p>
+            <p>
+                Giorgio Gilestro<br>
+                Email: <a href="mailto:giorgio@gilest.ro">giorgio@gilest.ro</a><br>
+                ICO registration: ZC098928
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+    <div class="container footer-inner">
+        <div class="footer-brand">
+            <img src="assets/berengario_owl.png" alt="" class="footer-logo">
+            <span>Berengario</span>
+        </div>
+        <div class="footer-links">
+            <a href="https://github.com/gilestrolab/berengario">GitHub</a>
+            <a href="https://github.com/gilestrolab/berengario/issues">Issues</a>
+            <a href="https://lab.gilest.ro">Gilestro Lab</a>
+        </div>
+        <div class="footer-links footer-legal">
+            <a href="/terms">Terms</a>
+            <a href="/privacy">Privacy</a>
+            <a href="/aup">Acceptable Use</a>
+            <a href="/dpa">DPA</a>
+        </div>
+        <p class="footer-copy">&copy; 2026 Gilestro Lab. MIT License.</p>
+    </div>
+</footer>
+
+<script>
+const toggle = document.getElementById('nav-toggle');
+const links = document.getElementById('nav-links');
+toggle.addEventListener('click', () => {
+    links.classList.toggle('open');
+    toggle.classList.toggle('open');
+});
+links.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => {
+        links.classList.remove('open');
+        toggle.classList.remove('open');
+    });
+});
+</script>
+
+</body>
+</html>
