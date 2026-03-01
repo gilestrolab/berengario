@@ -50,3 +50,6 @@ temp/
 
 # Diagnostic and troubleshooting scripts
 accessories/
+
+# Landing page (lives on orphan `www` branch)
+www/
