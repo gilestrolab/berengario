@@ -24,6 +24,7 @@ def get_system_prompt(
     instance_description: str,
     organization: str = "",
     include_tools: bool = False,
+    custom_prompt_text: Optional[str] = None,
 ) -> str:
     """
     Generate system prompt based on instance configuration.
@@ -33,6 +34,8 @@ def get_system_prompt(
         instance_description: Description of the instance's purpose.
         organization: Organization name (optional).
         include_tools: Whether to include tool descriptions in the prompt.
+        custom_prompt_text: Custom prompt text to append. When provided,
+            used instead of reading from settings.rag_custom_prompt_file.
 
     Returns:
         Formatted system prompt.
@@ -66,8 +69,11 @@ Guidelines:
             base_prompt += "\n- Use export tools (CSV, JSON) when users request data exports or when providing structured information that would benefit from a downloadable format"
             base_prompt += "\n- Proactively generate attachments to enhance user experience - don't wait to be asked"
 
-    # Append custom prompt from file if specified
-    if settings.rag_custom_prompt_file and settings.rag_custom_prompt_file.exists():
+    # Append custom prompt: prefer provided text, fall back to file
+    if custom_prompt_text:
+        base_prompt += f"\n\n{custom_prompt_text}"
+        logger.info("Appended custom prompt from tenant context")
+    elif settings.rag_custom_prompt_file and settings.rag_custom_prompt_file.exists():
         try:
             with open(settings.rag_custom_prompt_file, "r", encoding="utf-8") as f:
                 custom_prompt = f.read().strip()
@@ -107,6 +113,7 @@ class RAGEngine:
         kb_manager: Optional[KnowledgeBaseManager] = None,
         llm_model: Optional[str] = None,
         enable_function_calling: bool = True,
+        tenant_context: Optional["TenantContext"] = None,  # noqa: F821
     ):
         """
         Initialize the RAG engine.
@@ -115,10 +122,14 @@ class RAGEngine:
             kb_manager: Knowledge base manager instance.
             llm_model: LLM model name (default from settings).
             enable_function_calling: Whether to enable function calling for tools.
+            tenant_context: Optional tenant context for multi-tenant config.
+                When provided, overrides instance_name/description/organization/
+                custom_prompt/top_k from global settings.
         """
         self.kb_manager = kb_manager or KnowledgeBaseManager()
         self.llm_model = llm_model or settings.openrouter_model
         self.enable_function_calling = enable_function_calling
+        self.tenant_context = tenant_context
 
         # Initialize LLM (uses OpenAI-compatible API like Naga.ac)
         # WORKAROUND: Use "gpt-4" to pass validation, but actual model is sent to API
@@ -132,7 +143,7 @@ class RAGEngine:
             max_tokens=4096,
             is_chat_model=True,
             default_headers={
-                "HTTP-Referer": "https://github.com/imperial-dols/dols-gpt",
+                "HTTP-Referer": "https://github.com/gilestrolab/berengar.io",
             },
             # Additional model parameters to override in API calls
             additional_kwargs={
@@ -159,18 +170,22 @@ class RAGEngine:
             self.openai_client = None
 
         # Create custom prompt template based on instance configuration
+        # Use tenant context when available, otherwise fall back to global settings
+        ctx = self.tenant_context
         system_prompt = get_system_prompt(
-            settings.instance_name,
-            settings.instance_description,
-            settings.organization,
+            instance_name=ctx.instance_name if ctx else settings.instance_name,
+            instance_description=(
+                ctx.instance_description if ctx else settings.instance_description
+            ),
+            organization=ctx.organization if ctx else settings.organization,
             include_tools=self.enable_function_calling,
+            custom_prompt_text=ctx.custom_prompt if ctx else None,
         )
         self.prompt_template = PromptTemplate(system_prompt)
 
         # Get query engine from KB manager (pass our LLM)
-        self.query_engine = self.kb_manager.get_query_engine(
-            top_k=settings.top_k_retrieval, llm=self.llm
-        )
+        top_k = ctx.top_k_retrieval if ctx else settings.top_k_retrieval
+        self.query_engine = self.kb_manager.get_query_engine(top_k=top_k, llm=self.llm)
 
         # Update query engine with custom prompt
         self.query_engine.update_prompts(
@@ -220,7 +235,7 @@ class RAGEngine:
                 tools=[{"type": "function", "function": tool} for tool in self.tools],
                 tool_choice="auto",
                 extra_headers={
-                    "HTTP-Referer": "https://github.com/imperial-dols/dols-gpt"
+                    "HTTP-Referer": "https://github.com/gilestrolab/berengar.io"
                 },
             )
 
@@ -331,7 +346,7 @@ class RAGEngine:
                 model=self.llm_model,
                 messages=messages,
                 extra_headers={
-                    "HTTP-Referer": "https://github.com/imperial-dols/dols-gpt"
+                    "HTTP-Referer": "https://github.com/gilestrolab/berengar.io"
                 },
             )
 
@@ -508,7 +523,7 @@ class RAGEngine:
 
         email_body += "\n---\n"
         email_body += (
-            "This response was generated by DoLS-GPT. "
+            f"This response was generated by {settings.instance_name}. "
             "Please verify critical information with official sources.\n"
         )
 

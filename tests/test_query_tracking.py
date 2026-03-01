@@ -27,10 +27,9 @@ def conversation_manager():
         test_db_manager = DatabaseManager()
         test_db_manager.init_db()
 
-        # Patch the global db_manager in conversation_manager module
-        with patch("src.email.conversation_manager.db_manager", test_db_manager):
-            manager = ConversationManager()
-            yield manager
+        # Pass the test db_manager directly via DI
+        manager = ConversationManager(db_manager=test_db_manager)
+        yield manager
 
         test_db_manager.close()
 

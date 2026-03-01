@@ -41,6 +41,8 @@ def create_admin_router(
     query_handler,
     settings,
     require_admin,
+    component_resolver=None,
+    storage_backend=None,
 ):
     """
     Create admin router with dependency injection.
@@ -57,10 +59,51 @@ def create_admin_router(
         query_handler: Query handler instance
         settings: Settings instance
         require_admin: Admin authentication dependency function
+        component_resolver: ComponentResolver for MT mode (optional)
 
     Returns:
         Configured APIRouter instance
     """
+
+    def _get_kb(session):
+        """Get the KB manager for this session (MT-aware)."""
+        if component_resolver:
+            return component_resolver.resolve(session).kb_manager
+        return kb_manager
+
+    def _get_dp(session):
+        """Get the document processor for this session (MT-aware)."""
+        if component_resolver:
+            return component_resolver.resolve(session).doc_processor
+        return document_processor
+
+    def _get_qh(session):
+        """Get the query handler for this session (MT-aware)."""
+        if component_resolver:
+            return component_resolver.resolve(session).query_handler
+        return query_handler
+
+    def _get_desc_gen(session):
+        """Get a DescriptionGenerator scoped to the correct tenant DB."""
+        from src.document_processing.description_generator import DescriptionGenerator
+
+        if component_resolver:
+            components = component_resolver.resolve(session)
+            # Reuse the tenant's conversation_manager.db_manager for DB access
+            tenant_db = getattr(components.conversation_manager, "db_manager", None)
+            if tenant_db:
+                return DescriptionGenerator(db_manager=tenant_db)
+        return DescriptionGenerator()
+
+    def _get_questions_path(session):
+        """Get tenant-scoped example questions file path (None = ST default)."""
+        if component_resolver:
+            components = component_resolver.resolve(session)
+            ctx = components.context
+            # Store in tenant's config directory alongside other tenant config
+            tenant_config = ctx.documents_path.parent / "config"
+            return tenant_config / "example_questions.json"
+        return None
 
     # ============================================================================
     # Whitelist Management
@@ -298,11 +341,8 @@ def create_admin_router(
             List of document descriptions
         """
         try:
-            from src.document_processing.description_generator import (
-                description_generator,
-            )
-
-            descriptions = description_generator.get_all_descriptions()
+            desc_gen = _get_desc_gen(session)
+            descriptions = desc_gen.get_all_descriptions()
             logger.info(
                 f"Admin {session.email} retrieved {len(descriptions)} document descriptions"
             )
@@ -408,7 +448,7 @@ def create_admin_router(
                 )
 
             # Get content from KB
-            content = kb_manager.get_document_content(file_hash)
+            content = _get_kb(session).get_document_content(file_hash)
 
             if not content:
                 raise HTTPException(
@@ -575,27 +615,43 @@ def create_admin_router(
 
                 logger.info(f"Saved uploaded file to: {temp_file_path}")
 
-                # Save permanent copy to kb/documents/ first
-                documents_dir = settings.kb_documents_path
-                documents_dir.mkdir(parents=True, exist_ok=True)
+                # Save permanent copy to kb/documents/
+                # In MT mode with storage_backend, resolve tenant-specific path
+                if storage_backend and component_resolver and session.tenant_slug:
+                    components = component_resolver.resolve(session)
+                    documents_dir = components.context.kb_documents_path
+                else:
+                    documents_dir = settings.kb_documents_path
 
-                # Check if file already exists
-                permanent_path = documents_dir / file.filename
                 final_filename = file.filename
-                if permanent_path.exists():
-                    # Add timestamp to avoid overwriting
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    name_parts = file.filename.rsplit(".", 1)
-                    final_filename = f"{name_parts[0]}_{timestamp}.{name_parts[1]}"
-                    permanent_path = documents_dir / final_filename
 
-                # Copy to permanent location
-                shutil.copy2(temp_file_path, permanent_path)
-                logger.info(f"Saved permanent copy to: {permanent_path}")
+                if storage_backend and session.tenant_slug:
+                    # MT mode: archive via storage backend
+                    storage_backend.put(
+                        session.tenant_slug,
+                        f"kb/documents/{final_filename}",
+                        content,
+                    )
+                    permanent_path = documents_dir / final_filename
+                    logger.info(
+                        f"Archived upload to storage backend "
+                        f"({session.tenant_slug}/kb/documents/{final_filename})"
+                    )
+                else:
+                    # ST mode: local filesystem with collision handling
+                    documents_dir.mkdir(parents=True, exist_ok=True)
+                    permanent_path = documents_dir / file.filename
+                    if permanent_path.exists():
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        name_parts = file.filename.rsplit(".", 1)
+                        final_filename = f"{name_parts[0]}_{timestamp}.{name_parts[1]}"
+                        permanent_path = documents_dir / final_filename
+                    shutil.copy2(temp_file_path, permanent_path)
+                    logger.info(f"Saved permanent copy to: {permanent_path}")
 
                 # Process document with correct metadata
                 # Note: Use permanent path and filename in metadata
-                nodes = document_processor.process_document(
+                nodes = _get_dp(session).process_document(
                     temp_file_path,
                     source_type="manual",
                     extra_metadata={
@@ -609,7 +665,7 @@ def create_admin_router(
                 # Add to knowledge base
                 chunks_added = 0
                 if nodes:
-                    kb_manager.add_nodes(nodes)
+                    _get_kb(session).add_nodes(nodes)
                     chunks_added = len(nodes)
                     logger.info(
                         f"Processed uploaded document: {final_filename} ({chunks_added} chunks)"
@@ -617,9 +673,7 @@ def create_admin_router(
 
                     # Generate and save document description
                     try:
-                        from src.document_processing.description_generator import (
-                            description_generator,
-                        )
+                        desc_gen = _get_desc_gen(session)
 
                         # Use relative path from project root
                         relative_path = str(permanent_path)
@@ -628,7 +682,7 @@ def create_admin_router(
                                 5:
                             ]  # Remove '/app/' prefix in Docker
 
-                        description_generator.generate_and_save(
+                        desc_gen.generate_and_save(
                             file_path=relative_path,
                             filename=final_filename,
                             chunks=nodes,
@@ -711,7 +765,7 @@ def create_admin_router(
             )
 
             # Process URL with DocumentProcessor
-            nodes = document_processor.process_url(
+            nodes = _get_dp(session).process_url(
                 url=request.url,
                 crawl_depth=request.crawl_depth,
                 extra_metadata={
@@ -724,7 +778,7 @@ def create_admin_router(
             pages_crawled = 0
             chunks_added = 0
             if nodes:
-                kb_manager.add_nodes(nodes)
+                _get_kb(session).add_nodes(nodes)
                 chunks_added = len(nodes)
 
                 # Count unique pages (by url_hash)
@@ -794,7 +848,7 @@ def create_admin_router(
             CrawledUrlResponse with list of crawled URLs
         """
         try:
-            urls = kb_manager.get_crawled_urls()
+            urls = _get_kb(session).get_crawled_urls()
 
             # Format timestamps for display
             for url in urls:
@@ -839,7 +893,7 @@ def create_admin_router(
         """
         try:
             # Get all crawled URLs
-            urls = kb_manager.get_crawled_urls()
+            urls = _get_kb(session).get_crawled_urls()
 
             if not urls:
                 return AdminActionResponse(
@@ -855,7 +909,7 @@ def create_admin_router(
             total_chunks = 0
             for url_data in urls:
                 try:
-                    chunks = kb_manager.delete_document_by_url_hash(
+                    chunks = _get_kb(session).delete_document_by_url_hash(
                         url_data["url_hash"]
                     )
                     total_chunks += chunks
@@ -919,7 +973,7 @@ def create_admin_router(
         """
         try:
             # Get URL info before deletion
-            url_info = kb_manager.get_document_by_url_hash(url_hash)
+            url_info = _get_kb(session).get_document_by_url_hash(url_hash)
             if not url_info:
                 raise HTTPException(
                     status_code=404,
@@ -929,7 +983,7 @@ def create_admin_router(
             source_url = url_info.get("source_url", "Unknown")
 
             # Delete from KB
-            chunks_removed = kb_manager.delete_document_by_url_hash(url_hash)
+            chunks_removed = _get_kb(session).delete_document_by_url_hash(url_hash)
 
             # Log to audit trail
             audit_logger.log_action(
@@ -1423,9 +1477,11 @@ def create_admin_router(
 
             logger.info(f"Admin {session.email} requested example question generation")
 
-            # Generate and save questions
+            # Generate and save questions (tenant-scoped path in MT mode)
             result = generate_and_save_example_questions(
-                rag_engine=query_handler.rag_engine, count=15
+                rag_engine=_get_qh(session).rag_engine,
+                count=15,
+                file_path=_get_questions_path(session),
             )
 
             # Log to audit trail

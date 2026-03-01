@@ -82,6 +82,18 @@ class AdminPanel {
             } else {
                 document.getElementById('admin-title').textContent = headerText;
             }
+
+            // Multi-tenant mode: show Team tab, hide Whitelists tab
+            if (config.multi_tenant) {
+                this.multiTenant = true;
+                const teamTabBtn = document.getElementById('team-tab-btn');
+                const whitelistsTabBtn = document.getElementById('whitelists-tab-btn');
+                if (teamTabBtn) teamTabBtn.style.display = '';
+                if (whitelistsTabBtn) whitelistsTabBtn.style.display = 'none';
+                // Auto-select Team tab instead of Whitelists
+                this.switchTab('team');
+                this.loadTeamData();
+            }
         } catch (error) {
             console.error('Error loading config:', error);
         }
@@ -1521,587 +1533,331 @@ class AdminPanel {
         div.textContent = text;
         return div.innerHTML;
     }
-}
 
-/**
- * Usage Analytics Manager
- * Handles usage monitoring and statistics
- */
-class UsageAnalytics {
-    constructor() {
-        this.currentTimeRange = 7; // Default: last 7 days
-        this.chart = null;
-        this.init();
+    // === Team Management Methods (Multi-Tenant) ===
+
+    async loadTeamData() {
+        await Promise.all([
+            this.loadTeamMembers(),
+            this.loadInviteInfo(),
+            this.loadJoinRequests(),
+        ]);
+        this.setupTeamEventListeners();
     }
 
-    init() {
-        // Setup time range button listeners
-        document.querySelectorAll('.time-range-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.time-range-btn').forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-
-                const days = e.target.dataset.days;
-                this.currentTimeRange = days === 'all' ? null : parseInt(days);
-                this.loadAnalytics();
-            });
-        });
-
-        // Load initial analytics when usage tab is shown
-        const usageTab = document.querySelector('[data-tab="usage"]');
-        if (usageTab) {
-            usageTab.addEventListener('click', () => {
-                // Small delay to ensure tab content is visible
-                setTimeout(() => this.loadAnalytics(), 100);
-            });
-        }
-    }
-
-    async loadAnalytics() {
-        try {
-            const params = this.currentTimeRange ? `?days=${this.currentTimeRange}` : '';
-            const response = await fetch(`/api/admin/usage/analytics${params}`);
-
-            if (!response.ok) {
-                throw new Error('Failed to load analytics');
-            }
-
-            const data = await response.json();
-            this.renderOverviewStats(data.overview, data.channel_breakdown);
-            this.renderTrendsChart(data.daily_stats);
-            this.renderUserTable(data.user_activity);
-
-            // Load additional analytics
-            this.loadOptimizationAnalytics();
-            this.loadSourceAnalytics();
-
-        } catch (error) {
-            console.error('Error loading analytics:', error);
-            adminPanel.showToast('Error loading usage analytics', 'error');
-        }
-    }
-
-    renderOverviewStats(overview, channelBreakdown) {
-        document.getElementById('stat-total-queries').textContent = overview.total_queries.toLocaleString();
-        document.getElementById('stat-unique-users').textContent = overview.unique_users.toLocaleString();
-        document.getElementById('stat-avg-queries').textContent = overview.avg_queries_per_user.toFixed(1);
-
-        // Calculate channel split
-        const email = channelBreakdown.email || 0;
-        const webchat = channelBreakdown.webchat || 0;
-        const total = email + webchat;
-
-        if (total > 0) {
-            const emailPct = Math.round((email / total) * 100);
-            const webchatPct = Math.round((webchat / total) * 100);
-            document.getElementById('stat-channel-split').textContent = `${emailPct}% / ${webchatPct}%`;
-        } else {
-            document.getElementById('stat-channel-split').textContent = 'N/A';
-        }
-    }
-
-    renderTrendsChart(dailyStats) {
-        const ctx = document.getElementById('query-trends-chart');
-        if (!ctx) return;
-
-        // Destroy existing chart if it exists
-        if (this.chart) {
-            this.chart.destroy();
-        }
-
-        // Prepare data
-        const labels = dailyStats.map(stat => stat.date);
-        const data = dailyStats.map(stat => stat.count);
-
-        // Create chart
-        this.chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Queries',
-                    data: data,
-                    borderColor: 'rgb(0, 123, 255)',
-                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                    tension: 0.3,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            precision: 0
-                        }
-                    }
+    setupTeamEventListeners() {
+        const emailInput = document.getElementById('team-member-email');
+        if (emailInput) {
+            emailInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.addTeamMember();
                 }
-            }
-        });
+            });
+        }
+
+        const addBtn = document.getElementById('add-team-member-btn');
+        if (addBtn) addBtn.addEventListener('click', () => this.addTeamMember());
+
+        const copyBtn = document.getElementById('copy-invite-btn');
+        if (copyBtn) copyBtn.addEventListener('click', () => this.copyInviteCode());
+
+        const regenBtn = document.getElementById('regenerate-invite-btn');
+        if (regenBtn) regenBtn.addEventListener('click', () => this.regenerateInviteCode());
+
+        const qrBtn = document.getElementById('show-qr-btn');
+        if (qrBtn) qrBtn.addEventListener('click', () => this.toggleQRCode());
+
+        const approvalToggle = document.getElementById('join-approval-toggle');
+        if (approvalToggle) {
+            approvalToggle.addEventListener('change', (e) => {
+                this.toggleJoinApproval(e.target.checked);
+            });
+        }
     }
 
-    renderUserTable(userActivity) {
-        const tbody = document.getElementById('users-table-body');
-        if (!tbody) return;
+    async loadTeamMembers() {
+        try {
+            const resp = await fetch('/api/admin/team', { credentials: 'include' });
+            const members = await resp.json();
+            this.renderTeamMembers(members);
+        } catch (e) {
+            console.error('Failed to load team members:', e);
+        }
+    }
 
-        if (userActivity.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-secondary, #666);">No user activity in this period</td></tr>';
+    renderTeamMembers(members) {
+        const container = document.getElementById('team-members-list');
+        if (!members.length) {
+            container.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.875rem; padding: 1rem;">No team members</div>';
             return;
         }
 
-        tbody.innerHTML = userActivity.map(user => `
-            <tr>
-                <td>${this.escapeHtml(user.sender)}</td>
-                <td><span class="badge badge-${user.channel.toLowerCase()}">${user.channel}</span></td>
-                <td>${user.query_count}</td>
-                <td>
-                    <button class="btn-view-queries" onclick="usageAnalytics.viewUserQueries('${this.escapeHtml(user.sender)}')">
-                        View Queries
+        container.innerHTML = members.map(m => `
+            <div class="team-member-row">
+                <div class="team-member-info">
+                    <span class="team-member-email">${this.escapeHtml(m.email)}</span>
+                    <span class="role-badge role-${m.role}">${m.role}</span>
+                </div>
+                <div class="team-member-actions">
+                    <select class="team-select role-select" data-user-id="${m.id}">
+                        <option value="querier" ${m.role === 'querier' ? 'selected' : ''}>Querier</option>
+                        <option value="teacher" ${m.role === 'teacher' ? 'selected' : ''}>Teacher</option>
+                        <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
+                    </select>
+                    <button class="btn-remove-member" onclick="adminPanel.removeTeamMember(${m.id})" title="Remove member">
+                        <i class="fas fa-trash-alt"></i>
                     </button>
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    async viewUserQueries(sender) {
-        try {
-            const params = this.currentTimeRange ? `?days=${this.currentTimeRange}` : '';
-            const response = await fetch(`/api/admin/usage/user/${encodeURIComponent(sender)}${params}`);
-
-            if (!response.ok) {
-                throw new Error('Failed to load user queries');
-            }
-
-            const data = await response.json();
-            this.showQueriesModal(sender, data.queries);
-
-        } catch (error) {
-            console.error('Error loading user queries:', error);
-            adminPanel.showToast('Error loading user queries', 'error');
-        }
-    }
-
-    showQueriesModal(sender, queries) {
-        const modalHtml = `
-            <div class="modal-overlay" onclick="this.remove()">
-                <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 800px;">
-                    <div class="modal-header">
-                        <h3>Queries from ${this.escapeHtml(sender)}</h3>
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
-                    </div>
-                    <div class="modal-body" style="max-height: 600px; overflow-y: auto;">
-                        ${queries.length === 0 ? '<p>No queries found</p>' : queries.map((q, i) => `
-                            <div class="query-item" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary, #F7F2EA); border-radius: 6px;">
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                                    <strong>#${i + 1}</strong>
-                                    <span style="color: var(--text-secondary, #666); font-size: 0.875rem;">
-                                        ${new Date(q.timestamp).toLocaleString()}
-                                    </span>
-                                </div>
-                                ${q.subject ? `<div style="color: var(--text-secondary, #666); font-size: 0.875rem; margin-bottom: 0.5rem;"><em>Subject: ${this.escapeHtml(q.subject)}</em></div>` : ''}
-                                <div class="query-content" style="white-space: pre-wrap; word-wrap: break-word;">
-                                    ${this.truncateAndMakeExpandable(q.content, 200, `query-${i}`)}
-                                </div>
-                                <span class="badge badge-${q.channel.toLowerCase()}" style="margin-top: 0.5rem; display: inline-block;">${q.channel}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            </div>
-        `;
-
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-    }
-
-    truncateAndMakeExpandable(text, maxLength, id) {
-        if (text.length <= maxLength) {
-            return this.escapeHtml(text);
-        }
-
-        const truncated = text.substring(0, maxLength);
-        return `
-            <span id="${id}-short">${this.escapeHtml(truncated)}...
-                <a href="#" onclick="document.getElementById('${id}-short').style.display='none'; document.getElementById('${id}-full').style.display='block'; return false;" style="color: var(--primary, #7A5C3E);">
-                    [Show More]
-                </a>
-            </span>
-            <span id="${id}-full" style="display: none;">${this.escapeHtml(text)}
-                <a href="#" onclick="document.getElementById('${id}-full').style.display='none'; document.getElementById('${id}-short').style.display='block'; return false;" style="color: var(--primary, #7A5C3E);">
-                    [Show Less]
-                </a>
-            </span>
-        `;
-    }
-
-    async analyzeTopics() {
-        const btn = document.querySelector('.btn-analyze-topics');
-        const originalHtml = btn.innerHTML;
-
-        try {
-            // Disable button and show loading
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
-
-            const params = this.currentTimeRange ? `?days=${this.currentTimeRange}` : '';
-            const response = await fetch(`/api/admin/usage/topics${params}`, {
-                method: 'POST'
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to analyze topics');
-            }
-
-            const data = await response.json();
-            this.renderTopics(data.topics);
-            adminPanel.showToast(`Identified ${data.topics.length} topics from ${data.total_queries} queries`, 'success');
-
-        } catch (error) {
-            console.error('Error analyzing topics:', error);
-            adminPanel.showToast('Error analyzing topics', 'error');
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = originalHtml;
-        }
-    }
-
-    renderTopics(topics) {
-        const container = document.getElementById('topics-container');
-        if (!container) return;
-
-        if (topics.length === 0) {
-            container.innerHTML = '<p class="topics-placeholder">No topics identified. Try a longer time period or check if there are queries in the database.</p>';
-            return;
-        }
-
-        container.innerHTML = topics.map((topic, i) => `
-            <div class="topic-card">
-                <div class="topic-header">
-                    <div class="topic-name">${this.escapeHtml(topic.topic_name)}</div>
-                    <div class="topic-stats">${topic.query_count} queries (${topic.percentage}%)</div>
-                </div>
-                <div class="topic-description">${this.escapeHtml(topic.description)}</div>
-                <div class="topic-samples">
-                    <div class="topic-samples-title">Sample Queries</div>
-                    ${topic.sample_queries.slice(0, 3).map((query, j) => {
-                        const truncated = query.length > 100;
-                        const displayText = truncated ? query.substring(0, 100) : query;
-                        return `
-                            <div class="sample-query ${truncated ? 'truncated' : ''}"
-                                 id="topic-${i}-query-${j}"
-                                 onclick="usageAnalytics.toggleQueryExpand('topic-${i}-query-${j}', ${JSON.stringify(query).replace(/"/g, '&quot;')})">
-                                ${this.escapeHtml(displayText)}
-                            </div>
-                        `;
-                    }).join('')}
                 </div>
             </div>
         `).join('');
-    }
 
-    toggleQueryExpand(elementId, fullText) {
-        const element = document.getElementById(elementId);
-        if (!element) return;
-
-        if (element.classList.contains('expanded')) {
-            // Collapse
-            element.classList.remove('expanded');
-            const truncated = fullText.substring(0, 100);
-            element.textContent = truncated;
-        } else {
-            // Expand
-            element.classList.add('expanded');
-            element.textContent = fullText;
-        }
-    }
-
-    async loadOptimizationAnalytics() {
-        try {
-            const params = this.currentTimeRange ? `?days=${this.currentTimeRange}` : '';
-            const response = await fetch(`/api/admin/analytics/optimization${params}`);
-
-            if (!response.ok) {
-                throw new Error('Failed to load optimization analytics');
-            }
-
-            const data = await response.json();
-            this.renderOptimizationAnalytics(data);
-        } catch (error) {
-            console.error('Error loading optimization analytics:', error);
-            const container = document.getElementById('optimization-container');
-            if (container) {
-                container.innerHTML = '<p style="color: var(--text-secondary, #666);">Error loading optimization analytics</p>';
-            }
-        }
-    }
-
-    renderOptimizationAnalytics(data) {
-        const container = document.getElementById('optimization-container');
-        if (!container) return;
-
-        if (data.total_queries === 0) {
-            container.innerHTML = '<p style="color: var(--text-secondary, #666);">No queries in this period</p>';
-            return;
-        }
-
-        const optimizationRate = data.optimization_rate.toFixed(1);
-        const avgExpansion = data.avg_query_expansion.toFixed(1);
-
-        container.innerHTML = `
-            <div class="stats-grid" style="margin-bottom: 1.5rem;">
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-magic"></i></div>
-                    <div class="stat-content">
-                        <div class="stat-label">Optimization Rate</div>
-                        <div class="stat-value">${optimizationRate}%</div>
-                        <div class="stat-sub">${data.optimized_count} of ${data.total_queries} queries</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-expand-arrows-alt"></i></div>
-                    <div class="stat-content">
-                        <div class="stat-label">Avg Query Expansion</div>
-                        <div class="stat-value">${avgExpansion}%</div>
-                        <div class="stat-sub">Average length increase</div>
-                    </div>
-                </div>
-            </div>
-            ${data.sample_optimizations.length > 0 ? `
-                <div class="optimization-samples">
-                    <h4 style="margin-bottom: 1rem;">Sample Optimizations</h4>
-                    ${data.sample_optimizations.map((sample, i) => `
-                        <div class="optimization-sample" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary, #F7F2EA); border-radius: 6px;">
-                            <div style="margin-bottom: 0.5rem;">
-                                <strong>Original:</strong> <span style="color: var(--text-secondary, #666);">${this.escapeHtml(sample.original_query)}</span>
-                            </div>
-                            <div>
-                                <strong>Optimized:</strong> <span style="color: var(--success, #5B8C7A);">${this.escapeHtml(sample.optimized_query)}</span>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            ` : ''}
-        `;
-    }
-
-    async loadSourceAnalytics() {
-        try {
-            const params = this.currentTimeRange ? `?days=${this.currentTimeRange}` : '';
-            const response = await fetch(`/api/admin/analytics/sources${params}`);
-
-            if (!response.ok) {
-                throw new Error('Failed to load source analytics');
-            }
-
-            const data = await response.json();
-            this.renderSourceAnalytics(data);
-        } catch (error) {
-            console.error('Error loading source analytics:', error);
-            const container = document.getElementById('sources-container');
-            if (container) {
-                container.innerHTML = '<p style="color: var(--text-secondary, #666);">Error loading source analytics</p>';
-            }
-        }
-    }
-
-    renderSourceAnalytics(data) {
-        const container = document.getElementById('sources-container');
-        if (!container) return;
-
-        if (data.total_replies === 0) {
-            container.innerHTML = '<p style="color: var(--text-secondary, #666);">No replies with sources in this period</p>';
-            return;
-        }
-
-        const avgSources = data.avg_sources_per_reply.toFixed(1);
-        const avgScore = data.avg_relevance_score ? (data.avg_relevance_score * 100).toFixed(1) : 'N/A';
-
-        container.innerHTML = `
-            <div class="stats-grid" style="margin-bottom: 1.5rem;">
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-file-alt"></i></div>
-                    <div class="stat-content">
-                        <div class="stat-label">Total Replies</div>
-                        <div class="stat-value">${data.total_replies}</div>
-                        <div class="stat-sub">${data.replies_with_sources} with sources</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-layer-group"></i></div>
-                    <div class="stat-content">
-                        <div class="stat-label">Avg Sources/Reply</div>
-                        <div class="stat-value">${avgSources}</div>
-                        <div class="stat-sub">Documents cited</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-star"></i></div>
-                    <div class="stat-content">
-                        <div class="stat-label">Avg Relevance</div>
-                        <div class="stat-value">${avgScore}${avgScore !== 'N/A' ? '%' : ''}</div>
-                        <div class="stat-sub">Source quality</div>
-                    </div>
-                </div>
-            </div>
-            ${data.top_sources.length > 0 ? `
-                <div class="top-sources">
-                    <h4 style="margin-bottom: 1rem;">Most Cited Documents</h4>
-                    <div class="table-responsive">
-                        <table class="users-table">
-                            <thead>
-                                <tr>
-                                    <th>Document</th>
-                                    <th>Citations</th>
-                                    <th>Avg Score</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${data.top_sources.slice(0, 10).map(source => `
-                                    <tr>
-                                        <td>${this.escapeHtml(source.filename)}</td>
-                                        <td>${source.citation_count}</td>
-                                        <td>${(source.avg_score * 100).toFixed(1)}%</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            ` : ''}
-        `;
-    }
-
-    refresh() {
-        this.loadAnalytics();
-        adminPanel.showToast('Analytics refreshed', 'success');
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-}
-
-/**
- * Feedback Analytics Manager
- */
-class FeedbackAnalytics {
-    constructor() {
-        this.selectedDays = 7;
-        this.setupEventListeners();
-    }
-
-    setupEventListeners() {
-        // Time range buttons
-        document.querySelectorAll('.feedback-time-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.feedback-time-btn').forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-                this.selectedDays = e.target.dataset.days === 'all' ? null : parseInt(e.target.dataset.days);
-                this.loadAnalytics();
+        // Add change listeners for role selects
+        container.querySelectorAll('.role-select').forEach(sel => {
+            sel.addEventListener('change', (e) => {
+                this.changeTeamMemberRole(e.target.dataset.userId, e.target.value);
             });
         });
     }
 
-    async loadAnalytics() {
-        try {
-            const params = new URLSearchParams();
-            if (this.selectedDays) {
-                params.append('days', this.selectedDays);
-            }
+    async addTeamMember() {
+        const emailInput = document.getElementById('team-member-email');
+        const roleSelect = document.getElementById('team-member-role');
+        const email = emailInput.value.trim();
+        const role = roleSelect.value;
 
-            const response = await fetch(`/api/admin/feedback/analytics?${params}`, {
+        if (!email) {
+            this.showToast('Please enter an email', 'error');
+            return;
+        }
+
+        try {
+            const resp = await fetch('/api/admin/team', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, role }),
+                credentials: 'include',
+            });
+            const data = await resp.json();
+
+            if (resp.ok) {
+                emailInput.value = '';
+                this.showToast(`Added ${email} as ${role}`, 'success');
+                await this.loadTeamMembers();
+            } else {
+                this.showToast(data.detail || data.message || 'Failed to add member', 'error');
+            }
+        } catch (e) {
+            this.showToast('Failed to add member', 'error');
+        }
+    }
+
+    async removeTeamMember(userId) {
+        if (!confirm('Remove this team member?')) return;
+
+        try {
+            const resp = await fetch(`/api/admin/team/${userId}`, {
+                method: 'DELETE',
                 credentials: 'include',
             });
 
-            if (!response.ok) {
-                throw new Error('Failed to load feedback analytics');
+            if (resp.ok) {
+                this.showToast('Member removed', 'success');
+                await this.loadTeamMembers();
+            } else {
+                const data = await resp.json();
+                this.showToast(data.detail || 'Failed to remove', 'error');
             }
-
-            const data = await response.json();
-            this.displayAnalytics(data);
-        } catch (error) {
-            console.error('Error loading feedback analytics:', error);
-            adminPanel.showToast('Failed to load feedback analytics', 'error');
+        } catch (e) {
+            this.showToast('Failed to remove member', 'error');
         }
     }
 
-    displayAnalytics(data) {
-        // Update overview stats
-        document.getElementById('feedback-total').textContent = data.overview.total_feedback.toLocaleString();
-        document.getElementById('feedback-positive').textContent = data.overview.positive_count.toLocaleString();
-        document.getElementById('feedback-negative').textContent = data.overview.negative_count.toLocaleString();
-        document.getElementById('feedback-rate').textContent = data.overview.positive_rate + '%';
+    async changeTeamMemberRole(userId, newRole) {
+        try {
+            const resp = await fetch(`/api/admin/team/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role: newRole }),
+                credentials: 'include',
+            });
 
-        // Display negative responses
-        this.displayNegativeResponses(data.negative_responses);
+            if (resp.ok) {
+                this.showToast(`Role updated to ${newRole}`, 'success');
+            } else {
+                const data = await resp.json();
+                this.showToast(data.detail || 'Failed to update role', 'error');
+                await this.loadTeamMembers(); // Revert UI
+            }
+        } catch (e) {
+            this.showToast('Failed to update role', 'error');
+            await this.loadTeamMembers();
+        }
     }
 
-    displayNegativeResponses(responses) {
-        const container = document.getElementById('negative-responses-list');
+    async loadInviteInfo() {
+        try {
+            const resp = await fetch('/api/admin/tenant/invite', { credentials: 'include' });
+            const data = await resp.json();
 
-        if (responses.length === 0) {
-            container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">No negative feedback in this time period 🎉</p>';
+            document.getElementById('invite-code-display').textContent = data.invite_code || '---';
+            document.getElementById('join-approval-toggle').checked = data.join_approval_required || false;
+        } catch (e) {
+            console.error('Failed to load invite info:', e);
+        }
+    }
+
+    async copyInviteCode() {
+        const code = document.getElementById('invite-code-display').textContent;
+        if (code && code !== '---') {
+            try {
+                await navigator.clipboard.writeText(code);
+                this.showToast('Invite code copied!', 'success');
+            } catch (e) {
+                // Fallback for non-HTTPS
+                const textarea = document.createElement('textarea');
+                textarea.value = code;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                textarea.remove();
+                this.showToast('Invite code copied!', 'success');
+            }
+        }
+    }
+
+    async regenerateInviteCode() {
+        if (!confirm('Generate a new invite code? The old code will stop working.')) return;
+
+        try {
+            const resp = await fetch('/api/admin/tenant/invite/regenerate', {
+                method: 'POST',
+                credentials: 'include',
+            });
+            const data = await resp.json();
+
+            if (data.invite_code) {
+                document.getElementById('invite-code-display').textContent = data.invite_code;
+                this.showToast('Invite code regenerated', 'success');
+            }
+        } catch (e) {
+            this.showToast('Failed to regenerate code', 'error');
+        }
+    }
+
+    toggleQRCode() {
+        const container = document.getElementById('qr-container');
+        if (!container.classList.contains('visible')) {
+            const img = document.getElementById('qr-image');
+            img.style.display = 'none';
+            container.classList.add('visible');
+            container.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:1.5rem;color:var(--text-secondary,#8C8279)"></i>';
+            const qrImg = document.createElement('img');
+            qrImg.id = 'qr-image';
+            qrImg.alt = 'Invite QR Code';
+            qrImg.className = 'qr-image';
+            qrImg.onload = () => {
+                container.innerHTML = '';
+                container.appendChild(qrImg);
+            };
+            qrImg.onerror = () => {
+                container.innerHTML = '<span style="color:var(--text-secondary)">Failed to load QR code</span>';
+            };
+            qrImg.src = '/api/admin/tenant/invite/qr?' + Date.now();
+        } else {
+            container.classList.remove('visible');
+        }
+    }
+
+    async toggleJoinApproval(required) {
+        try {
+            await fetch('/api/admin/tenant/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ join_approval_required: required }),
+                credentials: 'include',
+            });
+            this.showToast(required ? 'Approval now required' : 'Open joining enabled', 'success');
+        } catch (e) {
+            this.showToast('Failed to update setting', 'error');
+        }
+    }
+
+    async loadJoinRequests() {
+        try {
+            const resp = await fetch('/api/admin/tenant/join-requests', { credentials: 'include' });
+            const requests = await resp.json();
+            this.renderJoinRequests(requests);
+        } catch (e) {
+            console.error('Failed to load join requests:', e);
+        }
+    }
+
+    renderJoinRequests(requests) {
+        const container = document.getElementById('join-requests-list');
+        if (!requests.length) {
+            container.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.875rem; padding: 1rem;">No pending requests</div>';
             return;
         }
 
-        container.innerHTML = responses.map(item => `
-            <div class="negative-response-item" style="border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; background: var(--surface);">
-                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <span style="font-size: 1.25rem;">👎</span>
-                        <span style="font-weight: 600; color: var(--text-primary);">${this.escapeHtml(item.user_email)}</span>
-                        <span style="padding: 0.125rem 0.5rem; background: #F5E0DC; color: #8A3630; border-radius: 0.25rem; font-size: 0.75rem;">${item.channel}</span>
-                    </div>
-                    <span style="color: var(--text-secondary); font-size: 0.875rem;">${this.formatDate(item.submitted_at)}</span>
+        container.innerHTML = requests.map(r => `
+            <div class="whitelist-item" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>${this.escapeHtml(r.email)}</strong>
+                    <span style="margin-left: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+                        ${new Date(r.created_at).toLocaleDateString()}
+                    </span>
                 </div>
-                <div style="background: var(--background); padding: 0.75rem; border-radius: 0.375rem; margin-bottom: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">
-                    ${this.escapeHtml(item.response_content)}
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="action-btn" onclick="adminPanel.approveJoinRequest(${r.id})" title="Approve" style="color: var(--success-color, #4A8C6F);">
+                        <i class="fas fa-check"></i>
+                    </button>
+                    <button class="action-btn delete-btn" onclick="adminPanel.rejectJoinRequest(${r.id})" title="Reject">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
-                ${item.comment ? `
-                    <div style="padding: 0.5rem; border-left: 3px solid #A3423A; background: #F5E0DC; border-radius: 0.25rem; font-size: 0.875rem;">
-                        <strong>User Comment:</strong> ${this.escapeHtml(item.comment)}
-                    </div>
-                ` : ''}
             </div>
         `).join('');
     }
 
-    formatDate(dateString) {
-        const date = new Date(dateString);
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    async approveJoinRequest(requestId) {
+        try {
+            const resp = await fetch(`/api/admin/tenant/join-requests/${requestId}/approve`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            const data = await resp.json();
+
+            if (data.success) {
+                this.showToast(data.message, 'success');
+                await this.loadJoinRequests();
+                await this.loadTeamMembers();
+            } else {
+                this.showToast(data.message, 'error');
+            }
+        } catch (e) {
+            this.showToast('Failed to approve request', 'error');
+        }
     }
 
-    refresh() {
-        this.loadAnalytics();
-        adminPanel.showToast('Feedback analytics refreshed', 'success');
+    async rejectJoinRequest(requestId) {
+        if (!confirm('Reject this join request?')) return;
+
+        try {
+            const resp = await fetch(`/api/admin/tenant/join-requests/${requestId}/reject`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            const data = await resp.json();
+
+            if (data.success) {
+                this.showToast(data.message, 'success');
+                await this.loadJoinRequests();
+            } else {
+                this.showToast(data.message, 'error');
+            }
+        } catch (e) {
+            this.showToast('Failed to reject request', 'error');
+        }
     }
 
-    escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 }
-
-// Initialize admin panel when page loads
-const adminPanel = new AdminPanel();
-const usageAnalytics = new UsageAnalytics();
-const feedbackAnalytics = new FeedbackAnalytics();
-
-// Expose to global scope for inline onclick handlers
-window.adminPanel = adminPanel;
-window.usageAnalytics = usageAnalytics;
-window.feedbackAnalytics = feedbackAnalytics;

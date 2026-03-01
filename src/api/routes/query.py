@@ -36,6 +36,7 @@ def create_query_router(
     require_auth,
     set_session_cookie,
     cleanup_old_attachments,
+    component_resolver=None,
 ):
     """
     Create query router with dependency injection.
@@ -48,6 +49,7 @@ def create_query_router(
         require_auth: Authentication dependency function
         set_session_cookie: Function to set session cookie
         cleanup_old_attachments: Function to cleanup old attachments
+        component_resolver: ComponentResolver for MT mode (optional)
 
     Returns:
         Configured APIRouter instance
@@ -79,6 +81,15 @@ def create_query_router(
         # Session is already authenticated via dependency
         set_session_cookie(response, session.session_id)
 
+        # Resolve tenant-specific components if MT mode
+        if component_resolver:
+            components = component_resolver.resolve(session)
+            qh = components.query_handler
+            cm = components.conversation_manager
+        else:
+            qh = query_handler
+            cm = conversation_manager
+
         user_identifier = (
             session.email
             if hasattr(session, "email") and session.email
@@ -93,7 +104,7 @@ def create_query_router(
             # Continue existing conversation
             from src.email.db_models import Conversation
 
-            with conversation_manager.db_manager.get_session() as db_session:
+            with cm.db_manager.get_session() as db_session:
                 existing_conv = (
                     db_session.query(Conversation)
                     .filter(Conversation.id == query_request.conversation_id)
@@ -133,7 +144,7 @@ def create_query_router(
         session.add_message("user", query_request.query)
 
         # Build conversation history from session messages for context
-        conversation_history = conversation_manager.format_conversation_context(
+        conversation_history = cm.format_conversation_context(
             thread_id=thread_id,
             max_messages=10,  # Last 10 messages for context
         )
@@ -144,7 +155,7 @@ def create_query_router(
             context = query_request.context or {}
             context["conversation_history"] = conversation_history
 
-            result = query_handler.process_query(
+            result = qh.process_query(
                 query_text=query_request.query,
                 user_email=user_identifier,
                 is_admin=session.is_admin if hasattr(session, "is_admin") else False,
@@ -152,7 +163,7 @@ def create_query_router(
             )
 
             # Store user query in conversation database (after processing to capture optimization data)
-            conversation_manager.add_message(
+            cm.add_message(
                 thread_id=thread_id,
                 message_type=MessageType.QUERY,
                 content=query_request.query,
@@ -167,7 +178,7 @@ def create_query_router(
                 session.add_message("assistant", error_response)
 
                 # Store error response in conversation database
-                conversation_manager.add_message(
+                cm.add_message(
                     thread_id=thread_id,
                     message_type=MessageType.REPLY,
                     content=error_response,
@@ -217,7 +228,7 @@ def create_query_router(
             )
 
             # Store assistant response in conversation database with sources and metadata
-            reply_message_id = conversation_manager.add_message(
+            reply_message_id = cm.add_message(
                 thread_id=thread_id,
                 message_type=MessageType.REPLY,
                 content=result["response"],
@@ -248,7 +259,7 @@ def create_query_router(
             session.add_message("assistant", error_response)
 
             # Store exception error in conversation database
-            conversation_manager.add_message(
+            cm.add_message(
                 thread_id=thread_id,
                 message_type=MessageType.REPLY,
                 content=error_response,

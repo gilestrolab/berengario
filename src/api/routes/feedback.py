@@ -23,6 +23,7 @@ def create_feedback_router(
     conversation_manager,
     static_dir,
     require_auth,
+    component_resolver=None,
 ):
     """
     Create feedback router with dependency injection.
@@ -31,10 +32,17 @@ def create_feedback_router(
         conversation_manager: Conversation manager instance
         static_dir: Path to static files directory
         require_auth: Authentication dependency function
+        component_resolver: ComponentResolver for MT mode (optional)
 
     Returns:
         Configured APIRouter instance
     """
+
+    def _get_cm(session):
+        """Get the conversation manager for this session (MT-aware)."""
+        if component_resolver:
+            return component_resolver.resolve(session).conversation_manager
+        return conversation_manager
 
     @router.get("/feedback")
     async def feedback_page():
@@ -170,7 +178,8 @@ def create_feedback_router(
             )
 
             # Verify message exists and is a reply
-            with conversation_manager.db_manager.get_session() as db_session:
+            cm = _get_cm(session)
+            with cm.db_manager.get_session() as db_session:
                 message = (
                     db_session.query(ConversationMessage)
                     .filter(ConversationMessage.id == feedback.message_id)

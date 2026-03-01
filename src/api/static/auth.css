@@ -50,8 +50,9 @@
 }
 
 .auth-logo {
-    width: 120px;
+    width: 180px;
     height: auto;
+    object-fit: contain;
 }
 
 @keyframes bounce {
@@ -290,6 +291,220 @@
 .stat-item-small .stat-value {
     font-weight: 600;
     color: var(--text-primary);
+}
+
+/* Landing Page */
+.landing-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Choice cards (onboarding wizard: join vs create) */
+.choice-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.choice-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+    border: 2px solid var(--border-color);
+    border-radius: 0.5rem;
+    background: var(--surface);
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: inherit;
+}
+
+.choice-card:hover {
+    border-color: var(--primary-color);
+    background: rgba(122, 92, 62, 0.04);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.choice-card i {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(122, 92, 62, 0.1);
+    border-radius: 0.5rem;
+    color: var(--primary-color);
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.choice-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.25rem 0;
+}
+
+.choice-card p {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Onboarding Wizard */
+.wizard-progress {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+}
+
+.wizard-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--border-color);
+    transition: var(--transition);
+}
+
+.wizard-dot.active {
+    background: var(--primary-color);
+    transform: scale(1.2);
+}
+
+.wizard-dot.completed {
+    background: var(--success-color, #4A8C6F);
+}
+
+.wizard-step {
+    display: none;
+    animation: stepFadeIn 0.3s ease-out;
+}
+
+.wizard-step.active {
+    display: block;
+}
+
+@keyframes stepFadeIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.wizard-step h2 {
+    font-family: var(--font-serif);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.wizard-step p.step-description {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+}
+
+.slug-preview {
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    padding: 0.5rem 0.75rem;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 0.25rem;
+    margin-top: 0.5rem;
+}
+
+.slug-preview .slug-value {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.slug-status {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.slug-status.available {
+    color: var(--success-color, #4A8C6F);
+}
+
+.slug-status.taken {
+    color: var(--error-color, #C25450);
+}
+
+.wizard-back {
+    background: none;
+    border: 2px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: var(--transition);
+    margin-right: 0.5rem;
+}
+
+.wizard-back:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.wizard-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
+.wizard-actions .auth-button {
+    flex: 1;
+}
+
+.team-info-card {
+    background: rgba(122, 92, 62, 0.06);
+    border: 1px solid rgba(122, 92, 62, 0.15);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.team-info-card .team-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.team-info-card .team-approval {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+.pending-message {
+    text-align: center;
+    padding: 2rem 1rem;
+}
+
+.pending-message i {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.pending-message h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.pending-message p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
 }
 
 /* Responsive */

@@ -29,6 +29,13 @@ class Session:
         authenticated: Whether session is authenticated
         email: Authenticated email address (if authenticated)
         is_admin: Whether user has admin privileges
+        tenant_id: Active tenant UUID (MT mode only)
+        tenant_slug: Active tenant slug (MT mode only)
+        tenant_name: Active tenant display name (MT mode only)
+        role: User's role in active tenant (MT mode only)
+        available_tenants: List of tenants this user belongs to (MT mode only)
+        onboarding_email: Email verified during onboarding (MT, pre-tenant)
+        onboarding_verified: Whether email is verified for onboarding flow
     """
 
     session_id: str
@@ -39,6 +46,13 @@ class Session:
     authenticated: bool = False
     email: Optional[str] = None
     is_admin: bool = False
+    tenant_id: Optional[str] = None
+    tenant_slug: Optional[str] = None
+    tenant_name: Optional[str] = None
+    role: Optional[str] = None
+    available_tenants: List[Dict] = field(default_factory=list)
+    onboarding_email: Optional[str] = None
+    onboarding_verified: bool = False
 
     def authenticate(self, email: str, is_admin: bool = False):
         """
@@ -60,6 +74,33 @@ class Session:
     def is_authenticated(self) -> bool:
         """Check if session is authenticated."""
         return self.authenticated and self.email is not None
+
+    def select_tenant(
+        self,
+        tenant_id: str,
+        tenant_slug: str,
+        tenant_name: str,
+        role: str,
+    ):
+        """
+        Set the active tenant for this session (MT mode).
+
+        Args:
+            tenant_id: Tenant UUID.
+            tenant_slug: Tenant slug.
+            tenant_name: Tenant display name.
+            role: User's role in this tenant.
+        """
+        self.tenant_id = tenant_id
+        self.tenant_slug = tenant_slug
+        self.tenant_name = tenant_name
+        self.role = role
+        self.is_admin = role == "admin"
+        self.last_activity = datetime.now()
+        logger.info(
+            f"Session {self.session_id} selected tenant "
+            f"'{tenant_slug}' with role '{role}'"
+        )
 
     def add_message(
         self,

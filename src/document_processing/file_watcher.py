@@ -185,7 +185,16 @@ class FileWatcher:
             watch_path: Path to watch for changes (default from settings).
             document_processor: Document processor instance.
             kb_manager: Knowledge base manager instance.
+
+        Raises:
+            RuntimeError: If multi-tenant mode is enabled.
         """
+        if settings.multi_tenant:
+            raise RuntimeError(
+                "FileWatcher is not supported in multi-tenant mode. "
+                "Documents are ingested via email or admin upload."
+            )
+
         self.watch_path = watch_path or settings.documents_path
         self.document_processor = document_processor or DocumentProcessor()
         self.kb_manager = kb_manager or KnowledgeBaseManager()

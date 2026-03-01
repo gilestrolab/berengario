@@ -79,7 +79,9 @@ def generate_feedback_urls(
 
 
 def load_custom_footer(
-    instance_name: str, message_id: Optional[int] = None
+    instance_name: str,
+    message_id: Optional[int] = None,
+    custom_footer_file=None,
 ) -> tuple[str, str]:
     """
     Load custom footer or use default, optionally with feedback links.
@@ -87,6 +89,8 @@ def load_custom_footer(
     Args:
         instance_name: Name of the instance for default footer
         message_id: Optional message ID for generating feedback links
+        custom_footer_file: Optional path to custom footer file. If None,
+            reads from settings.email_custom_footer_file.
 
     Returns:
         Tuple of (plain_text_footer, html_footer)
@@ -106,9 +110,14 @@ def load_custom_footer(
         <a href="{feedback_urls['negative']}" style="display: inline-block; padding: 8px 16px; background-color: #A3423A; color: white; text-decoration: none; border-radius: 4px;">👎 No</a>
     </div>"""
 
-    if settings.email_custom_footer_file and settings.email_custom_footer_file.exists():
+    # Resolve footer file: explicit param takes priority, then settings
+    footer_file = custom_footer_file
+    if footer_file is None:
+        footer_file = settings.email_custom_footer_file
+
+    if footer_file and footer_file.exists():
         try:
-            with open(settings.email_custom_footer_file, "r", encoding="utf-8") as f:
+            with open(footer_file, "r", encoding="utf-8") as f:
                 footer_text = f.read().strip()
 
             if footer_text:
@@ -118,9 +127,7 @@ def load_custom_footer(
                 # HTML version (convert newlines to <br>)
                 html_footer = f'<div class="footer">{footer_text.replace(chr(10), "<br>")}</div>{feedback_html}'
 
-                logger.info(
-                    f"Loaded custom footer from {settings.email_custom_footer_file}"
-                )
+                logger.info(f"Loaded custom footer from {footer_file}")
                 return plain_footer, html_footer
         except Exception as e:
             logger.warning(f"Failed to load custom footer file: {e}")
@@ -216,6 +223,8 @@ class EmailSender:
         in_reply_to: Optional[str] = None,
         references: Optional[List[str]] = None,
         attachments: Optional[List[Dict[str, any]]] = None,
+        from_address: Optional[str] = None,
+        from_name: Optional[str] = None,
     ) -> bool:
         """
         Send an email reply.
@@ -229,10 +238,15 @@ class EmailSender:
             references: List of message IDs in conversation thread
             attachments: List of attachments, each dict with 'content' (bytes or str),
                         'filename' (str), and optional 'content_type' (str)
+            from_address: Override sender address (for multi-tenant)
+            from_name: Override sender display name (for multi-tenant)
 
         Returns:
             True if email sent successfully, False otherwise.
         """
+        effective_from = from_address or self.from_address
+        effective_name = from_name or self.from_name
+
         try:
             # Create message - use "mixed" if attachments, otherwise "alternative"
             if attachments:
@@ -240,7 +254,7 @@ class EmailSender:
             else:
                 msg = MIMEMultipart("alternative")
 
-            msg["From"] = f"{self.from_name} <{self.from_address}>"
+            msg["From"] = f"{effective_name} <{effective_from}>"
             msg["To"] = to_address
             msg["Subject"] = subject
 

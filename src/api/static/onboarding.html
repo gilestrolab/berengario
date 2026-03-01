@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Get Started - Berengario</title>
+    <link rel="stylesheet" href="/static/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/auth.css">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <div class="auth-card">
+            <!-- Header -->
+            <div class="auth-header">
+                <div class="auth-icon">
+                    <img src="/static/berengario_logo.png" alt="Berengario" class="auth-logo">
+                </div>
+                <h1 class="auth-title" id="instance-name">Berengario</h1>
+            </div>
+
+            <!-- Progress Dots -->
+            <div class="wizard-progress" id="wizard-progress"></div>
+
+            <!-- Step: Email -->
+            <div class="wizard-step" id="step-email">
+                <h2>Create your account</h2>
+                <p class="step-description">Enter your email to get started.</p>
+                <form id="email-form" class="auth-form">
+                    <div class="form-group">
+                        <label for="email" class="form-label">Email Address</label>
+                        <input type="email" id="email" class="form-input" placeholder="your.email@example.com" required autocomplete="email" autofocus>
+                    </div>
+                    <button type="submit" class="auth-button" id="email-btn">
+                        <span class="button-text">Send Verification Code</span>
+                        <span class="button-spinner" style="display:none;">
+                            <svg class="spinner" viewBox="0 0 24 24"><circle class="spinner-circle" cx="12" cy="12" r="10"></circle></svg>
+                        </span>
+                    </button>
+                    <div class="auth-message error" id="email-error" style="display:none;"></div>
+                </form>
+            </div>
+
+            <!-- Step: OTP Verification -->
+            <div class="wizard-step" id="step-otp">
+                <h2>Verify your email</h2>
+                <p class="step-description">Enter the code sent to <strong id="otp-email-display"></strong></p>
+                <form id="otp-form" class="auth-form">
+                    <div class="form-group">
+                        <label for="otp-code" class="form-label">Verification Code</label>
+                        <input type="text" id="otp-code" class="form-input otp-input" placeholder="000000" maxlength="6" pattern="[0-9]{6}" required autocomplete="one-time-code">
+                    </div>
+                    <button type="submit" class="auth-button" id="otp-btn">
+                        <span class="button-text">Verify</span>
+                        <span class="button-spinner" style="display:none;">
+                            <svg class="spinner" viewBox="0 0 24 24"><circle class="spinner-circle" cx="12" cy="12" r="10"></circle></svg>
+                        </span>
+                    </button>
+                    <div class="auth-message error" id="otp-error" style="display:none;"></div>
+                </form>
+            </div>
+
+            <!-- Step: Choose path — join existing or start new -->
+            <div class="wizard-step" id="step-choice">
+                <h2>What would you like to do?</h2>
+                <p class="step-description">You can join a team or start your own.</p>
+                <div class="choice-cards">
+                    <button class="choice-card" id="choice-join">
+                        <i class="fas fa-users"></i>
+                        <h3>Join an existing team</h3>
+                        <p>I have an invite code from a team admin</p>
+                    </button>
+                    <button class="choice-card" id="choice-create">
+                        <i class="fas fa-plus-circle"></i>
+                        <h3>Start a new team</h3>
+                        <p>Set up a fresh workspace</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step: Invite Code (join path) -->
+            <div class="wizard-step" id="step-code">
+                <h2>Enter invite code</h2>
+                <p class="step-description">Your team admin should have given you an invite code.</p>
+                <form id="code-form" class="auth-form">
+                    <div class="form-group">
+                        <label for="invite-code" class="form-label">Invite Code</label>
+                        <input type="text" id="invite-code" class="form-input otp-input" placeholder="ABCD1234" maxlength="12" required style="text-transform: uppercase;">
+                    </div>
+                    <button type="submit" class="auth-button" id="code-btn">
+                        <span class="button-text">Validate Code</span>
+                        <span class="button-spinner" style="display:none;">
+                            <svg class="spinner" viewBox="0 0 24 24"><circle class="spinner-circle" cx="12" cy="12" r="10"></circle></svg>
+                        </span>
+                    </button>
+                    <div class="auth-message error" id="code-error" style="display:none;"></div>
+                </form>
+                <div class="team-info-card" id="team-info" style="display:none;">
+                    <div class="team-name" id="team-name"></div>
+                    <div class="team-approval" id="team-approval"></div>
+                </div>
+            </div>
+
+            <!-- Step: Join Confirmation -->
+            <div class="wizard-step" id="step-join">
+                <h2>Join team</h2>
+                <p class="step-description">You're about to join:</p>
+                <div class="team-info-card">
+                    <div class="team-name" id="join-team-name"></div>
+                    <div class="team-approval" id="join-team-approval"></div>
+                </div>
+                <button class="auth-button" id="join-btn">
+                    <span class="button-text">Join Team</span>
+                    <span class="button-spinner" style="display:none;">
+                        <svg class="spinner" viewBox="0 0 24 24"><circle class="spinner-circle" cx="12" cy="12" r="10"></circle></svg>
+                    </span>
+                </button>
+                <div class="auth-message error" id="join-error" style="display:none;"></div>
+            </div>
+
+            <!-- Step: Tenant Details (create path) -->
+            <div class="wizard-step" id="step-details">
+                <h2>Set up your team</h2>
+                <p class="step-description">Configure your new team workspace.</p>
+                <form id="details-form" class="auth-form">
+                    <div class="form-group">
+                        <label for="team-name-input" class="form-label">Team Name</label>
+                        <input type="text" id="team-name-input" class="form-input" placeholder="e.g., Acme Corp" required>
+                        <div class="slug-preview" id="slug-preview" style="display:none;">
+                            URL: <span class="slug-value" id="slug-display"></span>
+                        </div>
+                        <div class="slug-status" id="slug-status"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="org-input" class="form-label">Organization <span style="font-weight:normal;color:var(--text-secondary);">(optional)</span></label>
+                        <input type="text" id="org-input" class="form-input" placeholder="e.g., Acme Corporation">
+                    </div>
+                    <div class="form-group">
+                        <label for="desc-input" class="form-label">Description <span style="font-weight:normal;color:var(--text-secondary);">(optional)</span></label>
+                        <input type="text" id="desc-input" class="form-input" placeholder="e.g., Company knowledge base">
+                    </div>
+                    <button type="submit" class="auth-button" id="create-btn">
+                        <span class="button-text">Create Team</span>
+                        <span class="button-spinner" style="display:none;">
+                            <svg class="spinner" viewBox="0 0 24 24"><circle class="spinner-circle" cx="12" cy="12" r="10"></circle></svg>
+                        </span>
+                    </button>
+                    <div class="auth-message error" id="details-error" style="display:none;"></div>
+                </form>
+            </div>
+
+            <!-- Step: Pending Approval -->
+            <div class="wizard-step" id="step-pending">
+                <div class="pending-message">
+                    <i class="fas fa-clock"></i>
+                    <h3>Request Submitted</h3>
+                    <p>Your request to join has been sent to the team admin. You'll be able to access the team once approved.</p>
+                    <div style="margin-top: 1.5rem;">
+                        <a href="/static/login.html" class="auth-button" style="display:inline-flex;width:auto;padding:0.75rem 2rem;text-decoration:none;">Back to Home</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step: Success -->
+            <div class="wizard-step" id="step-success">
+                <div class="pending-message">
+                    <i class="fas fa-check-circle" style="color: var(--success-color, #4A8C6F);"></i>
+                    <h3 id="success-title">Welcome!</h3>
+                    <p id="success-message">Your team is ready. Redirecting...</p>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="auth-footer" style="margin-top: 1.5rem;">
+                <p class="auth-footer-text">
+                    Already have an account? <a href="/static/login.html" class="auth-link">Login</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/onboarding.js"></script>
+</body>
+</html>

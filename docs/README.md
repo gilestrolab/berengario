@@ -10,6 +10,7 @@ This directory contains all technical documentation for the DoLS-GPT / Berengari
 - **[DATABASE_DESIGN.md](DATABASE_DESIGN.md)** - Database abstraction layer design (SQLite/MariaDB)
 - **[EMAIL_AUTH_ISSUE.md](EMAIL_AUTH_ISSUE.md)** - Office 365 authentication troubleshooting
 - **[PHASE2_PLAN.md](PHASE2_PLAN.md)** - Phase 2 implementation plan and architecture
+- **[MULTI_TENANCY.md](MULTI_TENANCY.md)** - Multi-tenancy deployment guide
 
 ## Main Project Documentation
 
@@ -33,6 +34,7 @@ See the root directory for:
 ### Database & Storage
 - [DATABASE_DESIGN.md](DATABASE_DESIGN.md) - Database design and migrations
 - [DATA_STRUCTURE.md](DATA_STRUCTURE.md) - Storage structure and backup
+- [MULTI_TENANCY.md](MULTI_TENANCY.md) - Multi-tenancy setup and configuration
 
 ### Architecture & Planning
 - [../PLANNING.md](../PLANNING.md) - Overall system architecture

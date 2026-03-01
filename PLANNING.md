@@ -235,6 +235,40 @@ RAGInbox/
 6. CI/CD with GitHub Actions
 7. GitHub Container Registry publishing
 
+### Phase 6: Multi-Tenancy ✅ (Complete)
+
+**Architecture Decision**: Schema-separated isolation — each tenant gets its own database and storage, sharing a single application process. This balances isolation with operational simplicity.
+
+**Platform Database Models** (`src/platform/models.py`):
+- `Tenant` — slug, display name, domain, status, settings JSON
+- `TenantUser` — user-tenant membership with roles (owner, admin, member)
+- `TenantEncryptionKey` — encrypted per-tenant keys (envelope encryption via Fernet)
+- `JoinRequest` — pending tenant join requests with invite codes
+
+**Storage Abstraction** (`src/platform/storage.py`):
+- `StorageBackend` ABC with `LocalStorageBackend` (filesystem) and `S3StorageBackend` (boto3)
+- Local mode: `data/tenants/{slug}/` with subdirectories for documents, chroma_db, config
+- S3 mode: per-tenant buckets (`berengario-tenant-{slug}`)
+
+**Dependency Injection Pattern**:
+- `TenantContext` — frozen dataclass bundling tenant config; `from_settings()` (ST) or `from_tenant()` (MT)
+- `TenantComponentFactory` — LRU-cached factory for per-tenant KB/RAG/Query/ConversationManager stacks
+- `ComponentResolver` — ST mode returns default components; MT mode routes via factory
+- Optional `component_resolver=None` parameter on route factories — when None, uses closure defaults (ST)
+
+**Email Multi-Tenancy**:
+- `TenantEmailRouter` maps incoming email addresses to tenant slugs
+- Email processor receives tenant context and uses tenant-specific components
+- Parameterized processing pipeline (same code, different context per tenant)
+
+**Web Multi-Tenancy**:
+- Session carries `tenant_id`, `tenant_slug`, `role`
+- Auth flow: authenticate user → look up TenantUser memberships → select tenant
+- All route factories accept optional `component_resolver` for DI
+- Team management routes for invite codes, join requests, member CRUD
+
+**FileWatcher**: Disabled in MT mode (documents ingested via email or admin upload)
+
 ## Code Style & Conventions
 
 - **PEP8 compliance** with Black formatting

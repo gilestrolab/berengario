@@ -22,15 +22,36 @@ class QueryHandler:
     Provides a wrapper around RAGEngine with additional functionality.
     """
 
-    def __init__(self, rag_engine: Optional[RAGEngine] = None):
+    def __init__(
+        self,
+        rag_engine: Optional[RAGEngine] = None,
+        tenant_context: Optional["TenantContext"] = None,  # noqa: F821
+        conversation_manager: Optional[object] = None,
+    ):
         """
         Initialize the query handler.
 
         Args:
             rag_engine: RAG engine instance (creates new if None).
+            tenant_context: Optional tenant context for multi-tenant config.
+                When provided, passes optimization settings to QueryOptimizer.
+            conversation_manager: Optional ConversationManager for MT per-tenant DB.
+                Injected into tool context so database_tools use the correct tenant's data.
         """
         self.rag_engine = rag_engine or RAGEngine()
-        self.query_optimizer = QueryOptimizer()
+        self.tenant_context = tenant_context
+        self.conversation_manager = conversation_manager
+
+        # Configure query optimizer with tenant-specific settings when available
+        ctx = self.tenant_context
+        if ctx:
+            self.query_optimizer = QueryOptimizer(
+                enabled=ctx.query_optimization_enabled,
+                model=ctx.query_optimization_model,
+            )
+        else:
+            self.query_optimizer = QueryOptimizer()
+
         logger.info("QueryHandler initialized")
 
     def process_query(
@@ -73,11 +94,13 @@ class QueryHandler:
             if not query_text or not query_text.strip():
                 raise ValueError("Query text cannot be empty")
 
-            # Set tool context for admin-only tools
+            # Set tool context for admin-only tools and MT KB/DB routing
             set_tool_context(
                 user_email=user_email or "unknown",
                 is_admin=is_admin,
                 is_email_request=is_email_request,
+                kb_manager=self.rag_engine.kb_manager,
+                conversation_manager=self.conversation_manager,
             )
 
             try:
@@ -153,11 +176,13 @@ class QueryHandler:
             Formatted email body text.
         """
         if not result["success"]:
+            from src.config import settings
+
             return (
                 "I apologize, but I encountered an error processing your query.\n\n"
                 f"Error: {result.get('error', 'Unknown error')}\n\n"
                 "Please try rephrasing your question or contact support if the issue persists.\n\n"
-                "Best regards,\nDoLS GPT"
+                f"Best regards,\n{settings.instance_name}"
             )
 
         return self.rag_engine.format_response_for_email(result)

@@ -6,6 +6,7 @@ Tests explicit knowledge base search functionality with mocked KB manager.
 
 from unittest.mock import MagicMock, patch
 
+from src.rag.tools.context import clear_tool_context, get_kb_manager, set_tool_context
 from src.rag.tools.rag_tools import rag_search
 
 
@@ -223,3 +224,83 @@ class TestRAGSearchTool:
 
         top_k_param = next(p for p in tool.parameters if p.name == "top_k")
         assert top_k_param.required is False
+
+
+class TestRAGSearchContext:
+    """Test RAG search uses context kb_manager when available."""
+
+    def test_rag_search_uses_context_kb_manager(self):
+        """When kb_manager is set in context, rag_search should use it."""
+        # Set up mock KB manager in context
+        mock_node = MagicMock()
+        mock_node.text = "Context KB result"
+        mock_node.score = 0.9
+        mock_node.metadata = {"filename": "tenant_doc.pdf"}
+
+        mock_response = MagicMock()
+        mock_response.source_nodes = [mock_node]
+
+        mock_query_engine = MagicMock()
+        mock_query_engine.query.return_value = mock_response
+
+        mock_kb = MagicMock()
+        mock_kb.get_query_engine.return_value = mock_query_engine
+
+        try:
+            set_tool_context(
+                user_email="test@example.com",
+                is_admin=False,
+                kb_manager=mock_kb,
+            )
+
+            result = rag_search("test query", top_k=3)
+
+            assert result["success"] is True
+            assert result["num_results"] == 1
+            assert result["documents"][0]["text"] == "Context KB result"
+            # Verify the context KB was used, not a new default one
+            mock_kb.get_query_engine.assert_called_once_with(top_k=3)
+        finally:
+            clear_tool_context()
+
+    @patch("src.document_processing.kb_manager.KnowledgeBaseManager")
+    def test_rag_search_defaults_without_context(self, mock_kb_class):
+        """When no kb_manager in context, rag_search should create a default one."""
+        mock_response = MagicMock()
+        mock_response.source_nodes = []
+
+        mock_query_engine = MagicMock()
+        mock_query_engine.query.return_value = mock_response
+
+        mock_kb = MagicMock()
+        mock_kb.get_query_engine.return_value = mock_query_engine
+        mock_kb_class.return_value = mock_kb
+
+        try:
+            # Set context without kb_manager
+            set_tool_context(
+                user_email="test@example.com",
+                is_admin=False,
+            )
+
+            result = rag_search("test query")
+
+            assert result["success"] is True
+            # Should have created a new KnowledgeBaseManager
+            mock_kb_class.assert_called_once()
+        finally:
+            clear_tool_context()
+
+    def test_kb_manager_context_var_lifecycle(self):
+        """Test kb_manager context variable set/get/clear lifecycle."""
+        # Initially None
+        assert get_kb_manager() is None
+
+        mock_kb = MagicMock()
+        set_tool_context(
+            user_email="test@example.com", is_admin=False, kb_manager=mock_kb
+        )
+        assert get_kb_manager() is mock_kb
+
+        clear_tool_context()
+        assert get_kb_manager() is None

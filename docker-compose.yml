@@ -49,6 +49,11 @@ services:
       DB_NAME: berengario
       DB_USER: berengario
       DB_PASSWORD: test_password
+      # Multi-tenancy: platform DB uses same MariaDB server
+      PLATFORM_DB_HOST: mariadb
+      PLATFORM_DB_PORT: 3306
+      PLATFORM_DB_USER: berengario
+      PLATFORM_DB_PASSWORD: test_password
 
     volumes:
       - ./src:/app/src  # Mount src for live code changes
@@ -61,6 +66,7 @@ services:
       - ./data/config:/app/data/config
       - ./data/temp_attachments:/app/data/temp_attachments
       - ./data/backups:/app/data/backups
+      - ./data/tenants:/app/data/tenants  # Multi-tenancy: per-tenant data
 
     depends_on:
       mariadb:
@@ -83,6 +89,8 @@ services:
       - .env
 
     # Override DB settings for MariaDB
+    # Multi-tenancy settings are loaded from .env file.
+    # See .env.example for MULTI_TENANT, PLATFORM_DB_*, STORAGE_BACKEND, etc.
     environment:
       DB_TYPE: mariadb
       DB_HOST: mariadb
@@ -90,6 +98,11 @@ services:
       DB_NAME: berengario
       DB_USER: berengario
       DB_PASSWORD: test_password
+      # Multi-tenancy: platform DB uses same MariaDB server
+      PLATFORM_DB_HOST: mariadb
+      PLATFORM_DB_PORT: 3306
+      PLATFORM_DB_USER: berengario
+      PLATFORM_DB_PASSWORD: test_password
       GIT_BRANCH: ${GIT_BRANCH:-unknown}
       GIT_COMMIT: ${GIT_COMMIT:-unknown}
 
@@ -104,6 +117,7 @@ services:
       - ./data/config:/app/data/config
       - ./data/temp_attachments:/app/data/temp_attachments
       - ./data/backups:/app/data/backups  # Mount backups for persistence
+      - ./data/tenants:/app/data/tenants  # Multi-tenancy: per-tenant data
 
     depends_on:
       mariadb:
@@ -142,6 +156,8 @@ services:
       - .env
 
     # Override DB settings for MariaDB
+    # Multi-tenancy settings are loaded from .env file.
+    # See .env.example for MULTI_TENANT, PLATFORM_DB_*, STORAGE_BACKEND, etc.
     environment:
       DB_TYPE: mariadb
       DB_HOST: mariadb
@@ -149,6 +165,11 @@ services:
       DB_NAME: berengario
       DB_USER: berengario
       DB_PASSWORD: test_password
+      # Multi-tenancy: platform DB uses same MariaDB server
+      PLATFORM_DB_HOST: mariadb
+      PLATFORM_DB_PORT: 3306
+      PLATFORM_DB_USER: berengario
+      PLATFORM_DB_PASSWORD: test_password
       GIT_BRANCH: ${GIT_BRANCH:-unknown}
       GIT_COMMIT: ${GIT_COMMIT:-unknown}
 
@@ -163,6 +184,7 @@ services:
       - ./data/config:/app/data/config
       - ./data/temp_attachments:/app/data/temp_attachments
       - ./data/backups:/app/data/backups  # Mount backups for persistence
+      - ./data/tenants:/app/data/tenants  # Multi-tenancy: per-tenant data
 
     ports:
       - "8090:8000"  # Web interface port (host:container)
@@ -190,10 +212,92 @@ services:
     networks:
       - berengario-network
 
+  # Platform Admin (multi-tenant management panel)
+  # Only starts when explicitly requested with: docker-compose --profile multitenant up
+  berengario-admin:
+    profiles: ["multitenant"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: berengario-admin
+    restart: unless-stopped
+    command: python run_platform_admin.py
+
+    env_file:
+      - .env
+
+    environment:
+      DB_TYPE: mariadb
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_NAME: berengario
+      DB_USER: berengario
+      DB_PASSWORD: test_password
+      PLATFORM_DB_HOST: mariadb
+      PLATFORM_DB_PORT: 3306
+      PLATFORM_DB_USER: berengario
+      PLATFORM_DB_PASSWORD: test_password
+
+    volumes:
+      - ./src:/app/src
+      - ./.git:/app/.git:ro
+      - ./data/tenants:/app/data/tenants
+      - ./data/logs:/app/data/logs
+
+    ports:
+      - "8091:8000"
+
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/platform/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    networks:
+      - berengario-network
+
+  # MinIO Object Storage (S3-compatible, for multi-tenant file storage)
+  # Only starts when explicitly requested with: docker-compose --profile multitenant up
+  minio:
+    profiles: ["multitenant"]
+    image: minio/minio:latest
+    container_name: berengario-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console
+
+    volumes:
+      - berengario-minio-data:/data
+
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    networks:
+      - berengario-network
+
 networks:
   berengario-network:
     driver: bridge
 
 volumes:
   berengario-db-data:
+    driver: local
+  berengario-minio-data:
     driver: local

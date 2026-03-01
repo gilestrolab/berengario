@@ -28,6 +28,7 @@ def create_conversations_router(
     conversation_manager,
     session_manager,
     require_auth,
+    component_resolver=None,
 ):
     """
     Create conversations router with dependency injection.
@@ -36,10 +37,17 @@ def create_conversations_router(
         conversation_manager: Conversation manager instance
         session_manager: Session manager instance
         require_auth: Authentication dependency function
+        component_resolver: ComponentResolver for MT mode (optional)
 
     Returns:
         Configured APIRouter instance
     """
+
+    def _get_cm(session):
+        """Get the conversation manager for this session (MT-aware)."""
+        if component_resolver:
+            return component_resolver.resolve(session).conversation_manager
+        return conversation_manager
 
     @router.get("/history", response_model=HistoryResponse)
     async def get_history(
@@ -111,7 +119,7 @@ def create_conversations_router(
         if not user_email:
             return ConversationsResponse(conversations=[], total_count=0)
 
-        with conversation_manager.db_manager.get_session() as db_session:
+        with _get_cm(session).db_manager.get_session() as db_session:
             # Query conversations for this user, ordered by most recent
             conversations_query = (
                 db_session.query(Conversation)
@@ -200,7 +208,7 @@ def create_conversations_router(
         if not user_email:
             raise HTTPException(status_code=401, detail="Not authenticated")
 
-        with conversation_manager.db_manager.get_session() as db_session:
+        with _get_cm(session).db_manager.get_session() as db_session:
             # Get conversation and verify ownership
             conversation = (
                 db_session.query(Conversation)
@@ -282,7 +290,7 @@ def create_conversations_router(
         if not user_email:
             raise HTTPException(status_code=401, detail="Not authenticated")
 
-        with conversation_manager.db_manager.get_session() as db_session:
+        with _get_cm(session).db_manager.get_session() as db_session:
             # Get conversation and verify ownership
             conversation = (
                 db_session.query(Conversation)
@@ -339,7 +347,7 @@ def create_conversations_router(
 
         search_term = f"%{q}%"
 
-        with conversation_manager.db_manager.get_session() as db_session:
+        with _get_cm(session).db_manager.get_session() as db_session:
             # Find conversations where message content or subject matches search
             matching_conv_ids = (
                 db_session.query(ConversationMessage.conversation_id)

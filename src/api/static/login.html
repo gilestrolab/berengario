@@ -52,8 +52,8 @@
                 <div class="auth-message info" id="info-message" style="display: none;"></div>
             </form>
 
-            <!-- KB Stats -->
-            <div class="auth-footer">
+            <!-- KB Stats (ST mode only) -->
+            <div class="auth-footer" id="st-footer">
                 <div class="kb-stats-small">
                     <span class="stat-item-small">
                         <span class="stat-label">Documents:</span>
@@ -68,9 +68,16 @@
                     Passwordless authentication via one-time code
                 </p>
             </div>
+
+            <!-- Create account link (MT mode only) -->
+            <div class="auth-footer" id="mt-footer" style="display: none;">
+                <p class="auth-footer-text">
+                    New here? <a href="/static/onboarding.html" class="auth-link">Create an account</a>
+                </p>
+            </div>
         </div>
     </div>
 
-    <script src="/static/login.js"></script>
+    <script src="/static/login.js?v=2"></script>
 </body>
 </html>

@@ -40,6 +40,7 @@ from src.api.routes.auth import create_auth_router
 from src.api.routes.conversations import create_conversations_router
 from src.api.routes.feedback import create_feedback_router
 from src.api.routes.query import create_query_router
+from src.api.routes.team import create_team_router
 from src.config import settings
 from src.document_processing.document_processor import DocumentProcessor
 from src.document_processing.kb_manager import KnowledgeBaseManager
@@ -135,6 +136,40 @@ document_manager = DocumentManager(
 audit_logger = AdminAuditLogger()
 backup_manager = BackupManager()
 
+# Multi-tenant initialization
+platform_db_manager = None
+component_resolver = None
+storage_backend = None
+key_manager = None
+
+if settings.multi_tenant:
+    from src.platform.component_factory import TenantComponentFactory
+    from src.platform.component_resolver import ComponentResolver
+    from src.platform.db_manager import TenantDBManager
+    from src.platform.storage import create_storage_backend
+
+    logger.info("Multi-tenant mode enabled. Initializing platform components...")
+    platform_db_manager = TenantDBManager()
+    platform_db_manager.init_platform_db()
+    storage_backend = create_storage_backend()
+    component_factory = TenantComponentFactory(
+        storage_backend=storage_backend,
+        db_manager=platform_db_manager,
+    )
+    component_resolver = ComponentResolver(
+        multi_tenant=True,
+        component_factory=component_factory,
+    )
+
+    # Initialize encryption key manager if master key is configured
+    if settings.master_encryption_key:
+        from src.platform.encryption import DatabaseKeyManager
+
+        key_manager = DatabaseKeyManager()
+        logger.info("DatabaseKeyManager initialized (MEK configured)")
+
+    logger.info("Multi-tenant platform components initialized")
+
 # Setup static files directory (needed by feedback router)
 static_dir = Path(__file__).parent / "static"
 static_dir.mkdir(exist_ok=True)
@@ -149,6 +184,7 @@ auth_router = create_auth_router(
     get_session_id=get_session_id,
     set_session_cookie=set_session_cookie,
     settings=settings,
+    platform_db_manager=platform_db_manager,
 )
 
 # Include auth router
@@ -307,12 +343,14 @@ feedback_router = create_feedback_router(
     conversation_manager=conversation_manager,
     static_dir=static_dir,
     require_auth=require_auth,
+    component_resolver=component_resolver,
 )
 
 conversations_router = create_conversations_router(
     conversation_manager=conversation_manager,
     session_manager=session_manager,
     require_auth=require_auth,
+    component_resolver=component_resolver,
 )
 
 query_router = create_query_router(
@@ -323,6 +361,7 @@ query_router = create_query_router(
     require_auth=require_auth,
     set_session_cookie=set_session_cookie,
     cleanup_old_attachments=cleanup_old_attachments,
+    component_resolver=component_resolver,
 )
 
 admin_router = create_admin_router(
@@ -337,12 +376,15 @@ admin_router = create_admin_router(
     query_handler=query_handler,
     settings=settings,
     require_admin=require_admin,
+    component_resolver=component_resolver,
+    storage_backend=storage_backend,
 )
 
 analytics_router = create_analytics_router(
     conversation_manager=conversation_manager,
     query_handler=query_handler,
     require_admin=require_admin,
+    component_resolver=component_resolver,
 )
 
 # Include routers
@@ -351,6 +393,36 @@ app.include_router(conversations_router)
 app.include_router(query_router)
 app.include_router(admin_router)
 app.include_router(analytics_router)
+
+# Multi-tenant routers (MT mode only)
+if settings.multi_tenant and platform_db_manager:
+    from src.api.routes.onboarding import create_onboarding_router
+    from src.api.routes.tenant_admin import create_tenant_admin_router
+
+    team_router = create_team_router(
+        platform_db_manager=platform_db_manager,
+        require_admin=require_admin,
+    )
+    app.include_router(team_router)
+
+    onboarding_router = create_onboarding_router(
+        platform_db_manager=platform_db_manager,
+        session_manager=session_manager,
+        get_session_id=get_session_id,
+        set_session_cookie=set_session_cookie,
+        settings=settings,
+        key_manager=key_manager,
+    )
+    app.include_router(onboarding_router)
+
+    tenant_admin_router = create_tenant_admin_router(
+        platform_db_manager=platform_db_manager,
+        require_admin=require_admin,
+        session_manager=session_manager,
+        get_session_id=get_session_id,
+        settings=settings,
+    )
+    app.include_router(tenant_admin_router)
 
 
 # API Endpoints
@@ -378,6 +450,10 @@ async def root(request: Request):
     session = session_manager.get_session(session_id)
     if not session or not session.is_authenticated():
         return RedirectResponse(url="/static/login.html", status_code=303)
+
+    # MT onboarding: verified email but no tenant yet → redirect to onboarding
+    if settings.multi_tenant and session.onboarding_verified and not session.tenant_id:
+        return RedirectResponse(url="/static/onboarding.html", status_code=303)
 
     # User is authenticated, serve the chat interface
     index_file = static_dir / "index.html"
@@ -431,16 +507,41 @@ async def admin_panel(request: Request):
     raise HTTPException(status_code=404, detail="Admin panel not found")
 
 
+def _try_resolve_tenant(request: Request):
+    """
+    Try to resolve tenant components from the current session.
+
+    Returns TenantComponents if in MT mode and user has a tenant selected,
+    otherwise None (falls back to ST defaults).
+    """
+    if not component_resolver:
+        return None
+    try:
+        session_id = get_session_id(request)
+        if not session_id:
+            return None
+        session = session_manager.get_session(session_id)
+        if not session or not session.is_authenticated():
+            return None
+        return component_resolver.resolve(session)
+    except Exception:
+        return None
+
+
 @app.get("/api/stats", response_model=StatsResponse)
-async def get_stats():
+async def get_stats(request: Request):
     """
     Get knowledge base statistics.
+
+    Tenant-aware: returns tenant-specific stats when a tenant session exists.
 
     Returns:
         StatsResponse with KB stats
     """
     try:
-        stats = query_handler.get_stats()
+        components = _try_resolve_tenant(request)
+        qh = components.query_handler if components else query_handler
+        stats = qh.get_stats()
         # Extract just filenames from document dicts
         documents = stats.get("documents", [])
         document_names = [
@@ -458,26 +559,38 @@ async def get_stats():
 
 
 @app.get("/api/config")
-async def get_config():
+async def get_config(request: Request):
     """
     Get public instance configuration.
+
+    Tenant-aware: returns tenant-specific name/description when session exists.
 
     Returns:
         Instance name, description, and organization
     """
+    components = _try_resolve_tenant(request)
+    if components:
+        ctx = components.context
+        return {
+            "instance_name": ctx.instance_name,
+            "instance_description": ctx.instance_description,
+            "organization": ctx.organization,
+            "multi_tenant": settings.multi_tenant,
+        }
     return {
         "instance_name": settings.instance_name,
         "instance_description": settings.instance_description,
         "organization": settings.organization,
+        "multi_tenant": settings.multi_tenant,
     }
 
 
 @app.get("/api/example-questions")
-async def get_example_questions():
+async def get_example_questions(request: Request):
     """
     Get example questions for the knowledge base.
 
-    Public endpoint - no authentication required.
+    Tenant-aware: loads tenant-specific questions when session exists.
 
     Returns:
         Dictionary with:
@@ -488,7 +601,15 @@ async def get_example_questions():
     try:
         from src.rag.example_questions import load_example_questions
 
-        result = load_example_questions()
+        # Resolve tenant-specific path if available
+        questions_path = None
+        components = _try_resolve_tenant(request)
+        if components:
+            ctx = components.context
+            tenant_config = ctx.documents_path.parent / "config"
+            questions_path = tenant_config / "example_questions.json"
+
+        result = load_example_questions(file_path=questions_path)
         return result
 
     except FileNotFoundError:

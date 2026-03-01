@@ -9,8 +9,19 @@ import logging
 from typing import Any, Dict, Optional
 
 from .base import ParameterType, Tool, ToolParameter, register_tool
+from .context import get_conversation_manager
 
 logger = logging.getLogger(__name__)
+
+
+def _get_conv_manager():
+    """Get conversation manager from tool context, falling back to global default."""
+    mgr = get_conversation_manager()
+    if mgr is not None:
+        return mgr
+    from src.email.conversation_manager import ConversationManager
+
+    return ConversationManager()
 
 
 def query_conversation_history(
@@ -34,7 +45,7 @@ def query_conversation_history(
             - error: Error message (if failed)
     """
     try:
-        from src.email.conversation_manager import conversation_manager
+        conv_mgr = _get_conv_manager()
 
         # Validate parameters
         if days < 1:
@@ -52,9 +63,7 @@ def query_conversation_history(
         # Query based on sender
         if sender:
             # Get recent queries from specific user
-            conversations = conversation_manager.get_user_queries(
-                sender, days=days, limit=limit
-            )
+            conversations = conv_mgr.get_user_queries(sender, days=days, limit=limit)
             summary = {
                 "sender": sender,
                 "num_conversations": len(conversations),
@@ -62,7 +71,7 @@ def query_conversation_history(
             }
         else:
             # Get overall usage analytics
-            analytics = conversation_manager.get_usage_analytics(days=days)
+            analytics = conv_mgr.get_usage_analytics(days=days)
             conversations = []
             summary = {
                 "total_queries": analytics.get("total_queries", 0),
@@ -105,7 +114,7 @@ def query_analytics(metric: str = "usage", days: int = 7) -> Dict[str, Any]:
             - error: Error message (if failed)
     """
     try:
-        from src.email.conversation_manager import conversation_manager
+        conv_mgr = _get_conv_manager()
 
         # Validate parameters
         if days < 1:
@@ -122,11 +131,11 @@ def query_analytics(metric: str = "usage", days: int = 7) -> Dict[str, Any]:
 
         # Get analytics based on metric type
         if metric == "usage":
-            data = conversation_manager.get_usage_analytics(days=days)
+            data = conv_mgr.get_usage_analytics(days=days)
         elif metric == "optimization":
-            data = conversation_manager.get_optimization_analytics(days=days)
+            data = conv_mgr.get_optimization_analytics(days=days)
         elif metric == "sources":
-            data = conversation_manager.get_source_analytics(days=days)
+            data = conv_mgr.get_source_analytics(days=days)
         else:
             raise ValueError(f"Unknown metric: {metric}")
 

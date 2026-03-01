@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Admin - Login</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+        }
+        .header { text-align: center; margin-bottom: 2rem; }
+        .header .icon {
+            width: 56px; height: 56px;
+            background: #7c3aed;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .header h1 { font-size: 1.4rem; font-weight: 600; }
+        .header p { color: #94a3b8; font-size: 0.9rem; margin-top: 0.25rem; }
+        .form-group { margin-bottom: 1.25rem; }
+        label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 0.4rem; color: #cbd5e1; }
+        input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus { border-color: #7c3aed; }
+        input::placeholder { color: #64748b; }
+        .btn {
+            width: 100%;
+            padding: 0.75rem;
+            background: #7c3aed;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: #6d28d9; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .message {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            display: none;
+        }
+        .message.error { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+        .message.info { background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); }
+        .footer { text-align: center; margin-top: 1.5rem; color: #64748b; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header">
+            <div class="icon">&#x1f6e1;</div>
+            <h1>Platform Admin</h1>
+            <p>Berengario Multi-Tenant Management</p>
+        </div>
+
+        <!-- Step 1: Email -->
+        <form id="email-form">
+            <div class="form-group">
+                <label for="email">Admin Email</label>
+                <input type="email" id="email" placeholder="admin@example.com" required autofocus>
+            </div>
+            <button type="submit" class="btn" id="email-btn">Send Login Code</button>
+        </form>
+
+        <!-- Step 2: OTP -->
+        <form id="otp-form" style="display:none;">
+            <div class="form-group">
+                <label for="otp">One-Time Code</label>
+                <input type="text" id="otp" placeholder="123456" maxlength="6" pattern="[0-9]{6}" required
+                       inputmode="numeric" autocomplete="one-time-code">
+            </div>
+            <button type="submit" class="btn" id="otp-btn">Verify</button>
+        </form>
+
+        <div class="message error" id="error-msg"></div>
+        <div class="message info" id="info-msg"></div>
+
+        <div class="footer">Platform administrator access only</div>
+    </div>
+
+    <script>
+    (function() {
+        const emailForm = document.getElementById('email-form');
+        const otpForm = document.getElementById('otp-form');
+        const errorMsg = document.getElementById('error-msg');
+        const infoMsg = document.getElementById('info-msg');
+        let pendingEmail = '';
+
+        function showError(msg) {
+            errorMsg.textContent = msg;
+            errorMsg.style.display = 'block';
+            infoMsg.style.display = 'none';
+        }
+        function showInfo(msg) {
+            infoMsg.textContent = msg;
+            infoMsg.style.display = 'block';
+            errorMsg.style.display = 'none';
+        }
+        function hideMessages() {
+            errorMsg.style.display = 'none';
+            infoMsg.style.display = 'none';
+        }
+
+        // Check if already authenticated
+        fetch('/api/auth/status').then(r => r.json()).then(data => {
+            if (data.authenticated) window.location.href = '/static/index.html';
+        });
+
+        emailForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideMessages();
+            const email = document.getElementById('email').value.trim();
+            const btn = document.getElementById('email-btn');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+
+            try {
+                const res = await fetch('/api/auth/request-otp', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email})
+                });
+                const data = await res.json();
+                if (data.success) {
+                    pendingEmail = email;
+                    emailForm.style.display = 'none';
+                    otpForm.style.display = 'block';
+                    showInfo(data.message);
+                    document.getElementById('otp').focus();
+                } else {
+                    showError(data.message);
+                }
+            } catch (err) {
+                showError('Connection error. Please try again.');
+            }
+            btn.disabled = false;
+            btn.textContent = 'Send Login Code';
+        });
+
+        otpForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideMessages();
+            const otp = document.getElementById('otp').value.trim();
+            const btn = document.getElementById('otp-btn');
+            btn.disabled = true;
+            btn.textContent = 'Verifying...';
+
+            try {
+                const res = await fetch('/api/auth/verify-otp', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email: pendingEmail, otp_code: otp})
+                });
+                const data = await res.json();
+                if (data.success) {
+                    window.location.href = '/static/index.html';
+                } else {
+                    showError(data.message);
+                }
+            } catch (err) {
+                showError('Connection error. Please try again.');
+            }
+            btn.disabled = false;
+            btn.textContent = 'Verify';
+        });
+    })();
+    </script>
+</body>
+</html>

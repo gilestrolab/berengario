@@ -146,6 +146,7 @@ class AuthResponse(BaseModel):
     success: bool
     message: str
     email: Optional[str] = None
+    requires_onboarding: bool = False
 
 
 class AuthStatusResponse(BaseModel):
@@ -155,6 +156,114 @@ class AuthStatusResponse(BaseModel):
     email: Optional[str] = None
     session_id: Optional[str] = None
     is_admin: bool = False
+    tenant_id: Optional[str] = None
+    tenant_name: Optional[str] = None
+    tenant_slug: Optional[str] = None
+    role: Optional[str] = None
+    requires_tenant_selection: bool = False
+    available_tenants: Optional[List[Dict]] = None
+    onboarding_verified: bool = False
+
+
+class TenantSelectRequest(BaseModel):
+    """Request model for selecting active tenant (MT mode)."""
+
+    tenant_id: str
+
+
+# ============================================================================
+# Onboarding Models
+# ============================================================================
+
+
+class CreateTenantRequest(BaseModel):
+    """Request model for creating a new tenant during onboarding."""
+
+    name: str
+    organization: Optional[str] = None
+    description: Optional[str] = None
+    slug: Optional[str] = None
+
+
+class CreateTenantResponse(BaseModel):
+    """Response model for tenant creation."""
+
+    success: bool
+    message: str
+    tenant_slug: Optional[str] = None
+    tenant_name: Optional[str] = None
+    tenant_id: Optional[str] = None
+
+
+class ValidateCodeRequest(BaseModel):
+    """Request model for validating an invite code."""
+
+    code: str
+
+
+class ValidateCodeResponse(BaseModel):
+    """Response model for invite code validation."""
+
+    valid: bool
+    tenant_name: Optional[str] = None
+    requires_approval: bool = False
+
+
+class JoinTenantRequest(BaseModel):
+    """Request model for joining a tenant via invite code."""
+
+    code: str
+
+
+class JoinTenantResponse(BaseModel):
+    """Response model for joining a tenant."""
+
+    success: bool
+    message: str
+    joined: bool = False
+    pending_approval: bool = False
+
+
+class SlugCheckResponse(BaseModel):
+    """Response model for slug availability check."""
+
+    available: bool
+    suggestion: Optional[str] = None
+
+
+class TenantSettingsRequest(BaseModel):
+    """Request model for updating tenant settings."""
+
+    join_approval_required: bool
+
+
+class JoinRequestActionResponse(BaseModel):
+    """Response model for join request approval/rejection."""
+
+    success: bool
+    message: str
+
+
+# ============================================================================
+# Team Models
+# ============================================================================
+
+
+class TeamMemberRequest(BaseModel):
+    """Request model for adding/updating team members."""
+
+    email: EmailStr
+    role: str  # "admin", "teacher", "querier"
+
+
+class TeamMemberResponse(BaseModel):
+    """Response model for team member data."""
+
+    id: int
+    email: str
+    role: str
+    tenant_id: str
+    created_at: str
 
 
 @dataclass

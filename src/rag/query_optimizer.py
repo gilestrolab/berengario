@@ -32,6 +32,7 @@ class QueryOptimizer:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         timeout: Optional[int] = None,
+        enabled: Optional[bool] = None,
     ):
         """
         Initialize the query optimizer.
@@ -41,8 +42,12 @@ class QueryOptimizer:
             max_tokens: Maximum tokens for response (default from settings).
             temperature: Temperature for LLM (default from settings).
             timeout: API timeout in seconds (default from settings).
+            enabled: Override for settings.query_optimization_enabled.
+                When provided, takes precedence over global config.
         """
-        self.enabled = settings.query_optimization_enabled
+        self.enabled = (
+            enabled if enabled is not None else settings.query_optimization_enabled
+        )
         # Use provided model, or configured optimization model, or fall back to main LLM model
         self.model = (
             model or settings.query_optimization_model or settings.openrouter_model
