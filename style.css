@@ -346,7 +346,8 @@ h1, h2, h3, h4 {
     color: var(--secondary);
 }
 
-.attachment-icon { font-size: 1rem; }
+.attachment-icon { line-height: 1; }
+.attachment-icon svg { width: 16px; height: 16px; stroke: var(--secondary); }
 
 .email-reply {
     background: var(--bg);
@@ -399,25 +400,38 @@ h1, h2, h3, h4 {
 
 .pitch-point {
     text-align: center;
-    padding: 0 1rem;
+    padding: 2rem 1rem;
+    position: relative;
+    overflow: hidden;
 }
 
 .pitch-icon {
-    font-size: 2rem;
-    margin-bottom: 1rem;
-    opacity: 0.9;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    line-height: 1;
+    pointer-events: none;
+}
+.pitch-icon svg {
+    width: 100px;
+    height: 100px;
+    stroke: rgba(255 255 255 / .08);
+    stroke-width: 1;
 }
 
 .pitch-point h3 {
     font-size: 1.15rem;
     margin-bottom: 0.75rem;
     color: #fff;
+    position: relative;
 }
 
 .pitch-point p {
     color: rgba(255 255 255 / .75);
     font-size: 0.95rem;
     line-height: 1.65;
+    position: relative;
 }
 
 .pitch-coda {
@@ -446,12 +460,24 @@ h1, h2, h3, h4 {
     border-radius: var(--radius);
     padding: 2.5rem 2rem;
     transition: box-shadow 0.2s;
+    position: relative;
+    overflow: hidden;
 }
 .case-card:hover { box-shadow: var(--shadow-md); }
 
 .case-icon {
-    font-size: 2rem;
-    margin-bottom: 1rem;
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    line-height: 1;
+    pointer-events: none;
+}
+.case-icon svg {
+    width: 80px;
+    height: 80px;
+    stroke: var(--primary);
+    stroke-width: 1;
+    opacity: 0.1;
 }
 
 .case-card h3 {
@@ -489,23 +515,37 @@ h1, h2, h3, h4 {
     padding: 1.5rem;
     text-align: center;
     transition: box-shadow 0.2s;
+    position: relative;
+    overflow: hidden;
 }
 .feature:hover { box-shadow: var(--shadow-md); }
 
 .feature-icon {
-    font-size: 1.75rem;
-    margin-bottom: 0.75rem;
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    line-height: 1;
+    pointer-events: none;
+}
+.feature-icon svg {
+    width: 64px;
+    height: 64px;
+    stroke: var(--primary);
+    stroke-width: 1;
+    opacity: 0.08;
 }
 
 .feature h4 {
     font-size: 0.95rem;
     margin-bottom: 0.5rem;
+    position: relative;
 }
 
 .feature p {
     color: var(--text-muted);
     font-size: 0.82rem;
     line-height: 1.55;
+    position: relative;
 }
 
 /* ── Pricing ─────────────────────────────────────────────── */

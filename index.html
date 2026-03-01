@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
 <body>
 
@@ -98,7 +99,7 @@
                     <div class="email-divider"></div>
                     <p>Hi all, attached is the updated Western Blot protocol with the new antibody dilutions we discussed.</p>
                     <div class="email-attachment">
-                        <span class="attachment-icon">&#128206;</span> western_blot_v3.pdf
+                        <span class="attachment-icon"><i data-lucide="paperclip"></i></span> western_blot_v3.pdf
                     </div>
                 </div>
             </div>
@@ -141,17 +142,17 @@
         </p>
         <div class="pitch-points">
             <div class="pitch-point">
-                <div class="pitch-icon">&#128172;</div>
+                <div class="pitch-icon"><i data-lucide="message-circle"></i></div>
                 <h3>Teach it like a colleague</h3>
                 <p>Put Berengario in CC and it learns. Forward a document and it reads it. No uploads, no dashboards, no training sessions. If you can send an email, you can teach Berengario.</p>
             </div>
             <div class="pitch-point">
-                <div class="pitch-icon">&#9993;</div>
+                <div class="pitch-icon"><i data-lucide="mail"></i></div>
                 <h3>Ask it like a colleague</h3>
                 <p>Write Berengario an email the way you'd write the person sitting next door. Plain language, no syntax, no tricks. It replies with sourced answers in under a minute.</p>
             </div>
             <div class="pitch-point">
-                <div class="pitch-icon">&#129504;</div>
+                <div class="pitch-icon"><i data-lucide="brain"></i></div>
                 <h3>It remembers everything</h3>
                 <p>Unlike the colleague next door, Berengario never forgets. Every document, every email, every protocol &mdash; it's all there, instantly searchable, permanently available.</p>
             </div>
@@ -169,13 +170,13 @@
         <p class="section-sub">Berengario works wherever knowledge gets buried in inboxes and shared drives.</p>
         <div class="cases-grid">
             <div class="case-card">
-                <div class="case-icon">&#129514;</div>
+                <div class="case-icon"><i data-lucide="flask-conical"></i></div>
                 <h3>Research Laboratory</h3>
                 <p>Protocols, SOPs, safety docs, equipment manuals, supplier info — everything a lab accumulates over years, instantly searchable.</p>
                 <p class="case-example">"Your postdoc asks about the Western Blot protocol at 11pm — Berengario answers instantly."</p>
             </div>
             <div class="case-card">
-                <div class="case-icon">&#127979;</div>
+                <div class="case-icon"><i data-lucide="graduation-cap"></i></div>
                 <h3>University Department</h3>
                 <p>Teaching practices, exam policies, room booking procedures, HR guidelines, committee minutes — the institutional knowledge that usually lives in one person's head.</p>
                 <p class="case-example">"New lecturers get answers to admin questions without waiting for a reply from the office."</p>
@@ -191,42 +192,42 @@
         <p class="section-sub">Everything you need to build and query a team knowledge base.</p>
         <div class="features-grid">
             <div class="feature">
-                <div class="feature-icon">&#128196;</div>
+                <div class="feature-icon"><i data-lucide="file-text"></i></div>
                 <h4>Multi-format documents</h4>
                 <p>PDF, DOCX, TXT, CSV, XLS, XLSX — just attach and send.</p>
             </div>
             <div class="feature">
-                <div class="feature-icon">&#128488;</div>
+                <div class="feature-icon"><i data-lucide="layout-dashboard"></i></div>
                 <h4>Web interface</h4>
                 <p>Chat-style web UI with conversation history and source citations.</p>
             </div>
             <div class="feature">
-                <div class="feature-icon">&#128736;</div>
+                <div class="feature-icon"><i data-lucide="settings"></i></div>
                 <h4>Admin panel</h4>
                 <p>Manage documents, monitor queries, view analytics, control whitelists.</p>
             </div>
             <div class="feature">
-                <div class="feature-icon">&#128269;</div>
+                <div class="feature-icon"><i data-lucide="search"></i></div>
                 <h4>Query optimization</h4>
                 <p>LLM-based query rewriting for better retrieval accuracy.</p>
             </div>
             <div class="feature">
-                <div class="feature-icon">&#9889;</div>
+                <div class="feature-icon"><i data-lucide="zap"></i></div>
                 <h4>Document enhancement</h4>
                 <p>Automatic narrative expansion and Q&A generation for structured data.</p>
             </div>
             <div class="feature">
-                <div class="feature-icon">&#128279;</div>
+                <div class="feature-icon"><i data-lucide="globe"></i></div>
                 <h4>Web crawling</h4>
                 <p>Ingest content from URLs — send a link, Berengario reads the page.</p>
             </div>
             <div class="feature">
-                <div class="feature-icon">&#128197;</div>
+                <div class="feature-icon"><i data-lucide="calendar"></i></div>
                 <h4>Function calling</h4>
                 <p>Calendar event creation and export formatting via natural language.</p>
             </div>
             <div class="feature">
-                <div class="feature-icon">&#128221;</div>
+                <div class="feature-icon"><i data-lucide="pen-tool"></i></div>
                 <h4>Custom prompts</h4>
                 <p>Per-instance system prompts, email footers, and response formats.</p>
             </div>
@@ -367,6 +368,9 @@ const nav = document.getElementById('nav');
 window.addEventListener('scroll', () => {
     nav.classList.toggle('scrolled', window.scrollY > 40);
 });
+
+// Initialize Lucide icons
+lucide.createIcons();
 </script>
 
 </body>
