@@ -1936,6 +1936,75 @@
             color: var(--text-secondary, #8C8279);
         }
 
+        .settings-form .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .settings-form .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary, #4A3728);
+            margin-bottom: 0.35rem;
+        }
+
+        .settings-form .form-group label small {
+            font-weight: 400;
+            color: var(--text-secondary, #8C8279);
+        }
+
+        .settings-form .form-group input,
+        .settings-form .form-group textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0.5rem 0.65rem;
+            border: 1px solid var(--border, #D5C9B8);
+            border-radius: 4px;
+            font-size: 0.9375rem;
+            font-family: inherit;
+            background: var(--surface, #fff);
+            color: var(--text-primary, #2E2E2E);
+        }
+
+        .settings-form .form-group input:focus,
+        .settings-form .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-color, #7A5C3E);
+            box-shadow: 0 0 0 2px rgba(122, 92, 62, 0.12);
+        }
+
+        .settings-form .form-group input[readonly] {
+            opacity: 0.55;
+            cursor: not-allowed;
+            background: var(--bg-secondary, #F7F2EA);
+        }
+
+        .settings-form .form-group textarea {
+            resize: vertical;
+            min-height: 4rem;
+        }
+
+        .settings-form .save-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.55rem 1.25rem;
+            background: var(--primary, #7A5C3E);
+            color: #fff;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            font-family: inherit;
+            margin-top: 0.25rem;
+        }
+
+        .settings-form .save-btn:hover {
+            background: var(--primary-dark, #5E4730);
+        }
+
         @media (max-width: 600px) {
             .invite-code-row {
                 flex-direction: column;
@@ -1973,6 +2042,38 @@
 
         <!-- Team Tab (MT mode only) -->
         <div id="team-tab" class="tab-content">
+            <!-- Team Settings Section -->
+            <div class="whitelist-section">
+                <h3><i class="fas fa-cog"></i> Team Settings</h3>
+                <p class="section-description">Manage your team's details and disambiguation email.</p>
+
+                <div class="settings-form">
+                    <div class="form-group">
+                        <label for="team-name-input">Team Name</label>
+                        <input type="text" id="team-name-input" readonly
+                            title="Team name is set during provisioning">
+                    </div>
+                    <div class="form-group">
+                        <label for="team-org-input">Organization</label>
+                        <input type="text" id="team-org-input" placeholder="Organization name">
+                    </div>
+                    <div class="form-group">
+                        <label for="team-desc-input">Description</label>
+                        <textarea id="team-desc-input" rows="3"
+                            placeholder="Describe what this team's knowledge base is about..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="team-slug-input">Slug
+                            <small>(determines your email: <code><span id="slug-email-preview">slug</span>@berengar.io</code>)</small>
+                        </label>
+                        <input type="text" id="team-slug-input" placeholder="my-team">
+                    </div>
+                    <button class="save-btn" id="save-team-settings-btn">
+                        <i class="fas fa-save"></i> Save Settings
+                    </button>
+                </div>
+            </div>
+
             <!-- Invite Code Section -->
             <div class="whitelist-section">
                 <h3><i class="fas fa-envelope-open-text"></i> Invite Code</h3>

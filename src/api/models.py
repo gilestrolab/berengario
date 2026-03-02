@@ -234,7 +234,10 @@ class SlugCheckResponse(BaseModel):
 class TenantSettingsRequest(BaseModel):
     """Request model for updating tenant settings."""
 
-    join_approval_required: bool
+    join_approval_required: Optional[bool] = None
+    description: Optional[str] = None
+    organization: Optional[str] = None
+    slug: Optional[str] = None
 
 
 class JoinRequestActionResponse(BaseModel):

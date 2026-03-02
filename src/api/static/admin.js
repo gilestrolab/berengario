@@ -1541,6 +1541,7 @@ class AdminPanel {
             this.loadTeamMembers(),
             this.loadInviteInfo(),
             this.loadJoinRequests(),
+            this.loadTeamSettings(),
         ]);
         this.setupTeamEventListeners();
     }
@@ -1571,6 +1572,17 @@ class AdminPanel {
         if (approvalToggle) {
             approvalToggle.addEventListener('change', (e) => {
                 this.toggleJoinApproval(e.target.checked);
+            });
+        }
+
+        const saveSettingsBtn = document.getElementById('save-team-settings-btn');
+        if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', () => this.saveTeamSettings());
+
+        const slugInput = document.getElementById('team-slug-input');
+        if (slugInput) {
+            slugInput.addEventListener('input', () => {
+                const preview = document.getElementById('slug-email-preview');
+                if (preview) preview.textContent = slugInput.value || 'slug';
             });
         }
     }
@@ -1857,6 +1869,63 @@ class AdminPanel {
             }
         } catch (e) {
             this.showToast('Failed to reject request', 'error');
+        }
+    }
+
+    async loadTeamSettings() {
+        try {
+            const resp = await fetch('/api/admin/tenant/details', { credentials: 'include' });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            const nameInput = document.getElementById('team-name-input');
+            const orgInput = document.getElementById('team-org-input');
+            const descInput = document.getElementById('team-desc-input');
+            const slugInput = document.getElementById('team-slug-input');
+            const preview = document.getElementById('slug-email-preview');
+
+            if (nameInput) nameInput.value = data.name || '';
+            if (orgInput) orgInput.value = data.organization || '';
+            if (descInput) descInput.value = data.description || '';
+            if (slugInput) slugInput.value = data.slug || '';
+            if (preview) preview.textContent = data.slug || 'slug';
+        } catch (e) {
+            console.error('Failed to load team settings:', e);
+        }
+    }
+
+    async saveTeamSettings() {
+        const orgInput = document.getElementById('team-org-input');
+        const descInput = document.getElementById('team-desc-input');
+        const slugInput = document.getElementById('team-slug-input');
+
+        const body = {};
+        if (orgInput) body.organization = orgInput.value.trim();
+        if (descInput) body.description = descInput.value.trim();
+        if (slugInput) body.slug = slugInput.value.trim();
+
+        try {
+            const resp = await fetch('/api/admin/tenant/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+                credentials: 'include',
+            });
+            const data = await resp.json();
+
+            if (resp.ok && data.success) {
+                this.showToast('Settings saved', 'success');
+                // Update slug preview from server response
+                if (data.details) {
+                    const preview = document.getElementById('slug-email-preview');
+                    if (preview) preview.textContent = data.details.slug || 'slug';
+                    if (slugInput) slugInput.value = data.details.slug || '';
+                }
+            } else {
+                this.showToast(data.detail || data.message || 'Failed to save settings', 'error');
+            }
+        } catch (e) {
+            this.showToast('Failed to save settings', 'error');
         }
     }
 

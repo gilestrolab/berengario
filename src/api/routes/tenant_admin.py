@@ -9,7 +9,7 @@ import io
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from src.api.models import (
@@ -27,6 +27,7 @@ def create_tenant_admin_router(
     session_manager,
     get_session_id,
     settings,
+    email_sender=None,
 ):
     """
     Create tenant admin router with dependency injection.
@@ -37,6 +38,7 @@ def create_tenant_admin_router(
         session_manager: Session management instance.
         get_session_id: Function to extract session ID from request.
         settings: Application settings.
+        email_sender: EmailSender instance for welcome emails (optional).
 
     Returns:
         Configured APIRouter instance.
@@ -45,6 +47,29 @@ def create_tenant_admin_router(
         prefix="/api/admin/tenant",
         tags=["tenant-admin"],
     )
+
+    @router.get("/details")
+    async def get_tenant_details(admin_session=Depends(require_admin)):
+        """Get tenant details for the settings form."""
+
+        from src.platform.models import Tenant
+
+        with platform_db_manager.get_platform_session() as db_session:
+            tenant = (
+                db_session.query(Tenant)
+                .filter(Tenant.id == admin_session.tenant_id)
+                .first()
+            )
+            if not tenant:
+                raise HTTPException(status_code=404, detail="Tenant not found")
+
+            return {
+                "name": tenant.name,
+                "description": tenant.description or "",
+                "organization": tenant.organization or "",
+                "slug": tenant.slug,
+                "email_address": tenant.email_address or "",
+            }
 
     @router.get("/invite")
     async def get_invite_info(admin_session=Depends(require_admin)):
@@ -98,9 +123,10 @@ def create_tenant_admin_router(
         body: TenantSettingsRequest,
         admin_session=Depends(require_admin),
     ):
-        """Update tenant join settings."""
+        """Update tenant settings (join policy, description, organization, slug)."""
 
         from src.platform.models import Tenant
+        from src.platform.provisioning import TenantProvisioner
 
         with platform_db_manager.get_platform_session() as db_session:
             tenant = (
@@ -111,17 +137,65 @@ def create_tenant_admin_router(
             if not tenant:
                 raise HTTPException(status_code=404, detail="Tenant not found")
 
-            tenant.join_approval_required = body.join_approval_required
-            tenant.updated_at = datetime.utcnow()
+            updated_fields = []
+
+            if body.join_approval_required is not None:
+                tenant.join_approval_required = body.join_approval_required
+                updated_fields.append("join_approval_required")
+
+            if body.description is not None:
+                tenant.description = body.description
+                updated_fields.append("description")
+
+            if body.organization is not None:
+                tenant.organization = body.organization
+                updated_fields.append("organization")
+
+            if body.slug is not None and body.slug != tenant.slug:
+                # Validate slug format
+                if not TenantProvisioner.validate_slug(body.slug):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Invalid slug. Must be 2-63 chars, lowercase "
+                        "alphanumeric with optional hyphens.",
+                    )
+
+                # Check uniqueness
+                existing = (
+                    db_session.query(Tenant)
+                    .filter(
+                        Tenant.slug == body.slug,
+                        Tenant.id != admin_session.tenant_id,
+                    )
+                    .first()
+                )
+                if existing:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Slug '{body.slug}' is already in use.",
+                    )
+
+                tenant.slug = body.slug
+                tenant.email_address = f"{body.slug}@{settings.platform_domain}"
+                updated_fields.append("slug")
+
+            if updated_fields:
+                tenant.updated_at = datetime.utcnow()
 
             logger.info(
                 f"Tenant settings updated for '{admin_session.tenant_slug}': "
-                f"join_approval_required={body.join_approval_required}"
+                f"{', '.join(updated_fields) or 'no changes'}"
             )
 
             return AdminActionResponse(
                 success=True,
                 message="Settings updated successfully.",
+                details={
+                    "slug": tenant.slug,
+                    "email_address": tenant.email_address or "",
+                    "description": tenant.description or "",
+                    "organization": tenant.organization or "",
+                },
             )
 
     @router.get("/join-requests")
@@ -146,6 +220,7 @@ def create_tenant_admin_router(
     @router.post("/join-requests/{request_id}/approve")
     async def approve_join_request(
         request_id: int,
+        background_tasks: BackgroundTasks,
         admin_session=Depends(require_admin),
     ):
         """
@@ -194,14 +269,56 @@ def create_tenant_admin_router(
             join_request.resolved_at = datetime.utcnow()
             join_request.resolved_by = admin_session.email
 
+            approved_email = join_request.email
+
             logger.info(
                 f"Join request #{request_id} approved by "
-                f"{admin_session.email} for {join_request.email}"
+                f"{admin_session.email} for {approved_email}"
             )
+
+            # Send welcome email to the approved user
+            if email_sender:
+                from src.email.email_sender import send_welcome_email
+                from src.platform.models import Tenant
+
+                # Get tenant details + admin emails for the welcome email
+                admin_list = None
+                tenant_name = admin_session.tenant_name
+                tenant_org = ""
+                try:
+                    tenant_obj = (
+                        db_session.query(Tenant)
+                        .filter(Tenant.id == admin_session.tenant_id)
+                        .first()
+                    )
+                    if tenant_obj:
+                        tenant_name = tenant_obj.name
+                        tenant_org = tenant_obj.organization or ""
+                    admins = (
+                        db_session.query(TenantUser.email)
+                        .filter(
+                            TenantUser.tenant_id == admin_session.tenant_id,
+                            TenantUser.role == TenantUserRole.ADMIN,
+                        )
+                        .all()
+                    )
+                    admin_list = [a.email for a in admins]
+                except Exception:
+                    pass
+
+                background_tasks.add_task(
+                    send_welcome_email,
+                    sender_instance=email_sender,
+                    to_email=approved_email,
+                    role="querier",
+                    instance_name=tenant_name,
+                    organization=tenant_org,
+                    admin_emails=admin_list,
+                )
 
             return JoinRequestActionResponse(
                 success=True,
-                message=f"Approved {join_request.email}.",
+                message=f"Approved {approved_email}.",
             )
 
     @router.post("/join-requests/{request_id}/reject")
