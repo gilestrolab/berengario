@@ -1171,6 +1171,7 @@ class EmailProcessor:
                 instance_name=instance_name,
                 original_subject=email.subject,
                 message_id=reply_message_id,
+                organization=organization,
             )
 
             # Check if tool already sent an email (e.g., confirmation email)
