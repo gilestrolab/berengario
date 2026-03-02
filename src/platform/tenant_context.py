@@ -46,6 +46,8 @@ class TenantContext:
         instance_name: Name of the assistant instance.
         instance_description: Description used in system prompts.
         organization: Organization name.
+        email_address: Tenant email address (e.g., "acme@berengar.io").
+        email_display_name: Display name for outgoing emails.
         custom_prompt: Custom RAG system prompt text (not file path).
         email_footer: Custom email footer text.
         query_optimization_enabled: Whether query optimization is on.
@@ -100,6 +102,10 @@ class TenantContext:
     openrouter_api_key: str
     openrouter_api_base: str
 
+    # Email identity (optional, defaults to global settings)
+    email_address: Optional[str] = None
+    email_display_name: Optional[str] = None
+
     @classmethod
     def from_settings(cls) -> "TenantContext":
         """
@@ -151,6 +157,8 @@ class TenantContext:
             instance_name=settings.instance_name,
             instance_description=settings.instance_description,
             organization=settings.organization,
+            email_address=settings.email_target_address,
+            email_display_name=settings.email_display_name,
             custom_prompt=custom_prompt,
             email_footer=email_footer,
             query_optimization_enabled=settings.query_optimization_enabled,
@@ -234,6 +242,8 @@ class TenantContext:
             instance_name=tenant.name,
             instance_description=tenant.description or "",
             organization=tenant.organization or "",
+            email_address=tenant.email_address,
+            email_display_name=tenant.email_display_name or tenant.name,
             custom_prompt=tenant.custom_prompt,
             email_footer=tenant.email_footer,
             query_optimization_enabled=settings.query_optimization_enabled,

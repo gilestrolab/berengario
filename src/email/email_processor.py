@@ -436,34 +436,6 @@ class EmailProcessor:
                 ctx = components.context
 
                 if is_query:
-                    # Check for "add user" admin command (MT)
-                    if role == "admin":
-                        from src.email.admin_commands import detect_add_user_command
-
-                        body_text = email.get_body(prefer_text=True) or ""
-                        if detect_add_user_command(email.subject or "", body_text):
-                            logger.info(
-                                f"MT: Detected add-user command from admin "
-                                f"{email.sender.email} for tenant '{tenant_slug}'"
-                            )
-                            result = self._handle_add_user_command_mt(
-                                email,
-                                message_id,
-                                body_text,
-                                tenant_id=mapping["tenant_id"],
-                                tenant_slug=tenant_slug,
-                                email_sender=self.email_sender,
-                                instance_name=ctx.instance_name,
-                                organization=ctx.organization,
-                                from_address=ctx.instance_name,
-                                from_name=ctx.instance_name,
-                            )
-                            if result.success:
-                                successes += 1
-                            else:
-                                failures += 1
-                            continue
-
                     result = self._process_query_with(
                         email=email,
                         query_handler=components.query_handler,
@@ -471,8 +443,8 @@ class EmailProcessor:
                         email_sender=self.email_sender,
                         instance_name=ctx.instance_name,
                         organization=ctx.organization,
-                        from_address=ctx.instance_name,  # Use tenant email if available
-                        from_name=ctx.instance_name,
+                        from_address=ctx.email_address or settings.email_target_address,
+                        from_name=ctx.email_display_name or ctx.instance_name,
                     )
                 else:
                     result = self._process_for_kb_with(
@@ -487,6 +459,8 @@ class EmailProcessor:
                         organization=ctx.organization,
                         storage_backend=self.storage_backend,
                         tenant_slug=ctx.tenant_slug,
+                        from_address=ctx.email_address or settings.email_target_address,
+                        from_name=ctx.email_display_name or ctx.instance_name,
                     )
 
                 if result.success:
@@ -614,6 +588,8 @@ class EmailProcessor:
         organization: str,
         storage_backend=None,
         tenant_slug: Optional[str] = None,
+        from_address: Optional[str] = None,
+        from_name: Optional[str] = None,
     ) -> ProcessingResult:
         """
         Process email for KB ingestion with explicit component injection.
@@ -793,6 +769,8 @@ class EmailProcessor:
                                 chunks_created,
                                 instance_name=instance_name,
                                 organization=organization,
+                                from_address=from_address,
+                                from_name=from_name,
                             )
 
                         return ProcessingResult(
@@ -967,6 +945,8 @@ class EmailProcessor:
                     duplicates_skipped,
                     instance_name=instance_name,
                     organization=organization,
+                    from_address=from_address,
+                    from_name=from_name,
                 )
 
             return ProcessingResult(
@@ -1114,24 +1094,6 @@ class EmailProcessor:
                     )
                     return self._handle_confirmation(
                         email, message_id, query_text, email.subject or ""
-                    )
-
-            # Check for "add user" admin command (ST only)
-            if is_admin and not self.tenant_email_router:
-                from src.email.admin_commands import detect_add_user_command
-
-                if detect_add_user_command(email.subject or "", query_text):
-                    logger.info(
-                        f"Detected add-user command from admin {email.sender.email}"
-                    )
-                    return self._handle_add_user_command(
-                        email,
-                        message_id,
-                        query_text,
-                        email_sender=email_sender,
-                        instance_name=instance_name,
-                        from_address=from_address,
-                        from_name=from_name,
                     )
 
             # Process query through RAG engine with conversation context
@@ -1305,6 +1267,8 @@ class EmailProcessor:
         duplicates_skipped: int = 0,
         instance_name: Optional[str] = None,
         organization: Optional[str] = None,
+        from_address: Optional[str] = None,
+        from_name: Optional[str] = None,
     ) -> None:
         """
         Send acknowledgment email after successful KB ingestion.
@@ -1316,6 +1280,8 @@ class EmailProcessor:
             duplicates_skipped: Number of duplicate documents skipped
             instance_name: Override instance name (for MT mode)
             organization: Override organization (for MT mode)
+            from_address: Override sender email address (for MT mode)
+            from_name: Override sender display name (for MT mode)
         """
         inst_name = instance_name or settings.instance_name
         org = organization or settings.organization
@@ -1372,6 +1338,8 @@ The following material has been successfully processed:
                 body_text=body_text,
                 body_html=body_html,
                 in_reply_to=email.message_id,
+                from_address=from_address,
+                from_name=from_name,
             )
 
             logger.info(f"Sent KB acknowledgment to {email.sender.email}")
@@ -1387,6 +1355,8 @@ The following material has been successfully processed:
         rejection_type: str,
         instance_name: Optional[str] = None,
         organization: Optional[str] = None,
+        from_address: Optional[str] = None,
+        from_name: Optional[str] = None,
     ) -> None:
         """
         Send rejection email to non-whitelisted sender.
@@ -1396,6 +1366,8 @@ The following material has been successfully processed:
             rejection_type: Type of rejection ("query" or "teach")
             instance_name: Override instance name (for MT mode)
             organization: Override organization (for MT mode)
+            from_address: Override sender email address (for MT mode)
+            from_name: Override sender display name (for MT mode)
         """
         inst_name = instance_name or settings.instance_name
         org = organization or settings.organization
@@ -1452,6 +1424,8 @@ If you believe you should have access, please contact the administrator at {org}
                 body_text=body_text,
                 body_html=body_html,
                 in_reply_to=email.message_id,
+                from_address=from_address,
+                from_name=from_name,
             )
 
             logger.info(
@@ -1530,215 +1504,6 @@ If you believe you should have access, please contact the administrator at {org}
             Dictionary with statistics.
         """
         return self.message_tracker.get_stats(days=days)
-
-    def _handle_add_user_command(
-        self,
-        email: EmailMessage,
-        message_id: str,
-        query_text: str,
-        email_sender: EmailSender,
-        instance_name: str,
-        from_address: str,
-        from_name: str,
-    ) -> ProcessingResult:
-        """
-        Handle an add-user admin command in single-tenant mode.
-
-        Args:
-            email: Parsed email message.
-            message_id: Unique message identifier.
-            query_text: Email body text.
-            email_sender: EmailSender for replies.
-            instance_name: Instance name for formatting.
-            from_address: Sender address for reply.
-            from_name: Sender display name for reply.
-
-        Returns:
-            ProcessingResult with command outcome.
-        """
-        from src.api.admin.whitelist_manager import WhitelistManager
-        from src.email.admin_commands import parse_add_user_command
-        from src.email.email_sender import send_welcome_email
-
-        cmd = parse_add_user_command(email.subject or "", query_text)
-        if not cmd:
-            # Could not parse — fall through to normal RAG processing
-            logger.debug(
-                "Add-user command detected but could not be parsed, falling through"
-            )
-            return self._process_query_with(
-                email=email,
-                query_handler=self.query_handler,
-                conv_manager=conversation_manager,
-                email_sender=email_sender,
-                instance_name=instance_name,
-                organization=settings.organization,
-                from_address=from_address,
-                from_name=from_name,
-            )
-
-        # Reject admin role assignment via email
-        if cmd.error == "admin_role_requested":
-            reply_body = (
-                "I can't assign the admin role via email for security reasons. "
-                f"Please use the admin panel: {settings.web_base_url}/admin"
-            )
-            email_sender.send_reply(
-                to_address=email.sender.email,
-                subject=f"Re: {email.subject or 'Add user'}",
-                body_text=reply_body,
-                body_html=None,
-                in_reply_to=message_id,
-                from_address=from_address,
-                from_name=from_name,
-            )
-            self.message_tracker.mark_processed(
-                message_id=message_id,
-                sender=email.sender.email,
-                subject=email.subject,
-                status="success",
-            )
-            return ProcessingResult(
-                message_id=message_id, success=True, action="admin_command"
-            )
-
-        # Execute the command
-        from src.email.admin_commands import execute_add_user_st
-
-        wm = WhitelistManager()
-        success, msg = execute_add_user_st(cmd, wm, self.reload_whitelists)
-
-        # Reply to admin
-        email_sender.send_reply(
-            to_address=email.sender.email,
-            subject=f"Re: {email.subject or 'Add user'}",
-            body_text=msg,
-            body_html=None,
-            in_reply_to=message_id,
-            from_address=from_address,
-            from_name=from_name,
-        )
-
-        # Send welcome email to the new user (if actually added)
-        if success and "already" not in msg:
-            send_welcome_email(
-                sender_instance=email_sender,
-                to_email=cmd.email,
-                role=cmd.role,
-                instance_name=instance_name,
-            )
-
-        self.message_tracker.mark_processed(
-            message_id=message_id,
-            sender=email.sender.email,
-            subject=email.subject,
-            status="success" if success else "error",
-            error_message=None if success else msg,
-        )
-        return ProcessingResult(
-            message_id=message_id,
-            success=success,
-            action="admin_command",
-            error=None if success else msg,
-        )
-
-    def _handle_add_user_command_mt(
-        self,
-        email: EmailMessage,
-        message_id: str,
-        body_text: str,
-        tenant_id: str,
-        tenant_slug: str,
-        email_sender: EmailSender,
-        instance_name: str,
-        organization: str,
-        from_address: str,
-        from_name: str,
-    ) -> ProcessingResult:
-        """
-        Handle an add-user admin command in multi-tenant mode.
-
-        Args:
-            email: Parsed email message.
-            message_id: Unique message identifier.
-            body_text: Email body text.
-            tenant_id: Target tenant ID.
-            tenant_slug: Target tenant slug.
-            email_sender: EmailSender for replies.
-            instance_name: Instance name for formatting.
-            organization: Organization name.
-            from_address: Sender address for reply.
-            from_name: Sender display name for reply.
-
-        Returns:
-            ProcessingResult with command outcome.
-        """
-        from src.email.admin_commands import (
-            execute_add_user_mt,
-            parse_add_user_command,
-        )
-        from src.email.email_sender import send_welcome_email
-
-        cmd = parse_add_user_command(email.subject or "", body_text)
-        if not cmd:
-            logger.debug("MT: Add-user command detected but could not be parsed")
-            return ProcessingResult(
-                message_id=message_id,
-                success=False,
-                action="admin_command",
-                error="Could not parse add-user command",
-            )
-
-        # Reject admin role assignment via email
-        if cmd.error == "admin_role_requested":
-            reply_body = (
-                "I can't assign the admin role via email for security reasons. "
-                "Please use the admin panel to manage administrator roles."
-            )
-            email_sender.send_reply(
-                to_address=email.sender.email,
-                subject=f"Re: {email.subject or 'Add user'}",
-                body_text=reply_body,
-                body_html=None,
-                in_reply_to=message_id,
-                from_address=from_address,
-                from_name=from_name,
-            )
-            return ProcessingResult(
-                message_id=message_id, success=True, action="admin_command"
-            )
-
-        # Execute the command
-        db_manager = self.tenant_email_router._db_manager
-        success, msg = execute_add_user_mt(cmd, tenant_id, tenant_slug, db_manager)
-
-        # Reply to admin
-        email_sender.send_reply(
-            to_address=email.sender.email,
-            subject=f"Re: {email.subject or 'Add user'}",
-            body_text=msg,
-            body_html=None,
-            in_reply_to=message_id,
-            from_address=from_address,
-            from_name=from_name,
-        )
-
-        # Send welcome email to the new user (if actually added)
-        if success and "already" not in msg:
-            send_welcome_email(
-                sender_instance=email_sender,
-                to_email=cmd.email,
-                role=cmd.role,
-                instance_name=instance_name,
-                organization=organization,
-            )
-
-        return ProcessingResult(
-            message_id=message_id,
-            success=success,
-            action="admin_command",
-            error=None if success else msg,
-        )
 
     def _handle_confirmation(
         self, email: EmailMessage, message_id: str, query_text: str, subject: str = ""
@@ -1931,6 +1696,20 @@ If you believe you should have access, please contact the administrator at {org}
 
                 # Remove pending action
                 pending_mgr.remove_action(action_id)
+
+                # Reload whitelists so in-memory validators pick up file changes
+                self.reload_whitelists()
+
+                # Send welcome email to newly added users
+                if action.action_type in ("add_teach", "add_query"):
+                    from src.email.email_sender import send_welcome_email
+
+                    role = "teacher" if action.action_type == "add_teach" else "querier"
+                    send_welcome_email(
+                        sender_instance=self.email_sender,
+                        to_email=action.email_to_modify,
+                        role=role,
+                    )
 
                 logger.info(f"Confirmed action executed successfully: {result_msg}")
 
