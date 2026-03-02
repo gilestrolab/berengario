@@ -151,6 +151,7 @@ def create_admin_router(
     async def add_whitelist_entry(
         whitelist_type: str,
         request: WhitelistEntryRequest,
+        background_tasks: BackgroundTasks,
         session=Depends(require_admin),
     ):
         """
@@ -161,6 +162,7 @@ def create_admin_router(
         Args:
             whitelist_type: Type of whitelist (queriers, teachers, admins)
             request: Entry to add
+            background_tasks: FastAPI background tasks
             session: Admin session (injected by dependency)
 
         Returns:
@@ -192,6 +194,45 @@ def create_admin_router(
             )
 
             logger.info(f"Admin {session.email}: {message}")
+
+            # Send welcome email for newly added individual addresses (not domain wildcards)
+            if added and not request.entry.startswith("@"):
+                from src.email.email_sender import send_welcome_email
+
+                role_map = {
+                    "queriers": "querier",
+                    "teachers": "teacher",
+                    "admins": "admin",
+                }
+                role = role_map.get(whitelist_type, "querier")
+
+                # Get admin emails for the "Need help?" section
+                try:
+                    admin_data = whitelist_manager.read_whitelist("admins")
+                    admin_list = admin_data.get("entries", [])
+                except Exception:
+                    admin_list = None
+
+                # Resolve tenant name/org when in MT mode
+                welcome_instance = None
+                welcome_org = None
+                if component_resolver:
+                    try:
+                        ctx = component_resolver.resolve(session).context
+                        welcome_instance = ctx.instance_name
+                        welcome_org = ctx.organization
+                    except Exception:
+                        pass
+
+                background_tasks.add_task(
+                    send_welcome_email,
+                    sender_instance=email_sender,
+                    to_email=request.entry,
+                    role=role,
+                    instance_name=welcome_instance,
+                    organization=welcome_org,
+                    admin_emails=admin_list,
+                )
 
             return AdminActionResponse(
                 success=True,
