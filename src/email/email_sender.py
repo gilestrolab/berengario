@@ -601,5 +601,358 @@ def _format_html_email(
     return plain_text, html_body
 
 
+def format_welcome_email(
+    to_email: str,
+    role: str,
+    instance_name: str,
+    organization: str = "",
+    query_address: str = "",
+    teach_address: Optional[str] = None,
+    web_base_url: str = "",
+    admin_emails: Optional[List[str]] = None,
+) -> tuple[str, str, str]:
+    """
+    Format a welcome email for a newly enrolled user.
+
+    Content varies by role (cumulative):
+    - All roles: greeting, what Berengario is, how to ask questions
+    - Teacher (teacher + admin): how to add to KB
+    - Admin (admin only): admin panel access
+    - Non-admin roles: admin contact info (if provided)
+
+    When teach_address is configured, teaching instructions reference
+    the teach address instead of the query address.
+
+    Args:
+        to_email: Recipient email address.
+        role: User role (querier, teacher, admin).
+        instance_name: Name of the instance.
+        organization: Organization name (optional).
+        query_address: Email address for queries.
+        teach_address: Dedicated teach address (optional).
+        web_base_url: Base URL for web interface.
+        admin_emails: List of admin email addresses (shown to non-admin roles).
+
+    Returns:
+        Tuple of (subject, plain_text, html_body).
+    """
+    role = role.lower()
+    org_text = f" at {organization}" if organization else ""
+    subject = f"Welcome to {instance_name}"
+
+    # The address used for KB ingestion: teach address if set, otherwise query address
+    kb_address = teach_address or query_address
+
+    # Filter admin list: exclude domain wildcards and the recipient themselves
+    admin_contacts = []
+    if admin_emails and role != "admin":
+        admin_contacts = [
+            e
+            for e in admin_emails
+            if not e.startswith("@") and e.lower() != to_email.lower()
+        ]
+
+    # --- Build plain text ---
+    sections_plain = []
+
+    # Greeting & intro
+    role_label = {
+        "querier": "member",
+        "teacher": "contributor",
+        "admin": "administrator",
+    }
+    friendly_role = role_label.get(role, role)
+
+    sections_plain.append(
+        f"Hello!\n\n"
+        f"You've been added to {instance_name}{org_text} as a {friendly_role}. "
+        f"Welcome aboard!\n\n"
+        f"{instance_name} is an AI-powered knowledge base assistant. "
+        f"It learns from documents and emails shared with it, and can answer "
+        f"questions based on that knowledge."
+    )
+
+    # Asking questions (all roles)
+    if query_address:
+        sections_plain.append(
+            "ASKING QUESTIONS\n\n"
+            f"You can ask {instance_name} anything about the knowledge base:\n\n"
+            f"  - By email: just send your question to {query_address}\n"
+            f"  - On the web: visit {web_base_url}\n\n"
+            f"Write naturally, as you would to a colleague. "
+            f"{instance_name} will reply with an answer and cite its sources."
+        )
+
+    # Teaching (teacher + admin)
+    if role in ("teacher", "admin"):
+        teach_intro = (
+            "SHARING KNOWLEDGE\n\n"
+            f"As a {friendly_role}, you can teach {instance_name} by sharing "
+            f"documents and emails. Here's how:\n\n"
+        )
+        teach_methods = []
+        if teach_address:
+            teach_methods.append(f"  - Send documents directly to {teach_address}")
+        teach_methods.append(
+            f"  - CC or BCC {kb_address} on any email you'd like to add"
+        )
+        teach_outro = (
+            "\n\nSupported file types: PDF, DOCX, TXT, CSV, XLS, and XLSX. "
+            "You can attach files to any of the above, and they'll be "
+            "processed automatically."
+        )
+        sections_plain.append(teach_intro + "\n".join(teach_methods) + teach_outro)
+
+    # Admin
+    if role == "admin":
+        sections_plain.append(
+            "ADMINISTRATION\n\n"
+            f"As an administrator, you have access to the admin panel where you "
+            f"can manage users, review the knowledge base, and configure the system.\n\n"
+            f"  - Admin panel: {web_base_url}/admin"
+        )
+
+    # Admin contacts (for non-admin roles)
+    if admin_contacts:
+        contacts_list = ", ".join(admin_contacts)
+        org_label = organization or instance_name
+        sections_plain.append(
+            "NEED HELP?\n\n"
+            f"If you have questions about {org_label} or need assistance "
+            f"with your account, you can reach your administrator"
+            f"{'s' if len(admin_contacts) > 1 else ''}: {contacts_list}"
+        )
+
+    # Sign-off
+    sections_plain.append(
+        f"If you have any questions about how things work, just ask "
+        f"{instance_name} — that's what it's here for!\n\n"
+        f"Best,\nThe {instance_name} Team"
+    )
+
+    plain_text = "\n\n---\n\n".join(sections_plain)
+
+    # --- Build HTML ---
+    sections_html = []
+
+    # Greeting & intro
+    sections_html.append(
+        f"<p>Hello!</p>"
+        f"<p>You've been added to <strong>{instance_name}</strong>{org_text} "
+        f"as a {friendly_role}. Welcome aboard!</p>"
+        f"<p>{instance_name} is an AI-powered knowledge base assistant. "
+        f"It learns from documents and emails shared with it, and can answer "
+        f"questions based on that knowledge.</p>"
+    )
+
+    # Asking questions (all roles)
+    if query_address:
+        sections_html.append(
+            f'<div style="background-color: #F7F2EA; border-radius: 8px; '
+            f'padding: 16px 20px; margin: 16px 0;">'
+            f'<h3 style="color: #2A2520; margin: 0 0 8px 0; font-size: 15px;">'
+            f"Asking Questions</h3>"
+            f'<p style="margin: 0 0 8px 0;">You can ask {instance_name} '
+            f"anything about the knowledge base:</p>"
+            f'<ul style="margin: 4px 0; padding-left: 20px;">'
+            f"<li><strong>By email:</strong> send your question to "
+            f'<a href="mailto:{query_address}" style="color: #5B8C7A;">'
+            f"{query_address}</a></li>"
+            f"<li><strong>On the web:</strong> visit "
+            f'<a href="{web_base_url}" style="color: #5B8C7A;">'
+            f"{web_base_url}</a></li>"
+            f"</ul>"
+            f'<p style="margin: 8px 0 0 0; font-size: 0.92em; color: #5C554D;">'
+            f"Write naturally, as you would to a colleague. "
+            f"{instance_name} will reply with an answer and cite its sources.</p>"
+            f"</div>"
+        )
+
+    # Teaching (teacher + admin)
+    if role in ("teacher", "admin"):
+        teach_items = ""
+        if teach_address:
+            teach_items += (
+                f"<li><strong>Send documents directly</strong> to "
+                f'<a href="mailto:{teach_address}" style="color: #5B8C7A;">'
+                f"{teach_address}</a></li>"
+            )
+        teach_items += (
+            f"<li><strong>CC or BCC</strong> "
+            f'<a href="mailto:{kb_address}" style="color: #5B8C7A;">'
+            f"{kb_address}</a> on any email you'd like to add</li>"
+        )
+
+        sections_html.append(
+            f'<div style="background-color: #F7F2EA; border-radius: 8px; '
+            f'padding: 16px 20px; margin: 16px 0;">'
+            f'<h3 style="color: #2A2520; margin: 0 0 8px 0; font-size: 15px;">'
+            f"Sharing Knowledge</h3>"
+            f'<p style="margin: 0 0 8px 0;">As a {friendly_role}, you can '
+            f"teach {instance_name} by sharing documents and emails:</p>"
+            f'<ul style="margin: 4px 0; padding-left: 20px;">'
+            f"{teach_items}"
+            f"</ul>"
+            f'<p style="margin: 8px 0 0 0; font-size: 0.92em; color: #5C554D;">'
+            f"Supported file types: PDF, DOCX, TXT, CSV, XLS, and XLSX. "
+            f"Attach files to any of the above and they'll be "
+            f"processed automatically.</p>"
+            f"</div>"
+        )
+
+    # Admin
+    if role == "admin":
+        sections_html.append(
+            f'<div style="background-color: #F7F2EA; border-radius: 8px; '
+            f'padding: 16px 20px; margin: 16px 0;">'
+            f'<h3 style="color: #2A2520; margin: 0 0 8px 0; font-size: 15px;">'
+            f"Administration</h3>"
+            f'<p style="margin: 0 0 8px 0;">As an administrator, you have '
+            f"access to the admin panel where you can manage users, review the "
+            f"knowledge base, and configure the system.</p>"
+            f'<p style="margin: 0;"><a href="{web_base_url}/admin" '
+            f'style="display: inline-block; padding: 8px 20px; '
+            f"background-color: #5B8C7A; color: white; text-decoration: none; "
+            f'border-radius: 5px; font-weight: bold;">'
+            f"Open Admin Panel</a></p>"
+            f"</div>"
+        )
+
+    # Admin contacts (for non-admin roles)
+    if admin_contacts:
+        org_label = organization or instance_name
+        contacts_html = ", ".join(
+            f'<a href="mailto:{e}" style="color: #5B8C7A;">{e}</a>'
+            for e in admin_contacts
+        )
+        sections_html.append(
+            f'<div style="background-color: #F0EDE8; border-radius: 8px; '
+            f'padding: 16px 20px; margin: 16px 0;">'
+            f'<h3 style="color: #2A2520; margin: 0 0 8px 0; font-size: 15px;">'
+            f"Need Help?</h3>"
+            f'<p style="margin: 0;">If you have questions about {org_label} '
+            f"or need assistance with your account, you can reach your "
+            f"administrator{'s' if len(admin_contacts) > 1 else ''}: "
+            f"{contacts_html}</p>"
+            f"</div>"
+        )
+
+    # Sign-off
+    sections_html.append(
+        f"<p>If you have any questions about how things work, just ask "
+        f"{instance_name} — that's what it's here for!</p>"
+    )
+
+    html_sections = "\n".join(sections_html)
+
+    # Logo URL — referenced from the web server
+    logo_url = f"{web_base_url}/static/berengario_owl.png" if web_base_url else ""
+    logo_html = ""
+    if logo_url:
+        logo_html = (
+            f'<img src="{logo_url}" alt="{instance_name}" '
+            f'style="width: 48px; height: auto; vertical-align: middle; '
+            f'margin-right: 12px; border-radius: 4px;">'
+        )
+
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+</head>
+<body style="font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #2E2E2E; max-width: 640px; margin: 0 auto; padding: 20px;">
+    {html_sections}
+    <div style="border-top: 1px solid #D5C9B8; padding-top: 16px; margin-top: 28px;">
+        <table cellpadding="0" cellspacing="0" border="0">
+            <tr>
+                <td style="vertical-align: middle; padding-right: 12px;">
+                    {logo_html}
+                </td>
+                <td style="vertical-align: middle;">
+                    <span style="font-weight: bold; color: #2A2520; font-size: 14px;">{instance_name}</span><br>
+                    <span style="font-size: 12px; color: #8C8279;">{organization or "AI-powered Knowledge Base Assistant"}</span>
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>"""
+
+    return subject, plain_text, html_body
+
+
+def send_welcome_email(
+    sender_instance: "EmailSender",
+    to_email: str,
+    role: str,
+    instance_name: Optional[str] = None,
+    organization: Optional[str] = None,
+    query_address: Optional[str] = None,
+    teach_address: Optional[str] = None,
+    web_base_url: Optional[str] = None,
+    admin_emails: Optional[List[str]] = None,
+) -> bool:
+    """
+    Send a welcome email to a newly enrolled user.
+
+    Non-critical: catches all exceptions and returns False on failure.
+    Respects the welcome_email_enabled setting.
+
+    Args:
+        sender_instance: EmailSender to use for sending.
+        to_email: Recipient email address.
+        role: User role (querier, teacher, admin).
+        instance_name: Name of instance (defaults to settings).
+        organization: Organization name (defaults to settings).
+        query_address: Query email address (defaults to settings).
+        teach_address: Teach email address (defaults to settings).
+        web_base_url: Web base URL (defaults to settings).
+        admin_emails: List of admin emails to show as contacts (optional).
+
+    Returns:
+        True if sent successfully, False otherwise.
+    """
+    try:
+        if not settings.welcome_email_enabled:
+            logger.debug("Welcome emails disabled, skipping")
+            return False
+
+        # Fill defaults from settings
+        instance_name = instance_name or settings.instance_name
+        organization = organization or settings.organization
+        query_address = query_address or settings.email_target_address
+        teach_address = teach_address or settings.email_teach_address
+        web_base_url = web_base_url or settings.web_base_url
+
+        subject, plain_text, html_body = format_welcome_email(
+            to_email=to_email,
+            role=role,
+            instance_name=instance_name,
+            organization=organization,
+            query_address=query_address,
+            teach_address=teach_address,
+            web_base_url=web_base_url,
+            admin_emails=admin_emails,
+        )
+
+        result = sender_instance.send_reply(
+            to_address=to_email,
+            subject=subject,
+            body_text=plain_text,
+            body_html=html_body,
+        )
+
+        if result:
+            logger.info(f"Welcome email sent to {to_email} (role: {role})")
+        else:
+            logger.warning(f"Failed to send welcome email to {to_email}")
+
+        return result
+
+    except Exception as e:
+        logger.warning(f"Error sending welcome email to {to_email}: {e}")
+        return False
+
+
 # Global email sender instance
 email_sender = EmailSender()

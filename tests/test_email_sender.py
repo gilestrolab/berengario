@@ -13,7 +13,9 @@ import pytest
 from src.email.email_sender import (
     EmailSender,
     format_response_email,
+    format_welcome_email,
     load_custom_footer,
+    send_welcome_email,
 )
 
 
@@ -654,3 +656,261 @@ class TestSendReplyFromOverrides:
         call_args = mock_instance.send_message.call_args
         message = call_args[0][0]
         assert message["From"] == "Default Bot <bot@example.com>"
+
+
+class TestFormatWelcomeEmail:
+    """Test suite for format_welcome_email function."""
+
+    def test_querier_role_content(self):
+        """Test welcome email for querier includes query instructions."""
+        subject, plain, html = format_welcome_email(
+            to_email="user@example.com",
+            role="querier",
+            instance_name="TestBot",
+            query_address="ask@example.com",
+            web_base_url="https://example.com",
+        )
+
+        assert "Welcome to TestBot" in subject
+        assert "member" in plain
+        assert "ask@example.com" in plain
+        assert "https://example.com" in plain
+        assert "AI-powered knowledge base" in plain
+        # Querier should NOT have teaching or admin sections
+        assert "SHARING KNOWLEDGE" not in plain
+        assert "ADMINISTRATION" not in plain
+        # HTML version
+        assert "ask@example.com" in html
+        assert "https://example.com" in html
+
+    def test_teacher_role_content(self):
+        """Test welcome email for teacher includes teach + query instructions."""
+        subject, plain, html = format_welcome_email(
+            to_email="user@example.com",
+            role="teacher",
+            instance_name="TestBot",
+            query_address="ask@example.com",
+            web_base_url="https://example.com",
+        )
+
+        assert "contributor" in plain
+        assert "ASKING QUESTIONS" in plain
+        assert "SHARING KNOWLEDGE" in plain
+        assert "CC or BCC" in plain
+        assert "Forward" not in plain
+        assert "Supported file types" in plain
+        assert "ADMINISTRATION" not in plain
+
+    def test_admin_role_content(self):
+        """Test welcome email for admin includes all sections."""
+        subject, plain, html = format_welcome_email(
+            to_email="admin@example.com",
+            role="admin",
+            instance_name="TestBot",
+            query_address="ask@example.com",
+            web_base_url="https://example.com",
+        )
+
+        assert "administrator" in plain
+        assert "ASKING QUESTIONS" in plain
+        assert "SHARING KNOWLEDGE" in plain
+        assert "ADMINISTRATION" in plain
+        assert "/admin" in plain
+        assert "/admin" in html
+
+    def test_teach_address_present(self):
+        """Test that teach address is included when provided."""
+        _, plain, html = format_welcome_email(
+            to_email="user@example.com",
+            role="teacher",
+            instance_name="TestBot",
+            query_address="ask@example.com",
+            teach_address="teach@example.com",
+            web_base_url="https://example.com",
+        )
+
+        assert "teach@example.com" in plain
+        assert "teach@example.com" in html
+        # Teaching instructions should reference teach address, not query address
+        assert "CC or BCC teach@example.com" in plain
+
+    def test_teach_address_absent(self):
+        """Test that teaching uses query address when no teach address."""
+        _, plain, html = format_welcome_email(
+            to_email="user@example.com",
+            role="teacher",
+            instance_name="TestBot",
+            query_address="ask@example.com",
+            web_base_url="https://example.com",
+        )
+
+        # Without teach address, teaching should reference query address
+        assert "CC or BCC ask@example.com" in plain
+        assert "Send documents directly" not in plain
+
+    def test_organization_in_body(self):
+        """Test that organization appears in body when provided."""
+        subject, plain, html = format_welcome_email(
+            to_email="user@example.com",
+            role="querier",
+            instance_name="TestBot",
+            organization="Acme Corp",
+            query_address="ask@example.com",
+            web_base_url="https://example.com",
+        )
+
+        assert "Welcome to TestBot" in subject
+        assert "Acme Corp" in plain
+
+    def test_html_structure(self):
+        """Test HTML email has proper structure and styling."""
+        _, _, html = format_welcome_email(
+            to_email="user@example.com",
+            role="querier",
+            instance_name="TestBot",
+            query_address="ask@example.com",
+            web_base_url="https://example.com",
+        )
+
+        assert "<!DOCTYPE html>" in html
+        assert "font-family: Arial" in html
+        assert "#D5C9B8" in html
+        # Signature with logo
+        assert "berengario_owl.png" in html
+
+    def test_role_case_insensitive(self):
+        """Test that role is case-insensitive."""
+        _, plain, _ = format_welcome_email(
+            to_email="user@example.com",
+            role="ADMIN",
+            instance_name="TestBot",
+            query_address="ask@example.com",
+            web_base_url="https://example.com",
+        )
+
+        assert "ADMINISTRATION" in plain
+        assert "SHARING KNOWLEDGE" in plain
+
+    def test_admin_contacts_shown_for_querier(self):
+        """Test that admin contacts are shown to queriers."""
+        _, plain, html = format_welcome_email(
+            to_email="user@example.com",
+            role="querier",
+            instance_name="TestBot",
+            query_address="ask@example.com",
+            web_base_url="https://example.com",
+            admin_emails=["admin1@example.com", "admin2@example.com"],
+        )
+
+        assert "NEED HELP?" in plain
+        assert "admin1@example.com" in plain
+        assert "admin2@example.com" in plain
+        assert "admin1@example.com" in html
+        assert "admin2@example.com" in html
+
+    def test_admin_contacts_not_shown_for_admin_role(self):
+        """Test that admin contacts are NOT shown to admin users."""
+        _, plain, html = format_welcome_email(
+            to_email="admin@example.com",
+            role="admin",
+            instance_name="TestBot",
+            query_address="ask@example.com",
+            web_base_url="https://example.com",
+            admin_emails=["admin@example.com", "other@example.com"],
+        )
+
+        assert "NEED HELP?" not in plain
+
+    def test_admin_contacts_exclude_recipient(self):
+        """Test that recipient is excluded from admin contacts list."""
+        _, plain, _ = format_welcome_email(
+            to_email="only-admin@example.com",
+            role="querier",
+            instance_name="TestBot",
+            query_address="ask@example.com",
+            web_base_url="https://example.com",
+            admin_emails=["only-admin@example.com"],
+        )
+
+        # Only admin is the recipient, so no contacts to show
+        assert "NEED HELP?" not in plain
+
+    def test_admin_contacts_skip_domain_wildcards(self):
+        """Test that domain wildcards in admin list are skipped."""
+        _, plain, _ = format_welcome_email(
+            to_email="user@example.com",
+            role="querier",
+            instance_name="TestBot",
+            query_address="ask@example.com",
+            web_base_url="https://example.com",
+            admin_emails=["@example.com"],
+        )
+
+        # Only entry is a domain wildcard, so no contacts to show
+        assert "NEED HELP?" not in plain
+
+
+class TestSendWelcomeEmail:
+    """Test suite for send_welcome_email function."""
+
+    @patch("src.email.email_sender.settings")
+    def test_send_success(self, mock_settings):
+        """Test successful welcome email sending."""
+        mock_settings.welcome_email_enabled = True
+        mock_settings.instance_name = "TestBot"
+        mock_settings.organization = ""
+        mock_settings.email_target_address = "ask@test.com"
+        mock_settings.email_teach_address = None
+        mock_settings.web_base_url = "https://test.com"
+
+        mock_sender = MagicMock()
+        mock_sender.send_reply.return_value = True
+
+        result = send_welcome_email(
+            sender_instance=mock_sender,
+            to_email="user@test.com",
+            role="querier",
+        )
+
+        assert result is True
+        mock_sender.send_reply.assert_called_once()
+        call_kwargs = mock_sender.send_reply.call_args[1]
+        assert call_kwargs["to_address"] == "user@test.com"
+        assert "Welcome to TestBot" in call_kwargs["subject"]
+
+    @patch("src.email.email_sender.settings")
+    def test_send_disabled(self, mock_settings):
+        """Test that disabled setting skips sending."""
+        mock_settings.welcome_email_enabled = False
+
+        mock_sender = MagicMock()
+
+        result = send_welcome_email(
+            sender_instance=mock_sender,
+            to_email="user@test.com",
+            role="querier",
+        )
+
+        assert result is False
+        mock_sender.send_reply.assert_not_called()
+
+    @patch("src.email.email_sender.settings")
+    def test_send_failure_returns_false(self, mock_settings):
+        """Test that send failure returns False without raising."""
+        mock_settings.welcome_email_enabled = True
+        mock_settings.instance_name = "TestBot"
+        mock_settings.organization = ""
+        mock_settings.email_target_address = "ask@test.com"
+        mock_settings.email_teach_address = None
+        mock_settings.web_base_url = "https://test.com"
+
+        mock_sender = MagicMock()
+        mock_sender.send_reply.side_effect = Exception("SMTP failure")
+
+        result = send_welcome_email(
+            sender_instance=mock_sender,
+            to_email="user@test.com",
+            role="querier",
+        )
+
+        assert result is False
