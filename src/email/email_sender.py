@@ -614,6 +614,7 @@ def format_welcome_email(
     role: str,
     instance_name: str,
     organization: str = "",
+    instance_description: str = "",
     query_address: str = "",
     teach_address: Optional[str] = None,
     web_base_url: str = "",
@@ -636,6 +637,7 @@ def format_welcome_email(
         role: User role (querier, teacher, admin).
         instance_name: Name of the instance.
         organization: Organization name (optional).
+        instance_description: Instance/team description (optional, shown in signature).
         query_address: Email address for queries.
         teach_address: Dedicated teach address (optional).
         web_base_url: Base URL for web interface.
@@ -699,23 +701,26 @@ def format_welcome_email(
 
     # Teaching (teacher + admin)
     if role in ("teacher", "admin"):
-        teach_intro = (
-            "SHARING KNOWLEDGE\n\n"
-            f"As a {friendly_role}, you can teach {instance_name} by sharing "
-            f"documents and emails. Here's how:\n\n"
-        )
-        teach_methods = []
         if teach_address:
-            teach_methods.append(f"  - Send documents directly to {teach_address}")
-        teach_methods.append(
-            f"  - CC or BCC {kb_address} on any email you'd like to add"
-        )
-        teach_outro = (
-            "\n\nSupported file types: PDF, DOCX, TXT, CSV, XLS, and XLSX. "
-            "You can attach files to any of the above, and they'll be "
-            "processed automatically."
-        )
-        sections_plain.append(teach_intro + "\n".join(teach_methods) + teach_outro)
+            teach_section = (
+                "SHARING KNOWLEDGE\n\n"
+                f"As a {friendly_role}, you can teach {instance_name} by sharing "
+                f"documents and emails with {teach_address}. Simply include "
+                f"this address in the To, CC, or BCC field of your email and "
+                f"{instance_name} will process both the email content and any "
+                f"attachments, adding them to the knowledge base.\n\n"
+                f"Supported file types: PDF, DOCX, TXT, CSV, XLS, and XLSX."
+            )
+        else:
+            teach_section = (
+                "SHARING KNOWLEDGE\n\n"
+                f"As a {friendly_role}, you can teach {instance_name} by sharing "
+                f"documents and emails. CC or BCC {query_address} on any email "
+                f"you'd like to add to the knowledge base. {instance_name} will "
+                f"process both the email content and any attachments.\n\n"
+                f"Supported file types: PDF, DOCX, TXT, CSV, XLS, and XLSX."
+            )
+        sections_plain.append(teach_section)
 
     # Admin
     if role == "admin":
@@ -784,33 +789,36 @@ def format_welcome_email(
 
     # Teaching (teacher + admin)
     if role in ("teacher", "admin"):
-        teach_items = ""
         if teach_address:
-            teach_items += (
-                f"<li><strong>Send documents directly</strong> to "
+            teach_body = (
+                f'<p style="margin: 0 0 8px 0;">As a {friendly_role}, you can '
+                f"teach {instance_name} by sharing documents and emails with "
                 f'<a href="mailto:{teach_address}" style="color: #5B8C7A;">'
-                f"{teach_address}</a></li>"
+                f"{teach_address}</a>. Simply include this address in the "
+                f"<strong>To</strong>, <strong>CC</strong>, or <strong>BCC</strong> "
+                f"field of your email and {instance_name} will process both the "
+                f"email content and any attachments, adding them to the "
+                f"knowledge base.</p>"
             )
-        teach_items += (
-            f"<li><strong>CC or BCC</strong> "
-            f'<a href="mailto:{kb_address}" style="color: #5B8C7A;">'
-            f"{kb_address}</a> on any email you'd like to add</li>"
-        )
+        else:
+            teach_body = (
+                f'<p style="margin: 0 0 8px 0;">As a {friendly_role}, you can '
+                f"teach {instance_name} by sharing documents and emails. "
+                f"<strong>CC or BCC</strong> "
+                f'<a href="mailto:{query_address}" style="color: #5B8C7A;">'
+                f"{query_address}</a> on any email you'd like to add to the "
+                f"knowledge base. {instance_name} will process both the email "
+                f"content and any attachments.</p>"
+            )
 
         sections_html.append(
             f'<div style="background-color: #F7F2EA; border-radius: 8px; '
             f'padding: 16px 20px; margin: 16px 0;">'
             f'<h3 style="color: #2A2520; margin: 0 0 8px 0; font-size: 15px;">'
             f"Sharing Knowledge</h3>"
-            f'<p style="margin: 0 0 8px 0;">As a {friendly_role}, you can '
-            f"teach {instance_name} by sharing documents and emails:</p>"
-            f'<ul style="margin: 4px 0; padding-left: 20px;">'
-            f"{teach_items}"
-            f"</ul>"
+            f"{teach_body}"
             f'<p style="margin: 8px 0 0 0; font-size: 0.92em; color: #5C554D;">'
-            f"Supported file types: PDF, DOCX, TXT, CSV, XLS, and XLSX. "
-            f"Attach files to any of the above and they'll be "
-            f"processed automatically.</p>"
+            f"Supported file types: PDF, DOCX, TXT, CSV, XLS, and XLSX.</p>"
             f"</div>"
         )
 
@@ -869,6 +877,18 @@ def format_welcome_email(
             f'margin-right: 12px; border-radius: 4px;">'
         )
 
+    # Build signature subtitle from description and organization
+    subtitle_parts = []
+    if instance_description:
+        subtitle_parts.append(instance_description)
+    if organization:
+        subtitle_parts.append(organization)
+    signature_subtitle = (
+        " · ".join(subtitle_parts)
+        if subtitle_parts
+        else "AI-powered Knowledge Base Assistant"
+    )
+
     html_body = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -884,7 +904,7 @@ def format_welcome_email(
                 </td>
                 <td style="vertical-align: middle;">
                     <span style="font-weight: bold; color: #2A2520; font-size: 14px;">{instance_name}</span><br>
-                    <span style="font-size: 12px; color: #8C8279;">{organization or "AI-powered Knowledge Base Assistant"}</span>
+                    <span style="font-size: 12px; color: #8C8279;">{signature_subtitle}</span>
                 </td>
             </tr>
         </table>
@@ -895,12 +915,77 @@ def format_welcome_email(
     return subject, plain_text, html_body
 
 
+def fetch_tenant_welcome_params(
+    tenant_id: str,
+    db_session=None,
+) -> dict:
+    """
+    Fetch tenant details needed for welcome emails from the platform DB.
+
+    Queries the Tenant and TenantUser tables to build a dict of keyword
+    arguments suitable for passing to send_welcome_email().
+
+    Args:
+        tenant_id: UUID of the tenant.
+        db_session: An open SQLAlchemy session to the platform DB.
+            If None, opens (and closes) one via PlatformDBManager.
+
+    Returns:
+        Dict with keys: instance_name, organization, instance_description,
+        admin_emails. Values default gracefully on errors.
+    """
+    from src.platform.models import Tenant, TenantUser, TenantUserRole
+
+    result = {
+        "instance_name": None,
+        "organization": "",
+        "instance_description": "",
+        "admin_emails": None,
+    }
+
+    own_session = False
+    try:
+        if db_session is None:
+            from src.platform.db_manager import PlatformDBManager
+
+            platform_db = PlatformDBManager()
+            db_session = platform_db.get_platform_session().__enter__()
+            own_session = True
+
+        tenant = db_session.query(Tenant).filter(Tenant.id == tenant_id).first()
+        if tenant:
+            result["instance_name"] = tenant.name
+            result["organization"] = tenant.organization or ""
+            result["instance_description"] = tenant.description or ""
+
+        admins = (
+            db_session.query(TenantUser.email)
+            .filter(
+                TenantUser.tenant_id == tenant_id,
+                TenantUser.role == TenantUserRole.ADMIN,
+            )
+            .all()
+        )
+        result["admin_emails"] = [a.email for a in admins]
+    except Exception:
+        logger.debug(f"Could not fetch tenant welcome params for {tenant_id}")
+    finally:
+        if own_session and db_session:
+            try:
+                db_session.close()
+            except Exception:
+                pass
+
+    return result
+
+
 def send_welcome_email(
     sender_instance: "EmailSender",
     to_email: str,
     role: str,
     instance_name: Optional[str] = None,
     organization: Optional[str] = None,
+    instance_description: Optional[str] = None,
     query_address: Optional[str] = None,
     teach_address: Optional[str] = None,
     web_base_url: Optional[str] = None,
@@ -918,6 +1003,7 @@ def send_welcome_email(
         role: User role (querier, teacher, admin).
         instance_name: Name of instance (defaults to settings).
         organization: Organization name (defaults to settings).
+        instance_description: Instance/team description (defaults to settings).
         query_address: Query email address (defaults to settings).
         teach_address: Teach email address (defaults to settings).
         web_base_url: Web base URL (defaults to settings).
@@ -932,6 +1018,11 @@ def send_welcome_email(
             return False
 
         # Fill defaults from settings
+        # Only default instance_description when instance_name is also defaulting
+        # (ST mode). In MT mode, callers pass instance_name=tenant.name and the
+        # tenant name already serves as the team identifier in the signature.
+        if instance_name is None:
+            instance_description = instance_description or settings.instance_description
         instance_name = instance_name or settings.instance_name
         organization = organization or settings.organization
         query_address = query_address or settings.email_target_address
@@ -943,6 +1034,7 @@ def send_welcome_email(
             role=role,
             instance_name=instance_name,
             organization=organization,
+            instance_description=instance_description,
             query_address=query_address,
             teach_address=teach_address,
             web_base_url=web_base_url,

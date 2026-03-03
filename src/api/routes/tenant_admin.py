@@ -278,42 +278,21 @@ def create_tenant_admin_router(
 
             # Send welcome email to the approved user
             if email_sender:
-                from src.email.email_sender import send_welcome_email
-                from src.platform.models import Tenant
+                from src.email.email_sender import (
+                    fetch_tenant_welcome_params,
+                    send_welcome_email,
+                )
 
-                # Get tenant details + admin emails for the welcome email
-                admin_list = None
-                tenant_name = admin_session.tenant_name
-                tenant_org = ""
-                try:
-                    tenant_obj = (
-                        db_session.query(Tenant)
-                        .filter(Tenant.id == admin_session.tenant_id)
-                        .first()
-                    )
-                    if tenant_obj:
-                        tenant_name = tenant_obj.name
-                        tenant_org = tenant_obj.organization or ""
-                    admins = (
-                        db_session.query(TenantUser.email)
-                        .filter(
-                            TenantUser.tenant_id == admin_session.tenant_id,
-                            TenantUser.role == TenantUserRole.ADMIN,
-                        )
-                        .all()
-                    )
-                    admin_list = [a.email for a in admins]
-                except Exception:
-                    pass
+                params = fetch_tenant_welcome_params(
+                    admin_session.tenant_id, db_session=db_session
+                )
 
                 background_tasks.add_task(
                     send_welcome_email,
                     sender_instance=email_sender,
                     to_email=approved_email,
                     role="querier",
-                    instance_name=tenant_name,
-                    organization=tenant_org,
-                    admin_emails=admin_list,
+                    **params,
                 )
 
             return JoinRequestActionResponse(

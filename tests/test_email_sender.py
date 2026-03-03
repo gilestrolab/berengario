@@ -731,8 +731,8 @@ class TestFormatWelcomeEmail:
 
         assert "teach@example.com" in plain
         assert "teach@example.com" in html
-        # Teaching instructions should reference teach address, not query address
-        assert "CC or BCC teach@example.com" in plain
+        # Teaching instructions should mention To/CC/BCC with teach address
+        assert "To, CC, or BCC" in plain
 
     def test_teach_address_absent(self):
         """Test that teaching uses query address when no teach address."""
@@ -745,8 +745,8 @@ class TestFormatWelcomeEmail:
         )
 
         # Without teach address, teaching should reference query address
-        assert "CC or BCC ask@example.com" in plain
-        assert "Send documents directly" not in plain
+        assert "CC or BCC" in plain
+        assert "ask@example.com" in plain
 
     def test_organization_in_body(self):
         """Test that organization appears in body when provided."""
@@ -777,6 +777,46 @@ class TestFormatWelcomeEmail:
         assert "#D5C9B8" in html
         # Signature with logo
         assert "berengario_owl.png" in html
+
+    def test_signature_with_description_and_org(self):
+        """Test signature shows both instance_description and organization."""
+        _, _, html = format_welcome_email(
+            to_email="user@example.com",
+            role="querier",
+            instance_name="TestBot",
+            organization="Acme Corp",
+            instance_description="Department of Science",
+            query_address="ask@example.com",
+            web_base_url="https://example.com",
+        )
+
+        assert "Department of Science" in html
+        assert "Acme Corp" in html
+
+    def test_signature_with_org_only(self):
+        """Test signature shows just organization when no description."""
+        _, _, html = format_welcome_email(
+            to_email="user@example.com",
+            role="querier",
+            instance_name="TestBot",
+            organization="Acme Corp",
+            query_address="ask@example.com",
+            web_base_url="https://example.com",
+        )
+
+        assert "Acme Corp" in html
+
+    def test_signature_fallback(self):
+        """Test signature falls back to default when no description or org."""
+        _, _, html = format_welcome_email(
+            to_email="user@example.com",
+            role="querier",
+            instance_name="TestBot",
+            query_address="ask@example.com",
+            web_base_url="https://example.com",
+        )
+
+        assert "AI-powered Knowledge Base Assistant" in html
 
     def test_role_case_insensitive(self):
         """Test that role is case-insensitive."""
@@ -859,6 +899,7 @@ class TestSendWelcomeEmail:
         mock_settings.welcome_email_enabled = True
         mock_settings.instance_name = "TestBot"
         mock_settings.organization = ""
+        mock_settings.instance_description = ""
         mock_settings.email_target_address = "ask@test.com"
         mock_settings.email_teach_address = None
         mock_settings.web_base_url = "https://test.com"
@@ -900,6 +941,7 @@ class TestSendWelcomeEmail:
         mock_settings.welcome_email_enabled = True
         mock_settings.instance_name = "TestBot"
         mock_settings.organization = ""
+        mock_settings.instance_description = ""
         mock_settings.email_target_address = "ask@test.com"
         mock_settings.email_teach_address = None
         mock_settings.web_base_url = "https://test.com"

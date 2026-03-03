@@ -213,14 +213,16 @@ def create_admin_router(
                 except Exception:
                     admin_list = None
 
-                # Resolve tenant name/org when in MT mode
+                # Resolve tenant details when in MT mode
                 welcome_instance = None
                 welcome_org = None
+                welcome_desc = None
                 if component_resolver:
                     try:
                         ctx = component_resolver.resolve(session).context
                         welcome_instance = ctx.instance_name
                         welcome_org = ctx.organization
+                        welcome_desc = ctx.instance_description
                     except Exception:
                         pass
 
@@ -231,6 +233,7 @@ def create_admin_router(
                     role=role,
                     instance_name=welcome_instance,
                     organization=welcome_org,
+                    instance_description=welcome_desc,
                     admin_emails=admin_list,
                 )
 

@@ -7,7 +7,7 @@ All endpoints require either an onboarding-verified session or are public.
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
 
 from src.api.models import (
     CreateTenantRequest,
@@ -29,6 +29,7 @@ def create_onboarding_router(
     set_session_cookie,
     settings,
     key_manager=None,
+    email_sender=None,
 ):
     """
     Create onboarding router for multi-tenant self-service.
@@ -40,6 +41,7 @@ def create_onboarding_router(
         set_session_cookie: Function to set session cookie.
         settings: Application settings.
         key_manager: DatabaseKeyManager for per-tenant encryption (optional).
+        email_sender: EmailSender instance for welcome emails (optional).
 
     Returns:
         Configured APIRouter instance.
@@ -67,6 +69,7 @@ def create_onboarding_router(
         body: CreateTenantRequest,
         request: Request,
         response: Response,
+        background_tasks: BackgroundTasks,
     ):
         """
         Create a new tenant (requires onboarding-verified session).
@@ -122,6 +125,20 @@ def create_onboarding_router(
 
             logger.info(f"Tenant '{slug}' created by {email} via onboarding")
 
+            # Send welcome email to the new admin
+            if email_sender:
+                from src.email.email_sender import send_welcome_email
+
+                background_tasks.add_task(
+                    send_welcome_email,
+                    sender_instance=email_sender,
+                    to_email=email,
+                    role="admin",
+                    instance_name=body.name,
+                    organization=body.organization or "",
+                    instance_description=body.description or "",
+                )
+
             return CreateTenantResponse(
                 success=True,
                 message="Team created successfully!",
@@ -175,6 +192,7 @@ def create_onboarding_router(
         body: JoinTenantRequest,
         request: Request,
         response: Response,
+        background_tasks: BackgroundTasks,
     ):
         """
         Join a tenant via invite code (requires onboarding-verified session).
@@ -285,6 +303,26 @@ def create_onboarding_router(
                 logger.info(
                     f"User {email} joined tenant '{tenant.slug}' via invite code"
                 )
+
+                # Send welcome email to new member
+                if email_sender:
+                    from src.email.email_sender import (
+                        fetch_tenant_welcome_params,
+                        send_welcome_email,
+                    )
+
+                    params = fetch_tenant_welcome_params(
+                        tenant.id, db_session=db_session
+                    )
+
+                    background_tasks.add_task(
+                        send_welcome_email,
+                        sender_instance=email_sender,
+                        to_email=email,
+                        role="querier",
+                        **params,
+                    )
+
                 return JoinTenantResponse(
                     success=True,
                     message=f"Welcome to {tenant.name}!",

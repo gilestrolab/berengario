@@ -9,7 +9,7 @@ user permission management.
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from src.api.models import AdminActionResponse, TeamMemberRequest, TeamMemberResponse
 
@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 def create_team_router(
     platform_db_manager,
     require_admin,
+    email_sender=None,
 ):
     """
     Create team management router with dependency injection.
@@ -26,6 +27,7 @@ def create_team_router(
     Args:
         platform_db_manager: TenantDBManager for platform DB access.
         require_admin: Admin authentication dependency.
+        email_sender: EmailSender instance for welcome emails (optional).
 
     Returns:
         Configured APIRouter instance.
@@ -72,6 +74,7 @@ def create_team_router(
     @router.post("", response_model=AdminActionResponse)
     async def add_team_member(
         request: TeamMemberRequest,
+        background_tasks: BackgroundTasks,
         session=Depends(require_admin),
     ):
         """
@@ -130,6 +133,23 @@ def create_team_router(
             logger.info(
                 f"Admin {session.email} added {email} as {role.value} "
                 f"to tenant {session.tenant_slug}"
+            )
+
+        # Send welcome email in background
+        if email_sender:
+            from src.email.email_sender import (
+                fetch_tenant_welcome_params,
+                send_welcome_email,
+            )
+
+            params = fetch_tenant_welcome_params(session.tenant_id)
+
+            background_tasks.add_task(
+                send_welcome_email,
+                sender_instance=email_sender,
+                to_email=email,
+                role=role.value,
+                **params,
             )
 
         return AdminActionResponse(
