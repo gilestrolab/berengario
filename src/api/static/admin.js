@@ -9,6 +9,10 @@ class AdminPanel {
         this.crawledUrls = [];
         this.backups = [];
         this.sortState = {}; // Track sort state per section
+        this.teamMembers = [];
+        this.teamPage = 1;
+        this.teamPageSize = 20;
+        this.teamSearchDebounceTimer = null;
         this.init();
     }
 
@@ -1408,7 +1412,6 @@ class AdminPanel {
         await Promise.all([
             this.loadTeamMembers(),
             this.loadInviteInfo(),
-            this.loadJoinRequests(),
             this.loadTeamSettings(),
         ]);
         this.setupTeamEventListeners();
@@ -1426,6 +1429,26 @@ class AdminPanel {
 
         const addBtn = document.getElementById('add-team-member-btn');
         if (addBtn) addBtn.addEventListener('click', () => this.addTeamMember());
+
+        // Search and filter listeners
+        const searchInput = document.getElementById('team-search-input');
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                clearTimeout(this.teamSearchDebounceTimer);
+                this.teamSearchDebounceTimer = setTimeout(() => {
+                    this.teamPage = 1;
+                    this.renderTeamMembers();
+                }, 200);
+            });
+        }
+
+        const roleFilter = document.getElementById('team-role-filter');
+        if (roleFilter) {
+            roleFilter.addEventListener('change', () => {
+                this.teamPage = 1;
+                this.renderTeamMembers();
+            });
+        }
 
         const copyBtn = document.getElementById('copy-invite-btn');
         if (copyBtn) copyBtn.addEventListener('click', () => this.copyInviteCode());
@@ -1457,44 +1480,181 @@ class AdminPanel {
 
     async loadTeamMembers() {
         try {
-            const resp = await fetch('/api/admin/team', { credentials: 'include' });
-            const members = await resp.json();
-            this.renderTeamMembers(members);
+            const [membersResp, requestsResp] = await Promise.all([
+                fetch('/api/admin/team', { credentials: 'include' }),
+                fetch('/api/admin/tenant/join-requests', { credentials: 'include' }),
+            ]);
+            const members = await membersResp.json();
+            const requests = await requestsResp.json();
+
+            // Normalize members
+            const normalized = members.map(m => ({
+                ...m,
+                type: 'member',
+            }));
+
+            // Normalize pending join requests
+            const pending = (Array.isArray(requests) ? requests : []).map(r => ({
+                id: r.id,
+                email: r.email,
+                role: 'pending',
+                type: 'pending',
+                created_at: r.created_at,
+            }));
+
+            // Pending first, then members sorted by email
+            this.teamMembers = [
+                ...pending.sort((a, b) => a.email.localeCompare(b.email)),
+                ...normalized.sort((a, b) => a.email.localeCompare(b.email)),
+            ];
+            this.teamPage = 1;
+            this.renderTeamMembers();
         } catch (e) {
             console.error('Failed to load team members:', e);
         }
     }
 
-    renderTeamMembers(members) {
+    getFilteredTeamMembers() {
+        const searchInput = document.getElementById('team-search-input');
+        const roleFilter = document.getElementById('team-role-filter');
+        const searchText = (searchInput?.value || '').toLowerCase();
+        const roleValue = roleFilter?.value || 'all';
+
+        return this.teamMembers.filter(m => {
+            if (searchText && !m.email.toLowerCase().includes(searchText)) return false;
+            if (roleValue !== 'all' && m.role !== roleValue) return false;
+            return true;
+        });
+    }
+
+    renderTeamMembers() {
         const container = document.getElementById('team-members-list');
-        if (!members.length) {
+        const filtered = this.getFilteredTeamMembers();
+        const totalPages = Math.max(1, Math.ceil(filtered.length / this.teamPageSize));
+
+        // Clamp current page
+        if (this.teamPage > totalPages) this.teamPage = totalPages;
+        if (this.teamPage < 1) this.teamPage = 1;
+
+        const start = (this.teamPage - 1) * this.teamPageSize;
+        const pageMembers = filtered.slice(start, start + this.teamPageSize);
+
+        // Update count label
+        const countLabel = document.getElementById('team-member-count');
+        if (countLabel) {
+            const filterActive = filtered.length !== this.teamMembers.length;
+            countLabel.textContent = filterActive
+                ? `${filtered.length} of ${this.teamMembers.length}`
+                : `${this.teamMembers.length}`;
+        }
+
+        if (!this.teamMembers.length) {
             container.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.875rem; padding: 1rem;">No team members</div>';
+            this.renderTeamPagination(0, 0);
             return;
         }
 
-        container.innerHTML = members.map(m => `
-            <div class="team-member-row">
-                <div class="team-member-info">
-                    <span class="team-member-email">${this.escapeHtml(m.email)}</span>
-                    <span class="role-badge role-${m.role}">${m.role}</span>
-                </div>
-                <div class="team-member-actions">
-                    <select class="team-select role-select" data-user-id="${m.id}">
-                        <option value="querier" ${m.role === 'querier' ? 'selected' : ''}>Querier</option>
-                        <option value="teacher" ${m.role === 'teacher' ? 'selected' : ''}>Teacher</option>
-                        <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
-                    </select>
-                    <button class="btn-remove-member" onclick="adminPanel.removeTeamMember(${m.id})" title="Remove member">
-                        <i class="fas fa-trash-alt"></i>
-                    </button>
-                </div>
-            </div>
-        `).join('');
+        if (!filtered.length) {
+            container.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.875rem; padding: 1rem;">No members match filters</div>';
+            this.renderTeamPagination(0, 0);
+            return;
+        }
+
+        container.innerHTML = pageMembers.map(m => {
+            if (m.type === 'pending') {
+                const dateStr = m.created_at ? new Date(m.created_at).toLocaleDateString() : '';
+                return `
+                    <div class="team-member-row">
+                        <div class="team-member-info">
+                            <span class="team-member-email">${this.escapeHtml(m.email)}</span>
+                            <span class="role-badge role-pending">pending</span>
+                            <span class="team-member-date">${dateStr}</span>
+                        </div>
+                        <div class="team-member-actions">
+                            <button class="btn-approve-request" onclick="adminPanel.approveJoinRequest(${m.id})" title="Approve">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button class="btn-reject-request" onclick="adminPanel.rejectJoinRequest(${m.id})" title="Reject">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>`;
+            }
+            return `
+                <div class="team-member-row">
+                    <div class="team-member-info">
+                        <span class="team-member-email">${this.escapeHtml(m.email)}</span>
+                        <span class="role-badge role-${m.role}">${m.role}</span>
+                    </div>
+                    <div class="team-member-actions">
+                        <select class="team-select role-select" data-user-id="${m.id}">
+                            <option value="querier" ${m.role === 'querier' ? 'selected' : ''}>Querier</option>
+                            <option value="teacher" ${m.role === 'teacher' ? 'selected' : ''}>Teacher</option>
+                            <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
+                        </select>
+                        <button class="btn-remove-member" onclick="adminPanel.removeTeamMember(${m.id})" title="Remove member">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                </div>`;
+        }).join('');
 
         // Add change listeners for role selects
         container.querySelectorAll('.role-select').forEach(sel => {
             sel.addEventListener('change', (e) => {
                 this.changeTeamMemberRole(e.target.dataset.userId, e.target.value);
+            });
+        });
+
+        this.renderTeamPagination(totalPages, filtered.length);
+    }
+
+    renderTeamPagination(totalPages, totalFiltered) {
+        const paginationContainer = document.getElementById('team-pagination');
+        if (!paginationContainer) return;
+
+        if (totalPages <= 1) {
+            paginationContainer.innerHTML = '';
+            return;
+        }
+
+        let buttons = '';
+        buttons += `<button class="team-page-btn" data-page="prev" ${this.teamPage <= 1 ? 'disabled' : ''}>&lsaquo;</button>`;
+
+        // Show max 5 page buttons with ellipsis
+        const maxButtons = 5;
+        let startPage = Math.max(1, this.teamPage - Math.floor(maxButtons / 2));
+        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+        if (endPage - startPage < maxButtons - 1) {
+            startPage = Math.max(1, endPage - maxButtons + 1);
+        }
+
+        if (startPage > 1) {
+            buttons += `<button class="team-page-btn" data-page="1">1</button>`;
+            if (startPage > 2) buttons += `<span class="team-page-ellipsis">&hellip;</span>`;
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            buttons += `<button class="team-page-btn ${i === this.teamPage ? 'active' : ''}" data-page="${i}">${i}</button>`;
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) buttons += `<span class="team-page-ellipsis">&hellip;</span>`;
+            buttons += `<button class="team-page-btn" data-page="${totalPages}">${totalPages}</button>`;
+        }
+
+        buttons += `<button class="team-page-btn" data-page="next" ${this.teamPage >= totalPages ? 'disabled' : ''}>&rsaquo;</button>`;
+
+        paginationContainer.innerHTML = buttons;
+
+        // Wire up page button clicks
+        paginationContainer.querySelectorAll('.team-page-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const page = btn.dataset.page;
+                if (page === 'prev') this.teamPage--;
+                else if (page === 'next') this.teamPage++;
+                else this.teamPage = parseInt(page);
+                this.renderTeamMembers();
             });
         });
     }
@@ -1662,43 +1822,6 @@ class AdminPanel {
         }
     }
 
-    async loadJoinRequests() {
-        try {
-            const resp = await fetch('/api/admin/tenant/join-requests', { credentials: 'include' });
-            const requests = await resp.json();
-            this.renderJoinRequests(requests);
-        } catch (e) {
-            console.error('Failed to load join requests:', e);
-        }
-    }
-
-    renderJoinRequests(requests) {
-        const container = document.getElementById('join-requests-list');
-        if (!requests.length) {
-            container.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.875rem; padding: 1rem;">No pending requests</div>';
-            return;
-        }
-
-        container.innerHTML = requests.map(r => `
-            <div class="team-item" style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <strong>${this.escapeHtml(r.email)}</strong>
-                    <span style="margin-left: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
-                        ${new Date(r.created_at).toLocaleDateString()}
-                    </span>
-                </div>
-                <div style="display: flex; gap: 0.5rem;">
-                    <button class="action-btn" onclick="adminPanel.approveJoinRequest(${r.id})" title="Approve" style="color: var(--success-color, #4A8C6F);">
-                        <i class="fas fa-check"></i>
-                    </button>
-                    <button class="action-btn delete-btn" onclick="adminPanel.rejectJoinRequest(${r.id})" title="Reject">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-        `).join('');
-    }
-
     async approveJoinRequest(requestId) {
         try {
             const resp = await fetch(`/api/admin/tenant/join-requests/${requestId}/approve`, {
@@ -1709,7 +1832,6 @@ class AdminPanel {
 
             if (data.success) {
                 this.showToast(data.message, 'success');
-                await this.loadJoinRequests();
                 await this.loadTeamMembers();
             } else {
                 this.showToast(data.message, 'error');
@@ -1731,7 +1853,7 @@ class AdminPanel {
 
             if (data.success) {
                 this.showToast(data.message, 'success');
-                await this.loadJoinRequests();
+                await this.loadTeamMembers();
             } else {
                 this.showToast(data.message, 'error');
             }
