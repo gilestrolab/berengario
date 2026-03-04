@@ -54,7 +54,7 @@ Berengario is a flexible infrastructure that combines document processing, vecto
 - **Multi-Tenancy** (optional): Isolated per-tenant databases, storage, and email routing
 - **Auto-monitoring**: Watch folders for automatic document updates
 - **Source Citations**: All responses include source references
-- **Flexible Storage**: SQLite or MariaDB for tracking; local filesystem or S3/MinIO for documents
+- **Flexible Storage**: MariaDB for tracking; local filesystem or S3/MinIO for documents
 
 ## Quick Start
 
@@ -65,7 +65,7 @@ Berengario is a flexible infrastructure that combines document processing, vecto
 ```bash
 # Clone the repository
 git clone https://github.com/gilestrolab/berengar.io.git
-cd RAGInbox
+cd berengar.io
 
 # Copy and configure environment
 cp .env.example .env
@@ -90,7 +90,7 @@ docker pull ghcr.io/gilestrolab/berengar.io:latest
 ```bash
 # Clone the repository
 git clone https://github.com/gilestrolab/berengar.io.git
-cd RAGInbox
+cd berengar.io
 
 # Create virtual environment
 python -m venv .venv
@@ -123,7 +123,7 @@ OPENAI_API_BASE=https://api.openai.com/v1  # or https://api.naga.ac/v1
 # Run web service with Docker Compose
 docker-compose up -d
 
-# Access the web interface at http://localhost:8000
+# Access the web interface at http://localhost:8090
 # Login with your registered email to receive an OTP code
 ```
 
@@ -154,12 +154,15 @@ docker exec berengario-web berengario-cli kb stats             # Show KB statist
 docker exec berengario-web berengario-cli kb reingest          # Reingest all documents
 docker exec berengario-web berengario-cli kb delete <hash>     # Delete a specific document
 docker exec berengario-web berengario-cli kb clear             # Clear entire KB (confirmation required)
+docker exec berengario-web berengario-cli kb regenerate-descriptions  # Regenerate document descriptions via LLM
+docker exec berengario-web berengario-cli kb query "<text>"   # Query the knowledge base directly
 
 # Database operations
 docker exec berengario-web berengario-cli db init              # Initialize database tables
 docker exec berengario-web berengario-cli db test              # Test database connection
 docker exec berengario-web berengario-cli db info              # Show database configuration
 docker exec berengario-web berengario-cli db stats             # Show processing statistics
+docker exec berengario-web berengario-cli db cleanup           # Clean up old database records
 
 # Backup operations
 docker exec berengario-web berengario-cli backup create        # Create a new backup
@@ -188,6 +191,9 @@ python run_email_service.py
 
 # Run web service (chat interface with authentication)
 python run_web_service.py
+
+# Run platform admin (multi-tenant deployments only)
+python run_platform_admin.py
 
 # Or use Docker Compose to run everything
 docker-compose up -d
@@ -224,7 +230,7 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
    - Role-based access control with TenantUser lookup
    - Attachment handler with file type validation
    - Conversation manager with Q&A tracking
-   - Message tracking (SQLite/MariaDB)
+   - Message tracking (MariaDB)
    - Email service daemon with auto-reconnection
    - Tenant email routing (multi-tenancy)
 
@@ -253,7 +259,7 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 - **ChromaDB**: Vector database
 - **FastAPI**: Web API and authentication
 - **Uvicorn**: ASGI web server
-- **SQLAlchemy**: Database ORM (SQLite/MariaDB)
+- **SQLAlchemy**: Database ORM (MariaDB)
 - **Typer + Rich**: CLI framework
 - **OpenAI-compatible APIs**: Naga.ac, OpenAI, OpenRouter
 
@@ -266,7 +272,7 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 | `INSTANCE_NAME` | Name of your assistant | `Berengario` |
 | `INSTANCE_DESCRIPTION` | Purpose description | `AI assistant for...` |
 | `ORGANIZATION` | Organization name | `My Organization` |
-| `WEB_BASE_URL` | Base URL for web interface | `http://localhost:8000` |
+| `WEB_BASE_URL` | Base URL for web interface | `http://localhost:8090` |
 
 ### API Settings
 
@@ -365,7 +371,7 @@ See [`.env.example`](.env.example) for complete configuration options including 
 ### Project Structure
 
 ```
-RAGInbox/
+berengar.io/
 ├── .github/
 │   └── workflows/                        # CI/CD pipelines
 │       ├── ci.yml                        # Testing and linting
@@ -390,7 +396,6 @@ RAGInbox/
 │   │       ├── base.py                   # Tool registry and base classes
 │   │       ├── tool_executor.py          # Tool execution engine
 │   │       ├── context.py                # Execution context management
-│   │       ├── pending_actions.py        # Pending action tracking
 │   │       ├── calendar_tools.py         # Calendar event creation (.ics)
 │   │       ├── export_tools.py           # CSV, JSON, text file export
 │   │       ├── web_search_tools.py       # Web search via DuckDuckGo
@@ -406,7 +411,7 @@ RAGInbox/
 │   │   ├── email_service.py              # Background daemon with auto-reconnection
 │   │   ├── conversation_manager.py       # Message history with Q&A tracking
 │   │   ├── message_tracker.py            # Deduplication tracking
-│   │   ├── db_manager.py                 # Database abstraction (SQLite/MariaDB)
+│   │   ├── db_manager.py                 # Database abstraction (MariaDB)
 │   │   ├── db_models.py                  # SQLAlchemy models
 │   │   └── tenant_email_router.py        # Multi-tenant email routing
 │   ├── api/
@@ -415,6 +420,7 @@ RAGInbox/
 │   │   ├── auth/                         # Authentication
 │   │   │   ├── dependencies.py           # FastAPI dependency injection
 │   │   │   ├── otp_manager.py            # One-time password handling
+│   │   │   ├── otp_email.py             # Shared OTP email delivery helper
 │   │   │   └── session_manager.py        # Session management
 │   │   ├── admin/                        # Admin panel utilities
 │   │   │   ├── document_manager.py       # Document management
@@ -429,7 +435,8 @@ RAGInbox/
 │   │   │   ├── feedback.py               # Response feedback
 │   │   │   ├── onboarding.py             # Tenant onboarding flow
 │   │   │   ├── team.py                   # Team management (MT)
-│   │   │   └── tenant_admin.py           # Tenant admin (MT)
+│   │   │   ├── tenant_admin.py           # Tenant admin (MT)
+│   │   │   └── helpers.py                # Shared route helpers
 │   │   └── static/                       # Frontend files
 │   │       ├── index.html                # Chat interface
 │   │       ├── app.js                    # Chat app logic
@@ -438,6 +445,7 @@ RAGInbox/
 │   │       ├── admin.html / admin.js     # Admin panel
 │   │       ├── admin-usage.js            # Usage analytics
 │   │       ├── admin-feedback.js         # Feedback analytics
+│   │       ├── admin-kb-health.js       # KB health analytics panel
 │   │       ├── feedback.html / feedback.js # Feedback interface
 │   │       ├── onboarding.html / onboarding.js # Tenant onboarding
 │   │       ├── style.css                 # Chat styles
@@ -451,7 +459,19 @@ RAGInbox/
 │   │   ├── provisioning.py               # Tenant provisioning with rollback
 │   │   ├── component_factory.py          # Per-tenant component creation
 │   │   ├── component_resolver.py         # ST/MT routing bridge
-│   │   └── db_session_adapter.py         # Database session adapter
+│   │   ├── db_session_adapter.py         # Database session adapter
+│   │   └── bootstrap.py                  # Platform init and default tenant auto-provisioning
+│   ├── platform_admin/                   # Platform admin (multi-tenancy)
+│   │   ├── app.py                        # Standalone FastAPI app
+│   │   ├── models.py                     # Request/response models
+│   │   ├── routes/
+│   │   │   ├── auth.py                   # OTP auth for platform admins
+│   │   │   ├── tenants.py                # Tenant CRUD and user management
+│   │   │   └── health.py                 # Platform health endpoint
+│   │   └── static/
+│   │       ├── login.html                # Platform admin login
+│   │       ├── index.html                # Platform admin dashboard
+│   │       └── platform-admin.js         # Dashboard logic
 │   └── cli/
 │       ├── main.py                       # CLI entry point (Typer)
 │       ├── utils.py                      # CLI utilities (Rich formatting)
@@ -474,8 +494,7 @@ RAGInbox/
 │   │   └── admin_audit.log               # Admin actions audit log
 │   ├── backups/                          # Data backups (ZIP files)
 │   ├── temp_attachments/                 # Temporary email attachments
-│   ├── tenants/                          # Per-tenant data (multi-tenancy)
-│   └── message_tracker.db                # Email processing tracking (SQLite)
+│   └── tenants/                          # Per-tenant data (multi-tenancy)
 ├── docs/                                 # Documentation
 │   ├── QUICKSTART.md                     # Quick start guide
 │   ├── CLI.md                            # CLI usage documentation
@@ -489,6 +508,8 @@ RAGInbox/
 ├── docker-compose.yml                    # Docker Compose configuration
 ├── pyproject.toml                        # Package configuration
 ├── .env.example                          # Environment configuration template
+├── run_platform_admin.py                 # Platform admin entry point (multi-tenancy)
+├── run_migration.py                      # Database migration runner
 ├── PLANNING.md                           # Architecture documentation
 └── README.md                             # This file
 ```
@@ -508,7 +529,6 @@ Berengario includes comprehensive email integration for automatic knowledge base
 - TenantUser lookup determines who can add content via CC/BCC/forwarding
 - TenantUser lookup determines who can ask questions and get RAG replies
 - Users can have one role, multiple roles, or none
-- Support for domain wildcards (`@example.com`)
 - Database-backed configuration via team management
 
 **Query Response Features:**
@@ -568,7 +588,7 @@ Berengario includes a comprehensive admin panel for managing your instance:
 
 1. **Team Management**
    - Add/remove users with query, teacher, and admin roles
-   - Support for email addresses and domain wildcards
+   - Support for email addresses
    - Real-time access control updates without service restart
 
 2. **Document Management**
@@ -600,7 +620,7 @@ Berengario includes a comprehensive admin panel for managing your instance:
 **Configuration:**
 ```bash
 # .env
-WEB_BASE_URL=http://localhost:8000  # Used in backup notification emails
+WEB_BASE_URL=http://localhost:8090  # Used in backup notification emails
 ```
 
 Admin access is managed via TenantUser roles in the team management interface.
@@ -833,7 +853,7 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 - **[CLI.md](docs/CLI.md)** - CLI administration tool documentation
 - **[DATA_STRUCTURE.md](docs/DATA_STRUCTURE.md)** - Data directory structure and Docker volumes
 - **[EMAIL_PROCESSING_RULES.md](docs/EMAIL_PROCESSING_RULES.md)** - Email processing logic and decision tree
-- **[DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md)** - Database abstraction layer (SQLite/MariaDB)
+- **[DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md)** - Database abstraction layer (MariaDB)
 - **[MULTI_TENANCY.md](docs/MULTI_TENANCY.md)** - Multi-tenancy deployment guide
 - **[PRE_COMMIT_HOOK.md](docs/PRE_COMMIT_HOOK.md)** - Pre-commit hook setup and troubleshooting
 - **[EMAIL_AUTH_ISSUE.md](docs/EMAIL_AUTH_ISSUE.md)** - Office 365 authentication troubleshooting
