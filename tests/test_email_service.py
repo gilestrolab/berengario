@@ -32,7 +32,8 @@ class TestEmailServiceInitialization:
 
     def test_init_with_defaults(self):
         """Test initialization with default parameters."""
-        with patch("src.email.email_service.EmailProcessor"):
+        mock_proc = MagicMock()
+        with patch.object(EmailService, "_create_processor", return_value=mock_proc):
             service = EmailService()
 
             assert service.check_interval > 0
