@@ -322,9 +322,14 @@ class Settings(BaseSettings):
     s3_access_key: str = Field(default="", description="S3 access key ID")
     s3_secret_key: str = Field(default="", description="S3 secret access key")
     s3_region: str = Field(default="us-east-1", description="S3 region")
+    s3_bucket_name: str = Field(
+        default="",
+        description="Single S3 bucket name (tenant data separated by key prefixes). "
+        "If set, overrides s3_bucket_prefix.",
+    )
     s3_bucket_prefix: str = Field(
         default="berengario-tenant-",
-        description="Prefix for per-tenant S3 buckets",
+        description="Prefix for per-tenant S3 buckets (ignored if s3_bucket_name is set)",
     )
 
     # Platform Admin

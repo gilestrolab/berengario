@@ -153,8 +153,8 @@ class TestLocalStorageBackend:
 
 
 @pytest.mark.skipif(not HAS_BOTO3, reason="boto3 not installed (optional dependency)")
-class TestS3StorageBackend:
-    """Tests for S3StorageBackend (mocked boto3)."""
+class TestS3StorageBackendPerTenant:
+    """Tests for S3StorageBackend in per-tenant bucket mode (mocked boto3)."""
 
     @pytest.fixture
     def s3_setup(self):
@@ -166,6 +166,7 @@ class TestS3StorageBackend:
             mock_settings.s3_access_key = "test-key"
             mock_settings.s3_secret_key = "test-secret"
             mock_settings.s3_region = "us-east-1"
+            mock_settings.s3_bucket_name = ""
             mock_settings.s3_bucket_prefix = "berengario-tenant-"
 
             with patch("boto3.client") as mock_client_cls:
@@ -174,7 +175,7 @@ class TestS3StorageBackend:
                 yield S3Cls, mock_client
 
     def _make_storage(self, s3_setup):
-        """Create an S3StorageBackend from the fixture."""
+        """Create an S3StorageBackend in per-tenant mode."""
         cls, _ = s3_setup
         return cls(
             endpoint_url="http://localhost:9000",
@@ -261,6 +262,195 @@ class TestS3StorageBackend:
         mock_client.create_bucket.assert_called_once_with(
             Bucket="berengario-tenant-acme"
         )
+
+
+@pytest.mark.skipif(not HAS_BOTO3, reason="boto3 not installed (optional dependency)")
+class TestS3StorageBackendSingleBucket:
+    """Tests for S3StorageBackend in single-bucket mode (mocked boto3)."""
+
+    @pytest.fixture
+    def s3_setup(self):
+        """Mock boto3 and provide S3StorageBackend class for single-bucket tests."""
+        from src.platform.storage import S3StorageBackend as S3Cls  # noqa: N813
+
+        with patch("src.platform.storage.settings") as mock_settings:
+            mock_settings.s3_endpoint_url = "http://localhost:9000"
+            mock_settings.s3_access_key = "test-key"
+            mock_settings.s3_secret_key = "test-secret"
+            mock_settings.s3_region = "us-east-1"
+            mock_settings.s3_bucket_name = "berengario-storage"
+            mock_settings.s3_bucket_prefix = "berengario-tenant-"
+
+            with patch("boto3.client") as mock_client_cls:
+                mock_client = MagicMock()
+                mock_client_cls.return_value = mock_client
+                yield S3Cls, mock_client
+
+    def _make_storage(self, s3_setup):
+        """Create an S3StorageBackend in single-bucket mode."""
+        cls, _ = s3_setup
+        return cls(
+            endpoint_url="http://localhost:9000",
+            access_key="test",
+            secret_key="test",
+            bucket_name="berengario-storage",
+        )
+
+    def test_bucket_name_is_fixed(self, s3_setup):
+        """Test that bucket name is always the single bucket regardless of tenant."""
+        storage = self._make_storage(s3_setup)
+
+        assert storage._bucket_name("acme") == "berengario-storage"
+        assert storage._bucket_name("imperial-dols") == "berengario-storage"
+
+    def test_object_key_prefixed_with_tenant(self, s3_setup):
+        """Test that object keys are prefixed with tenant slug."""
+        storage = self._make_storage(s3_setup)
+
+        assert storage._object_key("acme", "docs/test.pdf") == "acme/docs/test.pdf"
+
+    def test_put_uses_tenant_prefix(self, s3_setup):
+        """Test storing a file uses tenant-prefixed key in single bucket."""
+        _, mock_client = s3_setup
+        storage = self._make_storage(s3_setup)
+
+        result = storage.put("acme", "docs/test.pdf", b"pdf-data")
+
+        mock_client.put_object.assert_called_once_with(
+            Bucket="berengario-storage",
+            Key="acme/docs/test.pdf",
+            Body=b"pdf-data",
+        )
+        assert result == "docs/test.pdf"
+
+    def test_get_uses_tenant_prefix(self, s3_setup):
+        """Test retrieving a file uses tenant-prefixed key."""
+        _, mock_client = s3_setup
+        storage = self._make_storage(s3_setup)
+
+        mock_body = MagicMock()
+        mock_body.read.return_value = b"file-content"
+        mock_client.get_object.return_value = {"Body": mock_body}
+
+        result = storage.get("acme", "file.txt")
+
+        assert result == b"file-content"
+        mock_client.get_object.assert_called_once_with(
+            Bucket="berengario-storage",
+            Key="acme/file.txt",
+        )
+
+    def test_delete_uses_tenant_prefix(self, s3_setup):
+        """Test deleting a file uses tenant-prefixed key."""
+        _, mock_client = s3_setup
+        storage = self._make_storage(s3_setup)
+
+        storage.delete("acme", "file.txt")
+
+        mock_client.delete_object.assert_called_once_with(
+            Bucket="berengario-storage",
+            Key="acme/file.txt",
+        )
+
+    def test_exists_uses_tenant_prefix(self, s3_setup):
+        """Test exists check uses tenant-prefixed key."""
+        _, mock_client = s3_setup
+        storage = self._make_storage(s3_setup)
+
+        storage.exists("acme", "file.txt")
+
+        mock_client.head_object.assert_called_once_with(
+            Bucket="berengario-storage",
+            Key="acme/file.txt",
+        )
+
+    def test_list_keys_scoped_to_tenant(self, s3_setup):
+        """Test listing keys only returns keys for the specified tenant."""
+        _, mock_client = s3_setup
+        storage = self._make_storage(s3_setup)
+
+        paginator = MagicMock()
+        mock_client.get_paginator.return_value = paginator
+        paginator.paginate.return_value = [
+            {
+                "Contents": [
+                    {"Key": "acme/docs/a.txt"},
+                    {"Key": "acme/docs/b.txt"},
+                ]
+            }
+        ]
+
+        keys = storage.list_keys("acme", prefix="docs")
+
+        paginator.paginate.assert_called_once_with(
+            Bucket="berengario-storage",
+            Prefix="acme/docs",
+        )
+        assert keys == ["docs/a.txt", "docs/b.txt"]
+
+    def test_list_keys_no_prefix(self, s3_setup):
+        """Test listing all keys for a tenant without prefix filter."""
+        _, mock_client = s3_setup
+        storage = self._make_storage(s3_setup)
+
+        paginator = MagicMock()
+        mock_client.get_paginator.return_value = paginator
+        paginator.paginate.return_value = [
+            {
+                "Contents": [
+                    {"Key": "acme/file1.txt"},
+                    {"Key": "acme/docs/file2.pdf"},
+                ]
+            }
+        ]
+
+        keys = storage.list_keys("acme")
+
+        paginator.paginate.assert_called_once_with(
+            Bucket="berengario-storage",
+            Prefix="acme/",
+        )
+        assert keys == ["docs/file2.pdf", "file1.txt"]
+
+    def test_ensure_tenant_storage_creates_shared_bucket(self, s3_setup):
+        """Test that ensure_tenant_storage creates the shared bucket if missing."""
+        _, mock_client = s3_setup
+        storage = self._make_storage(s3_setup)
+
+        mock_client.head_bucket.side_effect = Exception("Not found")
+
+        storage.ensure_tenant_storage("acme")
+
+        mock_client.create_bucket.assert_called_once_with(
+            Bucket="berengario-storage"
+        )
+
+    def test_delete_tenant_data_only_deletes_tenant_prefix(self, s3_setup):
+        """Test that deleting tenant data only removes objects under tenant prefix."""
+        _, mock_client = s3_setup
+        storage = self._make_storage(s3_setup)
+
+        paginator = MagicMock()
+        mock_client.get_paginator.return_value = paginator
+        paginator.paginate.return_value = [
+            {
+                "Contents": [
+                    {"Key": "acme/file1.txt"},
+                    {"Key": "acme/docs/file2.pdf"},
+                ]
+            }
+        ]
+
+        storage.delete_tenant_data("acme")
+
+        # Should list with tenant prefix
+        paginator.paginate.assert_called_once_with(
+            Bucket="berengario-storage",
+            Prefix="acme/",
+        )
+        # Should delete only tenant objects, NOT the bucket itself
+        mock_client.delete_objects.assert_called_once()
+        mock_client.delete_bucket.assert_not_called()
 
 
 class TestCreateStorageBackend:
