@@ -255,7 +255,7 @@ class JoinRequestActionResponse(BaseModel):
 class TeamMemberRequest(BaseModel):
     """Request model for adding/updating team members."""
 
-    email: EmailStr
+    email: Optional[EmailStr] = None
     role: str  # "admin", "teacher", "querier"
 
 

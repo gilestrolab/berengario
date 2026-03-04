@@ -89,6 +89,9 @@ def create_team_router(
         if not session.tenant_id:
             raise HTTPException(status_code=400, detail="No active tenant selected.")
 
+        if not request.email:
+            raise HTTPException(status_code=400, detail="Email is required.")
+
         from src.platform.models import TenantUser, TenantUserRole
 
         # Validate role
@@ -202,18 +205,19 @@ def create_team_router(
                 raise HTTPException(status_code=404, detail="Team member not found.")
 
             old_role = user.role.value if hasattr(user.role, "value") else user.role
+            email = user.email
             user.role = role
             db_session.commit()
 
             logger.info(
-                f"Admin {session.email} changed {user.email} role "
+                f"Admin {session.email} changed {email} role "
                 f"from {old_role} to {role.value} in tenant {session.tenant_slug}"
             )
 
         return AdminActionResponse(
             success=True,
-            message=f"Updated {user.email} role to {role.value}",
-            details={"email": user.email, "old_role": old_role, "new_role": role.value},
+            message=f"Updated {email} role to {role.value}",
+            details={"email": email, "old_role": old_role, "new_role": role.value},
         )
 
     @router.delete("/{user_id}", response_model=AdminActionResponse)
