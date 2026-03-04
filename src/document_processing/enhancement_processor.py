@@ -221,6 +221,47 @@ Q&A Pairs:"""
             logger.error(f"Error generating Q&A pairs: {e}")
             raise
 
+    @staticmethod
+    def generate_contextual_header(
+        filename: str,
+        file_type: str,
+        source_type: str = "file",
+        extra_metadata: Optional[Dict] = None,
+    ) -> str:
+        """
+        Generate a contextual header string for a document chunk.
+
+        Prepended to each chunk before embedding to improve retrieval accuracy
+        by providing document-level context.
+
+        Args:
+            filename: Name of the source file.
+            file_type: File extension (e.g., '.pdf', '.docx').
+            source_type: Source of the document ('manual', 'email', 'web').
+            extra_metadata: Additional metadata (subject, sender, etc.).
+
+        Returns:
+            Contextual header string.
+        """
+        header_parts = [f"Document: {filename}"]
+
+        if source_type == "web":
+            source_url = (extra_metadata or {}).get("source_url")
+            if source_url:
+                header_parts.append(f"Source: {source_url}")
+            else:
+                header_parts.append("Source: Web page")
+        elif source_type == "email":
+            if extra_metadata:
+                if extra_metadata.get("subject"):
+                    header_parts.append(f"Email subject: {extra_metadata['subject']}")
+                if extra_metadata.get("sender"):
+                    header_parts.append(f"From: {extra_metadata['sender']}")
+
+        header_parts.append(f"Type: {file_type.lstrip('.')}")
+
+        return " | ".join(header_parts)
+
     def should_enhance(self, file_type: str) -> bool:
         """
         Determine if a file should be enhanced based on type.

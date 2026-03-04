@@ -520,6 +520,12 @@ class DocumentProcessor:
             # Split into chunks
             nodes = self.splitter.get_nodes_from_documents([document])
 
+            # Prepend contextual headers to each chunk for improved retrieval
+            if settings.contextual_enrichment_enabled:
+                self._add_contextual_headers(
+                    nodes, file_path.name, file_type, source_type, extra_metadata
+                )
+
             logger.info(
                 f"Successfully processed {file_path.name}: {len(nodes)} chunks created"
             )
@@ -609,6 +615,16 @@ class DocumentProcessor:
                 # Split into chunks
                 nodes = self.splitter.get_nodes_from_documents([document])
 
+                # Prepend contextual headers for web content
+                if settings.contextual_enrichment_enabled:
+                    self._add_contextual_headers(
+                        nodes,
+                        f"Web: {page_url[:100]}",
+                        ".html",
+                        "web",
+                        {**(extra_metadata or {}), "source_url": page_url},
+                    )
+
                 all_nodes.extend(nodes)
 
                 logger.info(
@@ -624,6 +640,37 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Failed to process URL {url}: {e}")
             raise
+
+    def _add_contextual_headers(
+        self,
+        nodes: List[TextNode],
+        filename: str,
+        file_type: str,
+        source_type: str,
+        extra_metadata: Optional[Dict] = None,
+    ) -> None:
+        """
+        Prepend contextual headers to each chunk node in-place.
+
+        Args:
+            nodes: List of TextNode objects to modify.
+            filename: Source filename.
+            file_type: File extension.
+            source_type: Source type ('manual', 'email', 'web').
+            extra_metadata: Additional metadata for header.
+        """
+        from src.document_processing.enhancement_processor import (
+            EnhancementProcessor,
+        )
+
+        header = EnhancementProcessor.generate_contextual_header(
+            filename=filename,
+            file_type=file_type,
+            source_type=source_type,
+            extra_metadata=extra_metadata,
+        )
+        for node in nodes:
+            node.text = f"{header}\n\n{node.text}"
 
     def process_directory(
         self,

@@ -204,6 +204,31 @@ class Settings(BaseSettings):
         description="API timeout for query optimization in seconds",
     )
 
+    # Reranking Configuration (Cohere API)
+    reranking_enabled: bool = Field(
+        default=True, description="Enable Cohere reranking of retrieved chunks"
+    )
+    cohere_api_key: str = Field(default="", description="Cohere API key for reranking")
+    reranking_model: str = Field(
+        default="rerank-v3.5", description="Cohere reranking model"
+    )
+    reranking_top_n: Optional[int] = Field(
+        default=None,
+        description="Override top_n for reranker (defaults to top_k_retrieval)",
+    )
+
+    # Hybrid Search Configuration
+    hybrid_search_enabled: bool = Field(
+        default=True,
+        description="Enable BM25 + vector hybrid search with Reciprocal Rank Fusion",
+    )
+
+    # Contextual Enrichment Configuration
+    contextual_enrichment_enabled: bool = Field(
+        default=True,
+        description="Enable contextual headers on all document chunks",
+    )
+
     # Document Enhancement Configuration
     doc_enhancement_enabled: bool = Field(
         default=True,

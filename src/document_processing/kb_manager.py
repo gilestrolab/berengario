@@ -11,6 +11,7 @@ from typing import List, Optional
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 from llama_index.core import StorageContext, VectorStoreIndex
+from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.schema import TextNode
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
@@ -672,9 +673,48 @@ class KnowledgeBaseManager:
             logger.error(f"Failed to clear knowledge base: {e}")
             raise
 
+    def _build_bm25_retriever(self, top_k: int):
+        """
+        Build a BM25 retriever from all ChromaDB documents.
+
+        Loads all stored chunks into memory for keyword-based retrieval.
+
+        Args:
+            top_k: Number of top results to retrieve.
+
+        Returns:
+            BM25Retriever instance, or None if no documents exist.
+        """
+        try:
+            results = self.collection.get(include=["documents", "metadatas"])
+
+            if not results["ids"]:
+                logger.info("No documents in collection — skipping BM25 retriever")
+                return None
+
+            nodes = [
+                TextNode(id_=id_, text=text, metadata=meta or {})
+                for id_, text, meta in zip(
+                    results["ids"], results["documents"], results["metadatas"]
+                )
+            ]
+
+            from llama_index.retrievers.bm25 import BM25Retriever
+
+            retriever = BM25Retriever.from_defaults(nodes=nodes, similarity_top_k=top_k)
+            logger.info(f"BM25 retriever built with {len(nodes)} nodes")
+            return retriever
+
+        except Exception as e:
+            logger.warning(f"Failed to build BM25 retriever: {e}")
+            return None
+
     def get_query_engine(self, top_k: Optional[int] = None, llm=None):
         """
         Get a query engine for the knowledge base.
+
+        Supports hybrid search (BM25 + vector with Reciprocal Rank Fusion)
+        and Cohere reranking when enabled.
 
         Args:
             top_k: Number of top results to retrieve (default from settings).
@@ -685,13 +725,61 @@ class KnowledgeBaseManager:
         """
         k = top_k or settings.top_k_retrieval
 
-        # Use tree_summarize mode to avoid refinement-style responses
-        # This hierarchically combines chunks without iterative refinement
-        query_engine = self.index.as_query_engine(
-            similarity_top_k=k,
-            embed_model=self.embed_model,
+        # Over-fetch when reranking is active so the reranker has a diverse pool
+        has_reranking = settings.reranking_enabled and settings.cohere_api_key
+        retrieval_k = k * 3 if has_reranking else k
+
+        # --- Build retriever (hybrid or vector-only) ---
+        vector_retriever = self.index.as_retriever(
+            similarity_top_k=retrieval_k, embed_model=self.embed_model
+        )
+
+        if settings.hybrid_search_enabled:
+            bm25_retriever = self._build_bm25_retriever(top_k=retrieval_k)
+            if bm25_retriever:
+                from llama_index.core.retrievers import QueryFusionRetriever
+
+                retriever = QueryFusionRetriever(
+                    [vector_retriever, bm25_retriever],
+                    similarity_top_k=retrieval_k,
+                    num_queries=1,  # Don't generate extra queries (QueryOptimizer handles that)
+                    mode="reciprocal_rerank",
+                )
+                logger.info("Hybrid search enabled: BM25 + vector with RRF")
+            else:
+                retriever = vector_retriever
+        else:
+            retriever = vector_retriever
+
+        # --- Build postprocessors (reranking) ---
+        postprocessors = []
+
+        if has_reranking:
+            try:
+                from llama_index.postprocessor.cohere_rerank import CohereRerank
+
+                reranker = CohereRerank(
+                    api_key=settings.cohere_api_key,
+                    model=settings.reranking_model,
+                    top_n=settings.reranking_top_n or k,
+                )
+                postprocessors.append(reranker)
+                logger.info(
+                    f"Cohere reranking enabled: model={settings.reranking_model}, top_n={settings.reranking_top_n or k}"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to initialize Cohere reranker: {e}")
+        elif settings.reranking_enabled:
+            logger.warning(
+                "Reranking enabled but COHERE_API_KEY not set — skipping reranking"
+            )
+
+        # --- Build query engine ---
+        query_engine = RetrieverQueryEngine.from_args(
+            retriever,
             llm=llm,
             response_mode="tree_summarize",
+            node_postprocessors=postprocessors or None,
         )
 
         return query_engine
