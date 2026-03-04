@@ -117,7 +117,7 @@ def create_analytics_router(
     # ============================================================================
 
     @router.get("/usage/analytics", response_model=UsageAnalyticsResponse)
-    async def get_usage_analytics(
+    def get_usage_analytics(
         days: Optional[int] = None,
         session=Depends(require_admin),
     ):
@@ -152,7 +152,7 @@ def create_analytics_router(
             )
 
     @router.get("/usage/user/{sender}", response_model=UserQueriesResponse)
-    async def get_user_queries(
+    def get_user_queries(
         sender: str,
         days: Optional[int] = None,
         limit: Optional[int] = 100,
@@ -199,7 +199,7 @@ def create_analytics_router(
     # ============================================================================
 
     @router.get("/analytics/optimization")
-    async def get_optimization_analytics(
+    def get_optimization_analytics(
         days: Optional[int] = None,
         session=Depends(require_admin),
     ):
@@ -254,7 +254,7 @@ def create_analytics_router(
     # ============================================================================
 
     @router.get("/analytics/sources")
-    async def get_source_analytics(
+    def get_source_analytics(
         days: Optional[int] = None,
         session=Depends(require_admin),
     ):
@@ -300,7 +300,7 @@ def create_analytics_router(
     # ============================================================================
 
     @router.get("/feedback/analytics", response_model=FeedbackAnalyticsResponse)
-    async def get_feedback_analytics(
+    def get_feedback_analytics(
         days: Optional[int] = None,
         session=Depends(require_admin),
     ):
@@ -431,7 +431,7 @@ def create_analytics_router(
     # ============================================================================
 
     @router.post("/usage/topics", response_model=TopicClusteringResponse)
-    async def cluster_query_topics(
+    def cluster_query_topics(
         days: Optional[int] = 30,
         session=Depends(require_admin),
     ):
@@ -510,7 +510,7 @@ def create_analytics_router(
     # ============================================================================
 
     @router.get("/kb/health")
-    async def get_kb_health(
+    def get_kb_health(
         days: Optional[int] = None,
         session=Depends(require_admin),
     ):

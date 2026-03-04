@@ -1299,6 +1299,10 @@
                 flex-shrink: 0;
             }
 
+            .settings-form-row {
+                flex-direction: column;
+            }
+
             /* Team controls - stack on mobile */
             .team-controls {
                 flex-direction: column;
@@ -1936,6 +1940,16 @@
             color: var(--text-secondary, #8C8279);
         }
 
+        .settings-form-row {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .settings-form-row .form-group {
+            flex: 1;
+            min-width: 0;
+        }
+
         .settings-form .form-group {
             margin-bottom: 1rem;
         }
@@ -2048,25 +2062,27 @@
                 <p class="section-description">Manage your team's details and disambiguation email.</p>
 
                 <div class="settings-form">
-                    <div class="form-group">
-                        <label for="team-name-input">Team Name</label>
-                        <input type="text" id="team-name-input" readonly
-                            title="Team name is set during provisioning">
-                    </div>
-                    <div class="form-group">
-                        <label for="team-org-input">Organization</label>
-                        <input type="text" id="team-org-input" placeholder="Organization name">
+                    <div class="settings-form-row">
+                        <div class="form-group">
+                            <label for="team-name-input">Team Name</label>
+                            <input type="text" id="team-name-input" readonly
+                                title="Team name is set during provisioning">
+                        </div>
+                        <div class="form-group">
+                            <label for="team-org-input">Organization</label>
+                            <input type="text" id="team-org-input" placeholder="Organization name">
+                        </div>
+                        <div class="form-group">
+                            <label for="team-slug-input">Slug
+                                <small>(<code><span id="slug-email-preview">slug</span>@berengar.io</code>)</small>
+                            </label>
+                            <input type="text" id="team-slug-input" placeholder="my-team">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="team-desc-input">Description</label>
-                        <textarea id="team-desc-input" rows="3"
+                        <textarea id="team-desc-input" rows="2"
                             placeholder="Describe what this team's knowledge base is about..."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="team-slug-input">Slug
-                            <small>(determines your email: <code><span id="slug-email-preview">slug</span>@berengar.io</code>)</small>
-                        </label>
-                        <input type="text" id="team-slug-input" placeholder="my-team">
                     </div>
                     <button class="save-btn" id="save-team-settings-btn">
                         <i class="fas fa-save"></i> Save Settings

@@ -49,7 +49,7 @@ def create_tenant_admin_router(
     )
 
     @router.get("/details")
-    async def get_tenant_details(admin_session=Depends(require_admin)):
+    def get_tenant_details(admin_session=Depends(require_admin)):
         """Get tenant details for the settings form."""
 
         from src.platform.models import Tenant
@@ -72,7 +72,7 @@ def create_tenant_admin_router(
             }
 
     @router.get("/invite")
-    async def get_invite_info(admin_session=Depends(require_admin)):
+    def get_invite_info(admin_session=Depends(require_admin)):
         """Get invite code and join settings for the current tenant."""
 
         from src.platform.models import Tenant
@@ -93,7 +93,7 @@ def create_tenant_admin_router(
             }
 
     @router.post("/invite/regenerate")
-    async def regenerate_invite_code(admin_session=Depends(require_admin)):
+    def regenerate_invite_code(admin_session=Depends(require_admin)):
         """Generate a new invite code, invalidating the old one."""
 
         from src.platform.models import Tenant
@@ -119,7 +119,7 @@ def create_tenant_admin_router(
             return {"invite_code": new_code}
 
     @router.put("/settings")
-    async def update_tenant_settings(
+    def update_tenant_settings(
         body: TenantSettingsRequest,
         admin_session=Depends(require_admin),
     ):
@@ -199,7 +199,7 @@ def create_tenant_admin_router(
             )
 
     @router.get("/join-requests")
-    async def list_join_requests(admin_session=Depends(require_admin)):
+    def list_join_requests(admin_session=Depends(require_admin)):
         """List pending join requests for the current tenant."""
 
         from src.platform.models import JoinRequest, JoinRequestStatus
@@ -218,7 +218,7 @@ def create_tenant_admin_router(
             return [r.to_dict() for r in requests]
 
     @router.post("/join-requests/{request_id}/approve")
-    async def approve_join_request(
+    def approve_join_request(
         request_id: int,
         background_tasks: BackgroundTasks,
         admin_session=Depends(require_admin),
@@ -301,7 +301,7 @@ def create_tenant_admin_router(
             )
 
     @router.post("/join-requests/{request_id}/reject")
-    async def reject_join_request(
+    def reject_join_request(
         request_id: int,
         admin_session=Depends(require_admin),
     ):
@@ -348,7 +348,7 @@ def create_tenant_admin_router(
             )
 
     @router.get("/invite/qr")
-    async def get_invite_qr(admin_session=Depends(require_admin)):
+    def get_invite_qr(admin_session=Depends(require_admin)):
         """
         Generate a QR code PNG for the tenant invite link.
 

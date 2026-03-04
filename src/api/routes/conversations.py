@@ -50,7 +50,7 @@ def create_conversations_router(
         )
 
     @router.get("/history", response_model=HistoryResponse)
-    async def get_history(
+    def get_history(
         session=Depends(require_auth),
     ):
         """
@@ -72,7 +72,7 @@ def create_conversations_router(
         )
 
     @router.delete("/session")
-    async def clear_session(
+    def clear_session(
         response: Response,
         session=Depends(require_auth),
     ):
@@ -96,7 +96,7 @@ def create_conversations_router(
         return {"success": False, "message": "Failed to clear session"}
 
     @router.get("/conversations", response_model=ConversationsResponse)
-    async def list_conversations(
+    def list_conversations(
         session=Depends(require_auth),
     ):
         """
@@ -183,7 +183,7 @@ def create_conversations_router(
     @router.get(
         "/conversations/{conversation_id}", response_model=ConversationMessagesResponse
     )
-    async def get_conversation_messages(
+    def get_conversation_messages(
         conversation_id: int,
         session=Depends(require_auth),
     ):
@@ -265,7 +265,7 @@ def create_conversations_router(
             )
 
     @router.delete("/conversations/{conversation_id}")
-    async def delete_conversation(
+    def delete_conversation(
         conversation_id: int,
         session=Depends(require_auth),
     ):
@@ -320,7 +320,7 @@ def create_conversations_router(
             return {"success": True, "message": "Conversation deleted"}
 
     @router.get("/conversations/search", response_model=ConversationSearchResponse)
-    async def search_conversations(
+    def search_conversations(
         q: str,
         session=Depends(require_auth),
     ):

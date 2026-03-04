@@ -34,7 +34,7 @@ def create_team_router(
     router = APIRouter(prefix="/api/admin/team", tags=["team"])
 
     @router.get("", response_model=list[TeamMemberResponse])
-    async def list_team_members(
+    def list_team_members(
         session=Depends(require_admin),
     ):
         """
@@ -71,7 +71,7 @@ def create_team_router(
             ]
 
     @router.post("", response_model=AdminActionResponse)
-    async def add_team_member(
+    def add_team_member(
         request: TeamMemberRequest,
         background_tasks: BackgroundTasks,
         session=Depends(require_admin),
@@ -158,7 +158,7 @@ def create_team_router(
         )
 
     @router.put("/{user_id}", response_model=AdminActionResponse)
-    async def update_team_member(
+    def update_team_member(
         user_id: int,
         request: TeamMemberRequest,
         session=Depends(require_admin),
@@ -217,7 +217,7 @@ def create_team_router(
         )
 
     @router.delete("/{user_id}", response_model=AdminActionResponse)
-    async def remove_team_member(
+    def remove_team_member(
         user_id: int,
         session=Depends(require_admin),
     ):

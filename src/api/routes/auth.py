@@ -87,7 +87,7 @@ def create_auth_router(
             ]
 
     @router.post("/request-otp", response_model=AuthResponse)
-    async def request_otp(request: OTPRequest, background_tasks: BackgroundTasks):
+    def request_otp(request: OTPRequest, background_tasks: BackgroundTasks):
         """
         Request OTP for email authentication.
 
@@ -139,7 +139,7 @@ def create_auth_router(
         )
 
     @router.post("/verify-otp", response_model=AuthResponse)
-    async def verify_otp(
+    def verify_otp(
         verify_request: OTPVerifyRequest,
         request_obj: Request,
         response: Response,
@@ -236,7 +236,7 @@ def create_auth_router(
             )
 
     @router.post("/logout")
-    async def logout(request_obj: Request, response: Response):
+    def logout(request_obj: Request, response: Response):
         """Logout and clear session."""
         session_id = get_session_id(request_obj)
         if session_id:
@@ -247,7 +247,7 @@ def create_auth_router(
         return {"success": True, "message": "Logged out successfully"}
 
     @router.post("/select-tenant")
-    async def select_tenant(
+    def select_tenant(
         request: TenantSelectRequest,
         request_obj: Request,
     ):
@@ -294,7 +294,7 @@ def create_auth_router(
         }
 
     @router.get("/status", response_model=AuthStatusResponse)
-    async def auth_status(request_obj: Request):
+    def auth_status(request_obj: Request):
         """Check authentication status."""
         session_id = get_session_id(request_obj)
         if not session_id:

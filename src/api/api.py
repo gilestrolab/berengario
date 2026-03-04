@@ -195,7 +195,7 @@ def get_version() -> str:
         return base_version
 
 
-async def cleanup_old_attachments():
+def cleanup_old_attachments():
     """Background task to cleanup old attachment files."""
     temp_dir = settings.email_temp_dir
     if not temp_dir.exists():
@@ -220,7 +220,7 @@ async def cleanup_old_attachments():
 
 
 # Authentication dependencies
-async def require_auth(request: Request) -> Session:
+def require_auth(request: Request) -> Session:
     """
     Dependency to require authentication for endpoints.
 
@@ -253,7 +253,7 @@ async def require_auth(request: Request) -> Session:
     return session
 
 
-async def require_admin(request: Request) -> Session:
+def require_admin(request: Request) -> Session:
     """
     Dependency to require admin privileges for endpoints.
 
@@ -266,7 +266,7 @@ async def require_admin(request: Request) -> Session:
     Raises:
         HTTPException: If not authenticated or not an admin
     """
-    session = await require_auth(request)
+    session = require_auth(request)
 
     if not session.is_admin:
         raise HTTPException(
@@ -374,7 +374,7 @@ if settings.multi_tenant:
 
 
 @app.get("/")
-async def root(request: Request):
+def root(request: Request):
     """
     Serve main web interface.
 
@@ -409,7 +409,7 @@ async def root(request: Request):
 
 
 @app.get("/admin")
-async def admin_panel(request: Request):
+def admin_panel(request: Request):
     """
     Serve admin panel interface.
 
@@ -458,7 +458,7 @@ def _try_resolve_tenant(request: Request):
 
 
 @app.get("/api/stats", response_model=StatsResponse)
-async def get_stats(request: Request):
+def get_stats(request: Request):
     """
     Get knowledge base statistics.
 
@@ -484,7 +484,7 @@ async def get_stats(request: Request):
 
 
 @app.get("/api/config")
-async def get_config(request: Request):
+def get_config(request: Request):
     """
     Get public instance configuration.
 
@@ -516,7 +516,7 @@ async def get_config(request: Request):
 
 
 @app.get("/api/example-questions")
-async def get_example_questions(request: Request):
+def get_example_questions(request: Request):
     """
     Get example questions for the knowledge base.
 
@@ -549,14 +549,14 @@ async def get_example_questions(request: Request):
 
 
 @app.get("/health")
-async def health_check():
+def health_check():
     """Health check endpoint for Docker."""
     return {"status": "healthy", "instance": settings.instance_name}
 
 
 # Startup/Shutdown events
 @app.on_event("startup")
-async def startup_event():
+def startup_event():
     """Run on application startup."""
     logger.info(f"Starting {settings.instance_name} Web API")
     logger.info(f"Instance: {settings.instance_name}")
@@ -574,7 +574,7 @@ async def startup_event():
 
 
 @app.on_event("shutdown")
-async def shutdown_event():
+def shutdown_event():
     """Run on application shutdown."""
     logger.info("Shutting down Web API")
     for session_id in list(session_manager.sessions.keys()):

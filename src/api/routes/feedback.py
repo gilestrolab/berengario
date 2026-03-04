@@ -107,7 +107,7 @@ def create_feedback_router(
             logger.info(f"Stored feedback for message {message_id} from {user_email}")
 
     @router.get("/feedback")
-    async def feedback_page():
+    def feedback_page():
         """Serve feedback page for email link clicks."""
         feedback_file = static_dir / "feedback.html"
         if feedback_file.exists():
@@ -115,7 +115,7 @@ def create_feedback_router(
         raise HTTPException(status_code=404, detail="Feedback page not found")
 
     @router.post("/api/feedback/email", response_model=FeedbackResponse)
-    async def submit_email_feedback(
+    def submit_email_feedback(
         feedback: dict,
     ):
         """
@@ -159,7 +159,7 @@ def create_feedback_router(
             raise HTTPException(status_code=500, detail="Failed to submit feedback")
 
     @router.post("/api/feedback", response_model=FeedbackResponse)
-    async def submit_feedback(
+    def submit_feedback(
         feedback: FeedbackRequest,
         session=Depends(require_auth),
     ):

@@ -57,7 +57,7 @@ def create_query_router(
     """
 
     @router.post("/query", response_model=QueryResponse)
-    async def query(
+    def query(
         query_request: QueryRequest,
         request: Request,
         response: Response,
@@ -272,7 +272,7 @@ def create_query_router(
             )
 
     @router.get("/attachments/{session_id}/{filename}")
-    async def download_attachment(
+    def download_attachment(
         session_id: str,
         filename: str,
         session=Depends(require_auth),

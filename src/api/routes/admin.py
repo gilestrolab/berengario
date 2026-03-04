@@ -110,7 +110,7 @@ def create_admin_router(
     # ============================================================================
 
     @router.get("/documents", response_model=DocumentListResponse)
-    async def list_documents(
+    def list_documents(
         session=Depends(require_admin),
     ):
         """
@@ -141,7 +141,7 @@ def create_admin_router(
             )
 
     @router.get("/documents/descriptions")
-    async def get_document_descriptions(
+    def get_document_descriptions(
         session=Depends(require_admin),
     ):
         """
@@ -172,7 +172,7 @@ def create_admin_router(
             )
 
     @router.delete("/documents/{file_hash}", response_model=AdminActionResponse)
-    async def delete_document(
+    def delete_document(
         file_hash: str,
         archive: bool = True,
         session=Depends(require_admin),
@@ -234,7 +234,7 @@ def create_admin_router(
             )
 
     @router.get("/documents/{file_hash}/view")
-    async def view_document(
+    def view_document(
         file_hash: str,
         session=Depends(require_admin),
     ):
@@ -302,7 +302,7 @@ def create_admin_router(
             )
 
     @router.get("/documents/{file_hash}/download")
-    async def download_document(
+    def download_document(
         file_hash: str,
         session=Depends(require_admin),
     ):
@@ -558,7 +558,7 @@ def create_admin_router(
     # ============================================================================
 
     @router.post("/crawl", response_model=AdminActionResponse)
-    async def crawl_url(
+    def crawl_url(
         request: CrawlRequest,
         session=Depends(require_admin),
     ):
@@ -651,7 +651,7 @@ def create_admin_router(
             raise HTTPException(status_code=500, detail=f"Error crawling URL: {str(e)}")
 
     @router.get("/crawled-urls", response_model=CrawledUrlResponse)
-    async def list_crawled_urls(
+    def list_crawled_urls(
         session=Depends(require_admin),
     ):
         """
@@ -692,7 +692,7 @@ def create_admin_router(
             )
 
     @router.delete("/crawled-urls/all", response_model=AdminActionResponse)
-    async def delete_all_crawled_urls(
+    def delete_all_crawled_urls(
         session=Depends(require_admin),
     ):
         """
@@ -770,7 +770,7 @@ def create_admin_router(
             )
 
     @router.delete("/crawled-urls/{url_hash}", response_model=AdminActionResponse)
-    async def delete_crawled_url(
+    def delete_crawled_url(
         url_hash: str,
         session=Depends(require_admin),
     ):
@@ -843,7 +843,7 @@ def create_admin_router(
     # ============================================================================
 
     @router.post("/backup/create")
-    async def create_backup(
+    def create_backup(
         background_tasks: BackgroundTasks,
         session=Depends(require_admin),
     ):
@@ -967,7 +967,7 @@ def create_admin_router(
             )
 
     @router.get("/backups")
-    async def list_backups(session=Depends(require_admin)):
+    def list_backups(session=Depends(require_admin)):
         """
         List all available backup files.
 
@@ -993,7 +993,7 @@ def create_admin_router(
             )
 
     @router.get("/backups/{filename}")
-    async def download_backup(
+    def download_backup(
         filename: str,
         session=Depends(require_admin),
     ):
@@ -1047,7 +1047,7 @@ def create_admin_router(
             )
 
     @router.delete("/backups/{filename}")
-    async def delete_backup(
+    def delete_backup(
         filename: str,
         session=Depends(require_admin),
     ):
@@ -1102,7 +1102,7 @@ def create_admin_router(
     # ============================================================================
 
     @router.get("/settings/prompt")
-    async def get_prompt_settings(session=Depends(require_admin)):
+    def get_prompt_settings(session=Depends(require_admin)):
         """
         Get system prompt settings and preview.
 
@@ -1154,7 +1154,7 @@ def create_admin_router(
             )
 
     @router.post("/settings/prompt")
-    async def update_prompt_settings(
+    def update_prompt_settings(
         request: dict,
         session=Depends(require_admin),
     ):
@@ -1216,7 +1216,7 @@ def create_admin_router(
             )
 
     @router.get("/settings/models")
-    async def get_model_settings(session=Depends(require_admin)):
+    def get_model_settings(session=Depends(require_admin)):
         """
         Get information about configured LLM and embedding models.
 
@@ -1273,7 +1273,7 @@ def create_admin_router(
     # ============================================================================
 
     @router.post("/example-questions/generate", response_model=AdminActionResponse)
-    async def generate_example_questions_endpoint(
+    def generate_example_questions_endpoint(
         session=Depends(require_admin),
     ):
         """

@@ -65,7 +65,7 @@ def create_onboarding_router(
         return session
 
     @router.post("/create-tenant", response_model=CreateTenantResponse)
-    async def create_tenant(
+    def create_tenant(
         body: CreateTenantRequest,
         request: Request,
         response: Response,
@@ -157,7 +157,7 @@ def create_onboarding_router(
             )
 
     @router.post("/validate-code", response_model=ValidateCodeResponse)
-    async def validate_code(body: ValidateCodeRequest):
+    def validate_code(body: ValidateCodeRequest):
         """
         Validate an invite code (public endpoint).
 
@@ -188,7 +188,7 @@ def create_onboarding_router(
             )
 
     @router.post("/join-tenant", response_model=JoinTenantResponse)
-    async def join_tenant(
+    def join_tenant(
         body: JoinTenantRequest,
         request: Request,
         response: Response,
@@ -330,7 +330,7 @@ def create_onboarding_router(
                 )
 
     @router.get("/slug-check", response_model=SlugCheckResponse)
-    async def slug_check(slug: str):
+    def slug_check(slug: str):
         """
         Check if a slug is available (public endpoint).
 
