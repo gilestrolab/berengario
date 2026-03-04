@@ -1098,6 +1098,259 @@ def create_admin_router(
             )
 
     # ============================================================================
+    # Backup Restore
+    # ============================================================================
+
+    @router.post("/backup/validate")
+    async def validate_backup_upload(
+        file: UploadFile = File(...),
+        session=Depends(require_admin),
+    ):
+        """
+        Validate an uploaded backup ZIP without restoring.
+
+        Args:
+            file: Uploaded ZIP file.
+            session: Admin session (injected by dependency).
+
+        Returns:
+            Validation report.
+        """
+        temp_path = None
+        try:
+            # Save upload to temp file
+            temp_id = uuid.uuid4().hex[:8]
+            temp_path = Path(f"/tmp/backup_validate_{temp_id}.zip")
+            with open(temp_path, "wb") as f:
+                shutil.copyfileobj(file.file, f)
+
+            report = backup_manager.validate_backup(temp_path)
+            return {"success": True, **report}
+
+        except Exception as e:
+            logger.error(f"Error validating backup: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Error validating backup: {str(e)}"
+            )
+        finally:
+            if temp_path and temp_path.exists():
+                temp_path.unlink()
+
+    @router.post("/backup/restore")
+    def restore_backup_upload(
+        background_tasks: BackgroundTasks,
+        file: UploadFile = File(...),
+        session=Depends(require_admin),
+    ):
+        """
+        Upload a backup ZIP and restore from it.
+
+        Restore runs in background. Admin receives email on completion/failure.
+
+        Args:
+            file: Uploaded ZIP file.
+            background_tasks: FastAPI background tasks.
+            session: Admin session (injected by dependency).
+
+        Returns:
+            Acknowledgement message.
+        """
+        try:
+            # Save upload to a persistent temp file (background task needs it)
+            temp_id = uuid.uuid4().hex[:8]
+            temp_path = Path(f"/tmp/backup_restore_{temp_id}.zip")
+            with open(temp_path, "wb") as f:
+                shutil.copyfileobj(file.file, f)
+
+            async def restore_and_notify():
+                try:
+                    result = await backup_manager.restore_backup(
+                        temp_path, create_pre_restore=True
+                    )
+
+                    if result["success"]:
+                        subject = f"[{settings.instance_name}] Backup Restore Complete"
+                        body = f"""
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <h2 style="color: #2E2E2E;">Backup Restore Complete</h2>
+    <p>Your data has been restored successfully.</p>
+    <div style="background-color: #F7F2EA; border-left: 4px solid #5B8C7A; padding: 15px; margin: 20px 0;">
+        <p style="margin: 0;"><strong>Restore Details:</strong></p>
+        <p style="margin: 5px 0;">Files Restored: {result['files_restored']}</p>
+        <p style="margin: 5px 0;">Safety Backup: {result['pre_restore_backup'] or 'None'}</p>
+        <p style="margin: 5px 0;">Completed: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+    </div>
+    <p style="color: #8C8279; font-size: 0.9em;">
+        A safety backup was created before the restore. You can find it in the backups list.
+    </p>
+</body>
+</html>
+                        """
+                    else:
+                        subject = f"[{settings.instance_name}] Backup Restore Failed"
+                        errors_html = "".join(f"<li>{e}</li>" for e in result["errors"])
+                        body = f"""
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <h2 style="color: #A3423A;">Backup Restore Failed</h2>
+    <p>The restore operation failed. Your data has been rolled back to its previous state.</p>
+    <div style="background-color: #FFF0F0; border-left: 4px solid #A3423A; padding: 15px; margin: 20px 0;">
+        <p style="margin: 0;"><strong>Errors:</strong></p>
+        <ul>{errors_html}</ul>
+    </div>
+</body>
+</html>
+                        """
+
+                    email_sender.send_reply(
+                        to_address=session.email,
+                        subject=subject,
+                        body_text="",
+                        body_html=body,
+                    )
+
+                    audit_logger.log_action(
+                        session.email,
+                        "backup_restore_upload",
+                        file.filename or "uploaded.zip",
+                        "success" if result["success"] else "failed",
+                        f"files:{result['files_restored']}",
+                    )
+
+                except Exception as e:
+                    logger.error(f"Error in backup restore task: {e}")
+                    try:
+                        email_sender.send_reply(
+                            to_address=session.email,
+                            subject=f"[{settings.instance_name}] Backup Restore Failed",
+                            body_text=f"Restore failed: {str(e)}",
+                            body_html=None,
+                        )
+                    except Exception:
+                        pass
+                finally:
+                    if temp_path.exists():
+                        temp_path.unlink()
+
+            background_tasks.add_task(restore_and_notify)
+
+            return {
+                "success": True,
+                "message": "Restore started. You will receive an email when complete.",
+            }
+
+        except Exception as e:
+            logger.error(f"Error starting restore: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Error starting restore: {str(e)}"
+            )
+
+    @router.post("/backups/{filename}/restore")
+    def restore_existing_backup(
+        filename: str,
+        background_tasks: BackgroundTasks,
+        session=Depends(require_admin),
+    ):
+        """
+        Restore from an existing backup file.
+
+        Args:
+            filename: Name of the backup file to restore.
+            background_tasks: FastAPI background tasks.
+            session: Admin session (injected by dependency).
+
+        Returns:
+            Acknowledgement message.
+        """
+        try:
+            backup_path = backup_manager.get_backup_path(filename)
+            if not backup_path:
+                raise HTTPException(
+                    status_code=404, detail=f"Backup file not found: {filename}"
+                )
+
+            async def restore_and_notify():
+                try:
+                    result = await backup_manager.restore_backup(
+                        backup_path, create_pre_restore=True
+                    )
+
+                    if result["success"]:
+                        subject = f"[{settings.instance_name}] Backup Restore Complete"
+                        body = f"""
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <h2 style="color: #2E2E2E;">Backup Restore Complete</h2>
+    <p>Data restored from <strong>{filename}</strong>.</p>
+    <div style="background-color: #F7F2EA; border-left: 4px solid #5B8C7A; padding: 15px; margin: 20px 0;">
+        <p style="margin: 0;"><strong>Restore Details:</strong></p>
+        <p style="margin: 5px 0;">Files Restored: {result['files_restored']}</p>
+        <p style="margin: 5px 0;">Safety Backup: {result['pre_restore_backup'] or 'None'}</p>
+        <p style="margin: 5px 0;">Completed: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+    </div>
+</body>
+</html>
+                        """
+                    else:
+                        errors_html = "".join(f"<li>{e}</li>" for e in result["errors"])
+                        subject = f"[{settings.instance_name}] Backup Restore Failed"
+                        body = f"""
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <h2 style="color: #A3423A;">Backup Restore Failed</h2>
+    <p>Failed to restore from <strong>{filename}</strong>. Data has been rolled back.</p>
+    <div style="background-color: #FFF0F0; border-left: 4px solid #A3423A; padding: 15px; margin: 20px 0;">
+        <p style="margin: 0;"><strong>Errors:</strong></p>
+        <ul>{errors_html}</ul>
+    </div>
+</body>
+</html>
+                        """
+
+                    email_sender.send_reply(
+                        to_address=session.email,
+                        subject=subject,
+                        body_text="",
+                        body_html=body,
+                    )
+
+                    audit_logger.log_action(
+                        session.email,
+                        "backup_restore",
+                        filename,
+                        "success" if result["success"] else "failed",
+                        f"files:{result['files_restored']}",
+                    )
+
+                except Exception as e:
+                    logger.error(f"Error in backup restore task: {e}")
+                    try:
+                        email_sender.send_reply(
+                            to_address=session.email,
+                            subject=f"[{settings.instance_name}] Backup Restore Failed",
+                            body_text=f"Restore failed: {str(e)}",
+                            body_html=None,
+                        )
+                    except Exception:
+                        pass
+
+            background_tasks.add_task(restore_and_notify)
+
+            return {
+                "success": True,
+                "message": f"Restoring from '{filename}'. You will receive an email when complete.",
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error starting restore from {filename}: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Error starting restore: {str(e)}"
+            )
+
+    # ============================================================================
     # Settings Management
     # ============================================================================
 

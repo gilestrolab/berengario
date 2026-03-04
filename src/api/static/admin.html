@@ -841,6 +841,54 @@
             background: var(--danger-dark, #8A3630);
         }
 
+        .backup-actions .btn-restore-backup {
+            background: var(--warning, #C4973B);
+        }
+
+        .backup-actions .btn-restore-backup:hover {
+            background: #A87E2F;
+        }
+
+        .backup-restore-upload {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            border: 2px dashed var(--border, #D5C9B8);
+            border-radius: 8px;
+            text-align: center;
+            background: var(--bg-secondary, #F7F2EA);
+        }
+
+        .backup-restore-upload p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary, #8C8279);
+            font-size: 0.875rem;
+        }
+
+        .backup-restore-upload input[type="file"] {
+            display: none;
+        }
+
+        .btn-upload-restore {
+            padding: 0.75rem 1.5rem;
+            background: var(--warning, #C4973B);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .btn-upload-restore:hover {
+            background: #A87E2F;
+        }
+
+        .btn-upload-restore:disabled {
+            background: var(--text-secondary, #8C8279);
+            cursor: not-allowed;
+        }
+
         /* Settings section styles */
         .settings-section {
             padding: 1rem 0;
@@ -2600,6 +2648,15 @@
                 <h3 style="margin-top: 2rem;">Available Backups</h3>
                 <div class="backups-list" id="backups-list">
                     <div class="loading">Loading...</div>
+                </div>
+
+                <div class="backup-restore-upload">
+                    <h3>Restore from External Backup</h3>
+                    <p>Upload a backup ZIP file to restore your data. A safety backup will be created automatically before restoring.</p>
+                    <input type="file" id="restore-file-input" accept=".zip" onchange="adminPanel.handleRestoreFileSelected(event)">
+                    <button class="btn-upload-restore" onclick="document.getElementById('restore-file-input').click()">
+                        Upload &amp; Restore Backup
+                    </button>
                 </div>
             </div>
         </div>

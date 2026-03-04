@@ -846,6 +846,9 @@ class AdminPanel {
                         </div>
                     </div>
                     <div class="backup-actions">
+                        <button class="btn-restore-backup" onclick="adminPanel.restoreBackup('${this.escapeHtml(backup.filename)}')">
+                            Restore
+                        </button>
                         <button class="btn-download-backup" onclick="adminPanel.downloadBackup('${this.escapeHtml(backup.filename)}')">
                             Download
                         </button>
@@ -952,6 +955,78 @@ class AdminPanel {
         } catch (error) {
             console.error('Error deleting backup:', error);
             this.showToast(error.message, 'error');
+        }
+    }
+
+    async restoreBackup(filename) {
+        if (!confirm(`Restore from backup "${filename}"?\n\nThis will REPLACE your current data with the backup contents.\nA safety backup will be created automatically before restoring.\n\nThis operation runs in the background. You will receive an email when complete.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/backups/${filename}/restore`, {
+                method: 'POST',
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to start restore');
+            }
+
+            this.showToast(data.message, 'success');
+        } catch (error) {
+            console.error('Error restoring backup:', error);
+            this.showToast(error.message, 'error');
+        }
+    }
+
+    async handleRestoreFileSelected(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Reset the file input so the same file can be selected again
+        event.target.value = '';
+
+        if (!file.name.endsWith('.zip')) {
+            this.showToast('Please select a ZIP file', 'error');
+            return;
+        }
+
+        if (!confirm(`Restore from uploaded file "${file.name}"?\n\nThis will REPLACE your current data with the backup contents.\nA safety backup will be created automatically before restoring.\n\nThis operation runs in the background. You will receive an email when complete.`)) {
+            return;
+        }
+
+        const button = document.querySelector('.btn-upload-restore');
+        try {
+            if (button) {
+                button.disabled = true;
+                button.textContent = 'Uploading & restoring...';
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch('/api/admin/backup/restore', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to start restore');
+            }
+
+            this.showToast(data.message, 'success');
+        } catch (error) {
+            console.error('Error uploading restore:', error);
+            this.showToast(error.message, 'error');
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Upload & Restore Backup';
+            }
         }
     }
 

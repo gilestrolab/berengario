@@ -1,7 +1,7 @@
 """
 Backup CLI commands.
 
-Manages system backups (create, list, delete, cleanup).
+Manages system backups (create, list, delete, cleanup, restore).
 """
 
 import logging
@@ -229,3 +229,108 @@ def cleanup_backups(
 
     except Exception as e:
         handle_error(e, "cleaning up backups")
+
+
+@app.command("restore")
+def restore_backup(
+    source: str = typer.Argument(
+        ..., help="Backup filename (from 'backup list') or path to external ZIP file"
+    ),
+    no_pre_restore: bool = typer.Option(
+        False, "--no-pre-restore", help="Skip creating a safety backup before restoring"
+    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
+):
+    """
+    Restore data from a backup file.
+
+    Replaces current data directories with contents from the backup.
+    A pre-restore safety backup is created by default.
+
+    Use 'backup list' to see available backups, or provide a path to an external ZIP.
+    """
+    try:
+        print_header("Restore from Backup")
+
+        from src.api.admin.backup_manager import BackupManager
+
+        backup_manager = BackupManager()
+
+        # Resolve source: check if it's a known backup name or an external path
+        zip_path = None
+        source_path = Path(source)
+
+        if source_path.is_file():
+            zip_path = source_path
+        else:
+            # Try as a backup filename
+            resolved = backup_manager.get_backup_path(source)
+            if resolved:
+                zip_path = resolved
+
+        if not zip_path:
+            print_error(f"Backup not found: {source}")
+            print_info(
+                "Use 'backup list' to see available backups, or provide a full file path."
+            )
+            raise typer.Exit(1)
+
+        # Validate the backup
+        print_info(f"Validating: {zip_path.name}")
+        report = backup_manager.validate_backup(zip_path)
+
+        if not report["valid"]:
+            print_error("Backup validation failed:")
+            for err in report["errors"]:
+                console.print(f"  [red]✗[/red] {err}")
+            raise typer.Exit(1)
+
+        # Show validation summary
+        console.print()
+        print_key_value("File", zip_path.name)
+        print_key_value("Files", str(report["file_count"]))
+        print_key_value("Size", format_bytes(report["total_size"]))
+        print_key_value("Directories", ", ".join(report["top_level_dirs"]))
+
+        if report["warnings"]:
+            for warn in report["warnings"]:
+                print_warning(warn)
+
+        # Confirm restore
+        if not force:
+            console.print()
+            print_warning(
+                "This will REPLACE the data directories listed above with backup contents."
+            )
+            if not no_pre_restore:
+                print_info("A safety backup will be created before restoring.")
+            if not confirm_destructive("restore", f"from '{zip_path.name}'"):
+                return
+
+        # Perform restore
+        with create_progress() as progress:
+            task = progress.add_task("Restoring backup...", total=None)
+
+            result = backup_manager._restore_from_zip(
+                zip_path, create_pre_restore=not no_pre_restore
+            )
+
+            progress.update(task, completed=True)
+
+        console.print()
+
+        if result["success"]:
+            print_success("Restore completed successfully")
+            print_key_value("Files Restored", str(result["files_restored"]))
+            if result["pre_restore_backup"]:
+                print_key_value("Safety Backup", result["pre_restore_backup"])
+        else:
+            print_error("Restore failed (data has been rolled back):")
+            for err in result["errors"]:
+                console.print(f"  [red]✗[/red] {err}")
+            raise typer.Exit(1)
+
+    except typer.Exit:
+        raise
+    except Exception as e:
+        handle_error(e, "restoring backup")
