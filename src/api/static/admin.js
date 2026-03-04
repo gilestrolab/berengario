@@ -1680,7 +1680,7 @@ class AdminPanel {
         }
 
         container.innerHTML = requests.map(r => `
-            <div class="whitelist-item" style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="team-item" style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <strong>${this.escapeHtml(r.email)}</strong>
                     <span style="margin-left: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">

@@ -68,8 +68,8 @@ class QueryHandler:
         Args:
             query_text: The query string.
             user_email: Email address of the user (for logging).
-            is_admin: Whether the user has admin privileges (for whitelist management tools).
-            is_email_request: Whether this is an email request (requires confirmation for whitelist changes).
+            is_admin: Whether the user has admin privileges (for team management tools).
+            is_email_request: Whether this is an email request (requires confirmation for team changes).
             context: Additional context information.
 
         Returns:

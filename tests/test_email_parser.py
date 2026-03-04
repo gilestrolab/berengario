@@ -453,8 +453,8 @@ class TestEmailParser:
 
         assert parser.should_process_as_query(email) is False
 
-    def test_should_process_for_kb_whitelisted_direct(self, parser):
-        """Test whitelisted direct message should NOT be processed for KB (it's a query)."""
+    def test_should_process_for_kb_authorized_direct(self, parser):
+        """Test authorized direct message should NOT be processed for KB (it's a query)."""
         sender = EmailAddress(email="alice@example.com")
         email = EmailMessage(
             message_id="12345",
@@ -465,8 +465,8 @@ class TestEmailParser:
 
         assert parser.should_process_for_kb(email) is False
 
-    def test_should_process_for_kb_not_whitelisted(self, parser):
-        """Test non-whitelisted message should not be processed for KB."""
+    def test_should_process_for_kb_unauthorized(self, parser):
+        """Test unauthorized message should not be processed for KB."""
         sender = EmailAddress(email="spam@spam.com")
         email = EmailMessage(
             message_id="12345",

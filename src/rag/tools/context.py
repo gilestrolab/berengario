@@ -132,5 +132,5 @@ def get_conversation_manager() -> Optional[Any]:
 
 
 def get_tenant_id() -> Optional[str]:
-    """Get the current context's tenant ID (None in ST mode)."""
+    """Get the current context's tenant ID (may be None if not set explicitly)."""
     return _tenant_id.get()

@@ -16,17 +16,15 @@ Berengario is a configurable RAG (Retrieval-Augmented Generation) system with em
 
 ### Multi-Mode Email Processing
 
-The system has **dual whitelist validation** with separate permissions for teaching (KB ingestion) vs querying:
+The system uses **TenantUser role-based permissions** to control access for teaching (KB ingestion) vs querying:
 
-- **Direct emails (To: bot)** → RAG query processing + automated reply (if sender in query whitelist)
+- **Direct emails (To: bot)** → RAG query processing + automated reply (if sender has query permission)
   - Exception: Forwarded emails (Fw:/Fwd: prefix) → KB ingestion (configurable via `FORWARD_TO_KB_ENABLED`)
 - **Teach address emails** (To/CC: teach address) → KB ingestion (if `EMAIL_TEACH_ADDRESS` is configured, takes highest priority)
-- **CC/BCC emails** → Silent KB ingestion (if sender in teach whitelist)
-- **Forwarded emails** → KB ingestion (if sender in teach whitelist and `FORWARD_TO_KB_ENABLED=true`)
+- **CC/BCC emails** → Silent KB ingestion (if sender has teach permission)
+- **Forwarded emails** → KB ingestion (if sender has teach permission and `FORWARD_TO_KB_ENABLED=true`)
 
-Users can be in one whitelist, both whitelists, or neither. Configure in:
-- `data/config/allowed_teachers.txt` (who can add to KB)
-- `data/config/allowed_queriers.txt` (who can ask questions)
+Users can have one role, both roles, or neither. Roles are managed via TenantUser records in the database.
 
 ### Key Components
 
@@ -44,13 +42,13 @@ Users can be in one whitelist, both whitelists, or neither. Configure in:
 
 #### 3. Email Integration (`src/email/`)
 - **EmailClient**: IMAP client with SSL/TLS and STARTTLS support (ports 993, 143)
-- **EmailParser**: Parses headers, body (HTML-to-text), validates against whitelists
+- **EmailParser**: Parses headers, body (HTML-to-text), validates sender permissions
 - **AttachmentHandler**: Extracts and validates attachments (file type, size limits)
 - **EmailProcessor**: Orchestrates the full pipeline (fetch → parse → extract → process → track)
 - **EmailSender**: SMTP email sending with TLS, supports HTML/markdown/text formats
 - **MessageTracker**: SQLite or MariaDB tracking to prevent duplicate processing
 - **EmailService**: Background daemon with exponential backoff and graceful shutdown
-- **WhitelistValidator**: Dual validation for teach vs query permissions with domain wildcards
+
 
 #### 4. Database Layer (`src/email/db_*.py`)
 - **db_models.py**: SQLAlchemy models for `ProcessedMessage` and `ProcessingStats`
@@ -325,7 +323,7 @@ docker exec berengario-web berengario-cli kb list
    - Parse headers, body, extract attachments
    - Check if already processed via **MessageTracker**
    - Determine action type (query vs KB ingestion) based on To/CC/BCC/forwarding
-   - **Validate sender** against appropriate whitelist (teach vs query)
+   - **Validate sender** against TenantUser roles (teach vs query permissions)
    - For KB ingestion: Process attachments + body → **DocumentProcessor** → **KnowledgeBaseManager**
    - For queries: Extract question → **QueryHandler** → **RAGEngine** → **EmailSender**
    - Mark as processed in database
@@ -563,7 +561,7 @@ Custom footers via `EMAIL_CUSTOM_FOOTER_FILE`:
 All persistent data lives under `data/` for easy Docker volume mounting:
 - `data/documents/` - Source documents (monitored by FileWatcher)
 - `data/chroma_db/` - Vector database storage
-- `data/config/` - Configuration files (whitelists, custom prompts, footers)
+- `data/config/` - Configuration files (custom prompts, footers)
 - `data/logs/` - Application logs (`dols_gpt.log`)
 - `data/temp_attachments/` - Temporary email attachments (auto-cleaned)
 - `data/message_tracker.db` - SQLite database (if using SQLite)
@@ -597,10 +595,6 @@ Key environment variables (see `.env.example` for full list):
 - `EMAIL_DISPLAY_NAME` - Display name in emails
 - `EMAIL_CHECK_INTERVAL` - Polling frequency (seconds)
 - `WELCOME_EMAIL_ENABLED` - Send welcome emails to new users (default: true)
-
-### Whitelist Configuration (Dual Lists)
-- **Teaching**: `EMAIL_TEACH_WHITELIST_FILE`, `EMAIL_TEACH_WHITELIST_ENABLED`
-- **Query**: `EMAIL_QUERY_WHITELIST_FILE`, `EMAIL_QUERY_WHITELIST_ENABLED`
 
 ### RAG Configuration
 - `CHUNK_SIZE`, `CHUNK_OVERLAP` - Document chunking parameters
@@ -704,7 +698,7 @@ The EmailClient supports both SSL (port 993) and STARTTLS (port 143). Set `IMAP_
 
 **Problem**: Emails not being processed
 **Solution**:
-1. Check whitelist files exist and contain valid entries
+1. Verify sender has appropriate TenantUser role (teach/query) in the database
 2. Verify IMAP credentials with `accessories/test_email_connection.py`
 3. Check logs: `docker-compose logs -f berengario-email`
 

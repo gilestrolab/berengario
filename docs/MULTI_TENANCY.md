@@ -214,6 +214,6 @@ For schema migrations on existing tenants, SQL migration scripts can be placed i
 |---------|--------------|--------------|
 | FileWatcher | Active (monitors `data/documents/`) | Disabled (documents ingested via email/upload) |
 | Email routing | Single inbox | Per-tenant routing via `TenantEmailRouter` |
-| Authentication | Whitelist-based OTP | Whitelist + tenant membership |
+| Authentication | TenantUser-based OTP | TenantUser + tenant membership |
 | Admin panel | Global | Per-tenant with team management |
 | KB storage | Shared ChromaDB | Per-tenant ChromaDB instances |

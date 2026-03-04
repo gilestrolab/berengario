@@ -119,16 +119,44 @@ class TestAddTeamMember:
         assert result["success"] is False
         assert "Invalid role" in result["message"]
 
-    def test_rejects_no_tenant_context(self):
-        """Return error when tenant_id is None."""
+    def test_resolves_default_tenant_when_no_context(self):
+        """Resolve default tenant from platform DB when tenant_id is None."""
         set_tool_context(user_email="admin@co.com", is_admin=True)  # no tenant_id
 
-        from src.rag.tools.team_tools import add_team_member
+        mock_tenant = MagicMock()
+        mock_tenant.id = "default-t"
 
-        result = add_team_member(email="user@co.com")
+        mock_session = MagicMock()
+        mock_session.query.return_value.first.return_value = mock_tenant
+        mock_session.query.return_value.filter_by.return_value.first.return_value = None
+
+        with patch(
+            "src.rag.tools.team_tools._get_platform_session",
+            return_value=mock_session,
+        ):
+            from src.rag.tools.team_tools import add_team_member
+
+            result = add_team_member(email="user@co.com")
+
+        assert result["success"] is True
+
+    def test_error_when_no_tenant_exists(self):
+        """Return error when no tenant exists in platform DB."""
+        set_tool_context(user_email="admin@co.com", is_admin=True)  # no tenant_id
+
+        mock_session = MagicMock()
+        mock_session.query.return_value.first.return_value = None
+
+        with patch(
+            "src.rag.tools.team_tools._get_platform_session",
+            return_value=mock_session,
+        ):
+            from src.rag.tools.team_tools import add_team_member
+
+            result = add_team_member(email="user@co.com")
 
         assert result["success"] is False
-        assert "no tenant context" in result["message"].lower()
+        assert "no tenant found" in result["message"].lower()
 
     def test_existing_user(self):
         """Return message when user already exists."""
@@ -272,16 +300,48 @@ class TestRemoveTeamMember:
         assert "not a member" in result["message"].lower()
         mock_session.delete.assert_not_called()
 
-    def test_rejects_no_tenant_context(self):
-        """Return error when tenant_id is None."""
+    def test_resolves_default_tenant_when_no_context(self):
+        """Resolve default tenant from platform DB when tenant_id is None."""
         set_tool_context(user_email="admin@co.com", is_admin=True)  # no tenant_id
 
-        from src.rag.tools.team_tools import remove_team_member
+        mock_tenant = MagicMock()
+        mock_tenant.id = "default-t"
 
-        result = remove_team_member(email="user@co.com")
+        mock_user = MagicMock()
+
+        mock_session = MagicMock()
+        mock_session.query.return_value.first.return_value = mock_tenant
+        mock_session.query.return_value.filter_by.return_value.first.return_value = (
+            mock_user
+        )
+
+        with patch(
+            "src.rag.tools.team_tools._get_platform_session",
+            return_value=mock_session,
+        ):
+            from src.rag.tools.team_tools import remove_team_member
+
+            result = remove_team_member(email="user@co.com")
+
+        assert result["success"] is True
+
+    def test_error_when_no_tenant_exists(self):
+        """Return error when no tenant exists in platform DB."""
+        set_tool_context(user_email="admin@co.com", is_admin=True)  # no tenant_id
+
+        mock_session = MagicMock()
+        mock_session.query.return_value.first.return_value = None
+
+        with patch(
+            "src.rag.tools.team_tools._get_platform_session",
+            return_value=mock_session,
+        ):
+            from src.rag.tools.team_tools import remove_team_member
+
+            result = remove_team_member(email="user@co.com")
 
         assert result["success"] is False
-        assert "no tenant context" in result["message"].lower()
+        assert "no tenant found" in result["message"].lower()
 
     def test_non_admin_rejected(self):
         """Non-admin user gets PermissionError."""

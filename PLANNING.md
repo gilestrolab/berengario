@@ -21,7 +21,7 @@ Berengario is a configurable RAG (Retrieval-Augmented Generation) infrastructure
    - Extract email body and attachments
    - Process attachments as documents
    - Mark processed emails to prevent duplicates
-   - Whitelist validation for security
+   - Role-based access validation via TenantUser membership
 
 3. **Email Query Handler** (Phase 3)
    - Monitor direct emails (To: bot account) as queries
@@ -58,7 +58,7 @@ RAGInbox/
 ├── data/
 │   ├── documents/                 # Source documents for KB
 │   ├── chroma_db/                 # Vector database storage
-│   ├── config/                    # Configuration files (whitelists, custom prompts)
+│   ├── config/                    # Configuration files (custom prompts)
 │   ├── logs/                      # Application logs
 │   └── temp_attachments/          # Temporary email attachments
 ├── src/
@@ -223,7 +223,7 @@ RAGInbox/
 4. Session management with configurable timeout
 5. Source citations and attachments display
 6. Conversation history persistence
-7. Admin panel (whitelist management, document browser, backups)
+7. Admin panel (team management, document browser, backups)
 8. Frontend tests
 
 ### Phase 5: Docker & Deployment ✅ (Complete)
@@ -321,11 +321,10 @@ All configuration via environment variables in `.env` file:
 - `EMAIL_DISPLAY_NAME`: Display name in email responses
 - `FORWARD_TO_KB_ENABLED`, `FORWARD_SUBJECT_PREFIXES`: Forwarded email detection
 
-### Whitelist Configuration (Dual Permission System)
-- `EMAIL_TEACH_WHITELIST_FILE`, `EMAIL_TEACH_WHITELIST_ENABLED`: Who can add to KB
-- `EMAIL_QUERY_WHITELIST_FILE`, `EMAIL_QUERY_WHITELIST_ENABLED`: Who can query KB
-- `EMAIL_ADMIN_WHITELIST_FILE`, `EMAIL_ADMIN_WHITELIST_ENABLED`: Who can access admin panel
-- Hierarchical: Admins > Teachers > Queriers
+### Access Control (Role-Based via TenantUser)
+- Permissions managed through TenantUser membership and roles (owner, admin, member)
+- Roles determine who can add to KB, query KB, and access admin panel
+- Team management via web admin panel or platform admin
 
 ### Web Interface Configuration (Phase 4)
 - `API_HOST`, `API_PORT`, `API_RELOAD`: FastAPI server settings

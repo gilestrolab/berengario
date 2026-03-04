@@ -556,7 +556,7 @@ docker exec berengario-web pip install typer rich
 
 Planned additions for future releases:
 
-- `whitelist` commands - Manage query/teach/admin whitelists
+- `user` commands - Manage user roles and permissions
 - `conversation` commands - View and manage conversations
 - `config` commands - Modify configuration settings
 - `service` commands - Manage running services

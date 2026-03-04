@@ -2,8 +2,7 @@
 Team management routes for multi-tenant mode.
 
 CRUD operations on TenantUser records, scoped to the admin's active tenant.
-Only available when MULTI_TENANT=true. Replaces file-based whitelists for
-user permission management.
+Only available when MULTI_TENANT=true.
 """
 
 import logging

@@ -3,7 +3,7 @@ Tenant email routing for multi-tenant email processing.
 
 Routes incoming emails to the correct tenant(s) based on sender email
 address lookup in the platform TenantUser table. Handles permission
-checks using TenantUser roles instead of file-based whitelists.
+checks using TenantUser roles.
 """
 
 import logging
@@ -20,8 +20,7 @@ class TenantEmailRouter:
     """
     Routes emails to tenants based on sender lookup in TenantUser table.
 
-    In multi-tenant mode, replaces file-based whitelist validation with
-    database-backed TenantUser role checks. A single sender may belong
+    Uses database-backed TenantUser role checks. A single sender may belong
     to multiple tenants with different roles.
 
     Attributes:

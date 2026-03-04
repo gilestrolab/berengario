@@ -17,7 +17,7 @@ Berengario is a flexible infrastructure that combines document processing, vecto
 - **Semantic Search**: ChromaDB vector database for efficient retrieval
 - **Query Optimization**: Automatic query rewriting, expansion, and context-aware enhancement for better retrieval accuracy
 - **LLM Integration**: OpenAI-compatible API support (OpenAI, Naga.ac, OpenRouter)
-- **Function Calling / Tool System**: Calendar event creation, CSV/JSON export, web search, database queries, whitelist management
+- **Function Calling / Tool System**: Calendar event creation, CSV/JSON export, web search, database queries, team management
 - **Web Crawling**: Ingest content from URLs directly into the knowledge base
 - **Email Integration**:
   - IMAP inbox monitoring with SSL/TLS and STARTTLS
@@ -26,7 +26,7 @@ Berengario is a flexible infrastructure that combines document processing, vecto
   - SMTP email sending with HTML formatting
   - Customizable email format (text, markdown, or HTML)
   - Custom email footers
-  - Dual whitelists for security (teach vs query permissions)
+  - Role-based access control (teach vs query permissions)
   - Configurable forwarded email detection
   - Message tracking and deduplication
 - **Web Interface**:
@@ -39,7 +39,7 @@ Berengario is a flexible infrastructure that combines document processing, vecto
   - Mobile-responsive design
   - Dynamic branding from environment variables
 - **Admin Panel**:
-  - Whitelist management (queriers, teachers, admins)
+  - Team management (queriers, teachers, admins)
   - Document browser with view/download/delete
   - Query optimization analytics (optimization rate, expansion ratio)
   - Source document usage analytics (citation counts, relevance scores)
@@ -124,7 +124,7 @@ OPENAI_API_BASE=https://api.openai.com/v1  # or https://api.naga.ac/v1
 docker-compose up -d
 
 # Access the web interface at http://localhost:8000
-# Login with your whitelisted email to receive an OTP code
+# Login with your registered email to receive an OTP code
 ```
 
 The web interface provides:
@@ -134,7 +134,7 @@ The web interface provides:
 - **Attachments**: Download generated files (calendar events, CSV exports, etc.)
 - **Feedback**: Rate responses with thumbs up/down and comments
 - **Dynamic Branding**: Instance name and description from .env
-- **Admin Panel**: Whitelist, document, analytics, and backup management (for admin users)
+- **Admin Panel**: Team, document, analytics, and backup management (for admin users)
 
 #### CLI Administration Tool
 
@@ -214,14 +214,14 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 3. **RAG Engine** (`src/rag/`)
    - LlamaIndex query engine with customizable prompts
    - Query optimization (expansion, rewriting, context-aware enhancement)
-   - Function calling / tool system (calendar, export, web search, database, whitelist)
+   - Function calling / tool system (calendar, export, web search, database, team management)
    - Source citation
 
 4. **Email Integration** (`src/email/`)
    - IMAP client with SSL/TLS and STARTTLS support
    - SMTP email sender with TLS encryption
    - Email parser with HTML-to-text conversion
-   - Dual whitelist validation with domain wildcards
+   - Role-based access control with TenantUser lookup
    - Attachment handler with file type validation
    - Conversation manager with Q&A tracking
    - Message tracking (SQLite/MariaDB)
@@ -325,12 +325,6 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 | `SMTP_PASSWORD` | SMTP password | Required |
 | `SMTP_USE_TLS` | Use STARTTLS encryption | `true` |
 | `EMAIL_CHECK_INTERVAL` | Polling frequency in seconds | `300` |
-| `EMAIL_TEACH_WHITELIST_FILE` | Who can add to KB (teach) | `data/config/allowed_teachers.txt` |
-| `EMAIL_TEACH_WHITELIST_ENABLED` | Enable teaching whitelist | `true` |
-| `EMAIL_QUERY_WHITELIST_FILE` | Who can query KB | `data/config/allowed_queriers.txt` |
-| `EMAIL_QUERY_WHITELIST_ENABLED` | Enable query whitelist | `true` |
-| `EMAIL_ADMIN_WHITELIST_FILE` | Admin panel access | `data/config/allowed_admins.txt` |
-| `EMAIL_ADMIN_WHITELIST_ENABLED` | Enable admin whitelist | `true` |
 | `FORWARD_TO_KB_ENABLED` | Treat forwarded emails as KB content | `true` |
 | `FORWARD_SUBJECT_PREFIXES` | Forwarding prefixes (e.g., fw,fwd) | `fw,fwd` |
 
@@ -349,7 +343,7 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 | `API_HOST` | Web server host | `0.0.0.0` |
 | `API_PORT` | Web server port | `8000` |
 
-**Authentication:** Web interface uses OTP-based passwordless authentication. Users must be whitelisted in `EMAIL_QUERY_WHITELIST_FILE` to access the web interface.
+**Authentication:** Web interface uses OTP-based passwordless authentication. Users must have a TenantUser account with query permissions to access the web interface.
 
 ### RAG Customization
 
@@ -402,7 +396,7 @@ RAGInbox/
 │   │       ├── web_search_tools.py       # Web search via DuckDuckGo
 │   │       ├── rag_tools.py              # Knowledge base search
 │   │       ├── database_tools.py         # Conversation history and analytics queries
-│   │       └── whitelist_tools.py        # Whitelist management (admin only)
+│   │       └── team_tools.py             # Team management (admin only)
 │   ├── email/
 │   │   ├── email_client.py               # IMAP client (SSL/TLS, STARTTLS)
 │   │   ├── email_parser.py               # Header/body parsing, forwarding detection
@@ -412,7 +406,6 @@ RAGInbox/
 │   │   ├── email_service.py              # Background daemon with auto-reconnection
 │   │   ├── conversation_manager.py       # Message history with Q&A tracking
 │   │   ├── message_tracker.py            # Deduplication tracking
-│   │   ├── whitelist_validator.py         # Dual whitelist validation
 │   │   ├── db_manager.py                 # Database abstraction (SQLite/MariaDB)
 │   │   ├── db_models.py                  # SQLAlchemy models
 │   │   └── tenant_email_router.py        # Multi-tenant email routing
@@ -424,7 +417,6 @@ RAGInbox/
 │   │   │   ├── otp_manager.py            # One-time password handling
 │   │   │   └── session_manager.py        # Session management
 │   │   ├── admin/                        # Admin panel utilities
-│   │   │   ├── whitelist_manager.py      # Whitelist management
 │   │   │   ├── document_manager.py       # Document management
 │   │   │   ├── backup_manager.py         # Data backup
 │   │   │   └── audit_logger.py           # Admin audit logging
@@ -475,9 +467,6 @@ RAGInbox/
 │   │   └── archive/                      # Archived documents
 │   ├── chroma_db/                        # Vector database storage
 │   ├── config/                           # Configuration files
-│   │   ├── allowed_teachers.txt          # Teaching whitelist
-│   │   ├── allowed_queriers.txt          # Query whitelist
-│   │   ├── allowed_admins.txt            # Admin whitelist
 │   │   ├── custom_prompt.txt             # Custom system prompt (optional)
 │   │   └── email_footer.txt              # Custom email footer (optional)
 │   ├── logs/                             # Application logs
@@ -514,13 +503,13 @@ Berengario includes comprehensive email integration for automatic knowledge base
 - **Forwarded emails** (Fw:, Fwd:) → KB ingestion (configurable)
 - **Teach address emails** (To/CC: teach address) → KB ingestion (optional dedicated address)
 
-**Security (Dual Whitelists):**
+**Security (Role-Based Access Control):**
 - **Separate permissions** for teaching (KB ingestion) vs querying
-- Teaching whitelist (`allowed_teachers.txt`) - who can add content via CC/BCC/forwarding
-- Query whitelist (`allowed_queriers.txt`) - who can ask questions and get RAG replies
-- Users can be in one list, both lists, or neither
+- TenantUser lookup determines who can add content via CC/BCC/forwarding
+- TenantUser lookup determines who can ask questions and get RAG replies
+- Users can have one role, multiple roles, or none
 - Support for domain wildcards (`@example.com`)
-- File-based configuration for easy management
+- Database-backed configuration via team management
 
 **Query Response Features:**
 - Automated RAG-powered email replies
@@ -548,13 +537,13 @@ Berengario's web interface uses OTP-based passwordless authentication for secure
 
 **How it works:**
 1. User enters their email address on the login page
-2. System validates email against query whitelist (`allowed_queriers.txt`)
+2. System validates email via TenantUser lookup for query permissions
 3. If authorized, generates a 6-digit one-time code
 4. Sends OTP code via email using your configured SMTP settings
 5. User enters the code to authenticate and access the chat interface
 
 **Security Features:**
-- **Whitelist Validation**: Only users in `allowed_queriers.txt` can access the web interface
+- **Access Validation**: Only users with a TenantUser account and query permissions can access the web interface
 - **OTP Expiry**: Codes expire after 5 minutes
 - **Attempt Limiting**: Maximum 5 verification attempts per code
 - **Session Management**: Configurable timeout (default 24 hours via `WEB_SESSION_TIMEOUT`)
@@ -565,27 +554,22 @@ Berengario's web interface uses OTP-based passwordless authentication for secure
 ```bash
 # .env
 WEB_SESSION_TIMEOUT=86400  # Session timeout in seconds (24 hours)
-
-# data/config/allowed_queriers.txt
-# Add authorized users (one per line)
-user@example.com
-@example.com  # Domain wildcard for all users at example.com
 ```
 
-Users must be in the query whitelist to receive OTP codes. The system uses your existing SMTP configuration for sending authentication emails.
+Users must have a TenantUser account with query permissions to receive OTP codes. Manage users via the admin panel's team management interface. The system uses your existing SMTP configuration for sending authentication emails.
 
 ### Admin Panel
 
 Berengario includes a comprehensive admin panel for managing your instance:
 
-**Access:** Users in the admin whitelist (`allowed_admins.txt`) will see an admin button after logging in to the web interface.
+**Access:** Users with the admin role will see an admin button after logging in to the web interface.
 
 **Features:**
 
-1. **Whitelist Management**
-   - Add/remove users from query, teacher, and admin whitelists
+1. **Team Management**
+   - Add/remove users with query, teacher, and admin roles
    - Support for email addresses and domain wildcards
-   - Real-time whitelist updates without service restart
+   - Real-time access control updates without service restart
 
 2. **Document Management**
    - Browse all documents in the knowledge base
@@ -616,14 +600,10 @@ Berengario includes a comprehensive admin panel for managing your instance:
 **Configuration:**
 ```bash
 # .env
-EMAIL_ADMIN_WHITELIST_FILE=data/config/allowed_admins.txt
-EMAIL_ADMIN_WHITELIST_ENABLED=true
 WEB_BASE_URL=http://localhost:8000  # Used in backup notification emails
-
-# data/config/allowed_admins.txt
-admin@example.com
-@admin-domain.com  # All users at admin-domain.com
 ```
+
+Admin access is managed via TenantUser roles in the team management interface.
 
 ### Customization
 

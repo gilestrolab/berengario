@@ -36,9 +36,40 @@ def _get_platform_session():
     return sessionmaker(bind=_platform_engine)()
 
 
+def _resolve_tenant_id() -> str:
+    """
+    Resolve the tenant ID from context, falling back to the default tenant.
+
+    In MT mode, tenant_id is set in context. In ST mode, it may be None,
+    so we look up the single (default) tenant from the platform DB.
+
+    Returns:
+        Tenant UUID string.
+
+    Raises:
+        RuntimeError: If no tenant can be resolved.
+    """
+    tenant_id = get_tenant_id()
+    if tenant_id is not None:
+        return tenant_id
+
+    # ST mode: look up the default tenant
+    from src.platform.models import Tenant
+
+    session = _get_platform_session()
+    try:
+        tenant = session.query(Tenant).first()
+        if tenant:
+            return tenant.id
+    finally:
+        session.close()
+
+    raise RuntimeError("No tenant found in platform database.")
+
+
 def add_team_member(email: str, role: str = "querier") -> Dict[str, Any]:
     """
-    Add a user to the current tenant's team (multi-tenant mode only).
+    Add a user to the current tenant's team.
 
     ADMIN ONLY. Creates a TenantUser record in the platform database.
     Sends a welcome email to the new user on success.
@@ -73,12 +104,7 @@ def add_team_member(email: str, role: str = "querier") -> Dict[str, Any]:
                 "message": f"Invalid role '{role}'. Must be 'querier' or 'teacher'.",
             }
 
-        tenant_id = get_tenant_id()
-        if tenant_id is None:
-            return {
-                "success": False,
-                "message": "No tenant context available. Cannot add team member.",
-            }
+        tenant_id = _resolve_tenant_id()
 
         from src.platform.models import TenantUser, TenantUserRole
 
@@ -147,7 +173,7 @@ def add_team_member(email: str, role: str = "querier") -> Dict[str, Any]:
 
 def remove_team_member(email: str) -> Dict[str, Any]:
     """
-    Remove a user from the current tenant's team (multi-tenant mode only).
+    Remove a user from the current tenant's team.
 
     ADMIN ONLY. Deletes the TenantUser record from the platform database.
 
@@ -164,12 +190,7 @@ def remove_team_member(email: str) -> Dict[str, Any]:
         if not email:
             raise ValueError("Email address cannot be empty")
 
-        tenant_id = get_tenant_id()
-        if tenant_id is None:
-            return {
-                "success": False,
-                "message": "No tenant context available. Cannot remove team member.",
-            }
+        tenant_id = _resolve_tenant_id()
 
         from src.platform.models import TenantUser
 

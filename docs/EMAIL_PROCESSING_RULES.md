@@ -22,7 +22,7 @@ Berengario processes incoming emails differently based on how the bot email addr
 - 🤖 **Action**: Send automated reply using RAG
 - 📝 **Content used**: Email body text
 - 📎 **Attachments**: Not processed into KB
-- 🔒 **Whitelist**: Not required (anyone can query)
+- 🔒 **Permission**: Query role required (configurable)
 
 **Example scenarios**:
 ```
@@ -38,7 +38,7 @@ Subject: What is the vacation policy?
 - 🤖 **Action**: Add email body to knowledge base
 - 📝 **Content used**: Email body + attachments
 - 📎 **Attachments**: Processed if present
-- 🔒 **Whitelist**: Required
+- 🔒 **Permission**: Teach role required
 
 **Example scenarios**:
 ```
@@ -63,7 +63,7 @@ Subject: Fw: Important policy update
 - 🤖 **Action**: Add to vector database (no reply sent)
 - 📝 **Content used**: Email body + attachments
 - 📎 **Attachments**: Processed and ingested
-- 🔒 **Whitelist**: Required (only authorized senders)
+- 🔒 **Permission**: Teach role required
 
 **Example scenarios**:
 
@@ -99,7 +99,7 @@ Emails addressed To: or CC: the teach address are **always** treated as KB inges
 - 🤖 **Action**: Add to vector database (no reply sent)
 - 📝 **Content used**: Email body + attachments
 - 📎 **Attachments**: Processed and ingested
-- 🔒 **Whitelist**: Required (teaching whitelist)
+- 🔒 **Permission**: Teach role required
 
 **Example scenarios**:
 ```
@@ -134,21 +134,21 @@ Attachments: vacation_policy_2025.pdf
          ▼              ▼
   ┌──────────────┐  ┌────────────────────────┐
   │ Check TEACH  │  │ Check recipient field  │
-  │  whitelist   │  └─────┬────────┬─────────┘
+  │  permission  │  └─────┬────────┬─────────┘
   └──┬───────┬───┘        │        │
      │Yes    │No     To: bot?   CC/BCC?
      ▼       ▼            │        │
   ┌────┐ ┌────┐           ▼        ▼
   │ KB │ │Rej.│   ┌──────────────┐  ┌────────────────────────┐
-  │ING.│ └────┘   │ Forwarded?   │  │ Check TEACH whitelist  │
-  └────┘          │ (Fw:, Fwd:)  │  │ (allowed_teachers.txt) │
+  │ING.│ └────┘   │ Forwarded?   │  │ Check TEACH permission │
+  └────┘          │ (Fw:, Fwd:)  │  │ (TenantUser role)      │
                   └──┬────────┬──┘  └────┬───────────┬───────┘
                      │ Yes   │ No       │ Yes       │ No
                      ▼       ▼          ▼           ▼
                ┌──────────┐ ┌────────┐  │      ┌─────────┐
                │ Check    │ │ Check  │  │      │ Reject  │
                │ TEACH    │ │ QUERY  │  │      └─────────┘
-               │whitelist │ │whitelist│  │
+               │permiss. │ │permiss. │  │
                └──┬───┬───┘ └─┬────┬─┘  │
                   │Yes│No    │Yes │No    ▼
                   ▼   ▼      ▼    ▼   ┌──────────────┐
@@ -164,64 +164,37 @@ Attachments: vacation_policy_2025.pdf
 
 **Key Points**:
 - **Teach address takes highest priority**: If configured, emails to the teach address are always KB ingestion
-- **Two separate whitelist checks**: Teaching whitelist for KB ingestion, Query whitelist for queries
+- **Two separate permission checks**: Teach permission for KB ingestion, Query permission for queries
 - **Hierarchical**: Admins and teachers can also query (parent validator pattern)
-- **Forwarded emails** (To: bot) check teaching whitelist, not query whitelist
-- **CC/BCC emails** always check teaching whitelist
+- **Forwarded emails** (To: bot) check teach permission, not query permission
+- **CC/BCC emails** always check teach permission
 
 ---
 
-## Whitelist Security
+## Access Control
 
-### Dual Whitelist System
+### Role-Based Access Control
 
-Berengario uses **three separate whitelists** with hierarchical permissions:
+Berengario uses the **TenantUser** model with hierarchical roles to control access:
 
-1. **Teaching Whitelist** (`allowed_teachers.txt`)
-   - Controls who can add content to the knowledge base
-   - Required for: CC'd, BCC'd, and forwarded emails
-   - Prevents unauthorized KB pollution
+1. **Admin** role
+   - Full permissions: can teach, query, and access admin panel
+   - Can manage team members and system settings
 
-2. **Query Whitelist** (`allowed_queriers.txt`)
-   - Controls who can ask questions and receive RAG replies
-   - Required for: Direct emails (To: bot)
-   - Optional: can be disabled for public access
+2. **Member** role (with teach permission)
+   - Can add content to the knowledge base via CC'd, BCC'd, and forwarded emails
+   - Can also send queries and receive RAG replies
 
-3. **Admin Whitelist** (`allowed_admins.txt`)
-   - Controls who can access the admin panel
-   - Full permissions: can teach, query, and manage system
+3. **Member** role (query only)
+   - Can send direct questions and receive RAG replies
+   - Cannot add content to the knowledge base
 
 **Hierarchical Permissions**:
 - **Admins** can do everything (teach + query + admin panel)
-- **Teachers** can teach and query
-- **Queriers** can only query
+- **Members with teach** can teach and query
+- **Members without teach** can only query
 
-### Whitelist Configuration
-
-**Files**:
-- `data/config/allowed_teachers.txt` - Teaching permission
-- `data/config/allowed_queriers.txt` - Query permission
-- `data/config/allowed_admins.txt` - Admin permission
-
-**Syntax** (same for all files):
-```
-# Individual addresses
-alice@imperial.ac.uk
-bob@imperial.ac.uk
-
-# Domain wildcards (all users from domain)
-@imperial.ac.uk
-@ic.ac.uk
-
-# Comments start with #
-# One address/domain per line
-```
-
-**Why dual whitelists?**
-- **Separate concerns**: Teaching vs querying are different permissions
-- **Flexible access control**: Public can query, only staff can teach
-- **Security**: Prevents unauthorized KB pollution while allowing queries
-- **Scalability**: Teachers automatically get query access
+Users are managed via the admin panel or platform admin, not via flat files. Each user's permissions are stored in the `TenantUser` table in the database.
 
 ---
 
@@ -237,7 +210,7 @@ def should_process_as_query(email: EmailMessage) -> bool:
 
 def should_process_for_kb(email: EmailMessage) -> bool:
     """CC'd/BCC'd/forwarded messages are KB contributions."""
-    return email.is_whitelisted and email.is_cced
+    return email.is_authorized and email.is_cced
 ```
 
 **Processing**: `src/email/email_processor.py`
@@ -335,7 +308,7 @@ INSTANCE_NAME=TechDocs-AI
 **Unit tests**: `tests/test_email_parser.py`
 - `test_should_process_as_query_direct_message` ✓
 - `test_should_process_as_query_cced_no_attachments` ✓
-- `test_should_process_for_kb_whitelisted_direct` ✓
+- `test_should_process_for_kb_authorized_direct` ✓
 - `test_should_process_for_kb_cced_no_attachments` ✓
 
 All 47 email parser tests passing ✓
@@ -363,8 +336,8 @@ All 47 email parser tests passing ✓
 **Q: What if I send to the bot AND CC others?**
 A: If the bot appears in `To:`, it's treated as a query (unless it's a forwarded email). Other recipients are irrelevant.
 
-**Q: Can I query the bot if I'm not whitelisted?**
-A: Depends on the query whitelist setting. If `EMAIL_QUERY_WHITELIST_ENABLED=false`, anyone can query. If enabled, only whitelisted queriers can. KB contributions always require the teaching whitelist.
+**Q: Can I query the bot if I don't have an account?**
+A: Only users with a TenantUser record and query permission can send queries. KB contributions require teach permission.
 
 **Q: What happens to forwarded emails sent To: the bot?**
 A: If forwarded detection is enabled (default), they're added to KB instead of triggering a reply. The subject is checked for prefixes like "Fw:" or "Fwd:".
@@ -412,20 +385,12 @@ EMAIL_CHECK_INTERVAL=300  # seconds
 # Forwarded email detection
 FORWARD_TO_KB_ENABLED=true  # Treat forwarded emails as KB content
 FORWARD_SUBJECT_PREFIXES=fw,fwd  # Customize for your language
-
-# Dual Whitelist System
-# Teaching whitelist (who can add content to KB)
-EMAIL_TEACH_WHITELIST_FILE=data/config/allowed_teachers.txt
-EMAIL_TEACH_WHITELIST_ENABLED=true
-
-# Query whitelist (who can ask questions)
-EMAIL_QUERY_WHITELIST_FILE=data/config/allowed_queriers.txt
-EMAIL_QUERY_WHITELIST_ENABLED=true
-
-# Admin whitelist (who can access admin panel)
-EMAIL_ADMIN_WHITELIST_FILE=data/config/allowed_admins.txt
-EMAIL_ADMIN_WHITELIST_ENABLED=true
 ```
+
+**Access Control**:
+
+Permissions are managed via the TenantUser table in the database, not via configuration files.
+Users are added and assigned roles (admin, member) through the admin panel or platform admin.
 
 **See also**:
 - `.env.example` - Full configuration template

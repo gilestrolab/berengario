@@ -102,7 +102,7 @@ class TestMTRequestOTP:
         assert data["success"] is True
 
     def test_request_otp_rejects_in_st_mode(self):
-        """In ST mode, non-whitelisted emails are rejected."""
+        """In ST mode, unauthorized emails are rejected."""
         settings = _make_settings(multi_tenant=False)
         app, _ = _create_test_app(settings_override=settings)
         client = TestClient(app)

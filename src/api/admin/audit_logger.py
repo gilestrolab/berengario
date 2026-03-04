@@ -48,7 +48,7 @@ class AdminAuditLogger:
 
         Args:
             admin_email: Email of admin performing action
-            action: Action performed (e.g., "whitelist_add", "document_delete")
+            action: Action performed (e.g., "user_added", "document_delete")
             target: Target of action (e.g., "queriers", "document_hash")
             result: Result of action ("success", "failed", "denied")
             details: Optional additional details

@@ -244,15 +244,16 @@ class RAGEngine:
             # Check if there are tool calls
             if not hasattr(message, "tool_calls") or not message.tool_calls:
                 # No tools called, but check if this is an administrative query
-                # (whitelist management, clarification requests, etc.)
+                # (team management, clarification requests, etc.)
                 # If so, use the LLM's response directly without RAG retrieval
                 if message.content:
                     query_lower = query_text.lower()
                     response_lower = message.content.lower()
 
-                    # Check if query is about user/whitelist management
+                    # Check if query is about user/team management
                     admin_query_keywords = [
-                        "whitelist",
+                        "team",
+                        "team member",
                         "add to",
                         "remove from",
                         "list of users",
@@ -267,7 +268,7 @@ class RAGEngine:
                     admin_response_keywords = [
                         "confirmation required",
                         "please specify",
-                        "which whitelist",
+                        "which team",
                         "clarification",
                         "ambiguous",
                     ]

@@ -57,8 +57,7 @@ class Tenant(PlatformBase):
     Organization/tenant registry.
 
     Each tenant represents one organization using the platform.
-    Stores configuration that was previously in .env files and
-    whitelist text files.
+    Stores configuration that was previously in .env files.
 
     Attributes:
         id: UUID primary key
@@ -209,7 +208,6 @@ class TenantUser(PlatformBase):
     """
     Maps users to tenants with roles.
 
-    Replaces file-based whitelists (allowed_teachers.txt, allowed_queriers.txt).
     One user can have one role per tenant, but can belong to multiple tenants.
 
     Role hierarchy: admin > teacher > querier
