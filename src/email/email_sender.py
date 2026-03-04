@@ -69,7 +69,7 @@ def generate_feedback_urls(
     """
     # Use settings base URL if not provided
     if not base_url:
-        base_url = getattr(settings, "web_base_url", "http://localhost:8000")
+        base_url = settings.web_base_url
 
     token = generate_feedback_token(message_id)
 
