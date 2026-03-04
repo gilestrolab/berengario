@@ -8,7 +8,7 @@ provides monitoring capabilities.
 
 import logging
 from datetime import date, datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from sqlalchemy import func
 
@@ -156,43 +156,6 @@ class MessageTracker:
                 stats.errors_count += 1
             stats.last_updated = datetime.utcnow()
 
-    def get_message(self, message_id: str) -> Optional[Dict]:
-        """
-        Get details of a processed message.
-
-        Args:
-            message_id: Email message ID.
-
-        Returns:
-            Dictionary with message details, or None if not found.
-        """
-        with db_manager.get_session() as session:
-            message = (
-                session.query(ProcessedMessage)
-                .filter(ProcessedMessage.message_id == message_id)
-                .first()
-            )
-            return message.to_dict() if message else None
-
-    def get_recent_messages(self, limit: int = 10) -> List[Dict]:
-        """
-        Get recently processed messages.
-
-        Args:
-            limit: Maximum number of messages to return.
-
-        Returns:
-            List of message dictionaries, most recent first.
-        """
-        with db_manager.get_session() as session:
-            messages = (
-                session.query(ProcessedMessage)
-                .order_by(ProcessedMessage.processed_at.desc())
-                .limit(limit)
-                .all()
-            )
-            return [msg.to_dict() for msg in messages]
-
     def get_stats(self, days: int = 30) -> Dict:
         """
         Get processing statistics for the last N days.
@@ -286,55 +249,3 @@ class MessageTracker:
 
         logger.info(f"Cleaned up {deleted} message records older than {days} days")
         return deleted
-
-    def get_messages_by_sender(self, sender: str, limit: int = 10) -> List[Dict]:
-        """
-        Get messages from a specific sender.
-
-        Args:
-            sender: Email address of sender.
-            limit: Maximum number of messages to return.
-
-        Returns:
-            List of message dictionaries from this sender.
-        """
-        with db_manager.get_session() as session:
-            messages = (
-                session.query(ProcessedMessage)
-                .filter(ProcessedMessage.sender == sender)
-                .order_by(ProcessedMessage.processed_at.desc())
-                .limit(limit)
-                .all()
-            )
-            return [msg.to_dict() for msg in messages]
-
-    def get_failed_messages(self, limit: int = 10) -> List[Dict]:
-        """
-        Get recently failed message processing attempts.
-
-        Args:
-            limit: Maximum number of messages to return.
-
-        Returns:
-            List of failed message dictionaries.
-        """
-        with db_manager.get_session() as session:
-            messages = (
-                session.query(ProcessedMessage)
-                .filter(ProcessedMessage.status == "error")
-                .order_by(ProcessedMessage.processed_at.desc())
-                .limit(limit)
-                .all()
-            )
-            return [msg.to_dict() for msg in messages]
-
-    def get_total_count(self) -> int:
-        """
-        Get total number of processed messages.
-
-        Returns:
-            Total count of processed messages in database.
-        """
-        with db_manager.get_session() as session:
-            count = session.query(func.count(ProcessedMessage.message_id)).scalar()
-            return count or 0

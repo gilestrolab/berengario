@@ -238,6 +238,32 @@ python -m src.cli.main db stats [--days N]
 - Daily activity breakdown
 - Conversation statistics (email vs webchat)
 
+#### `db cleanup`
+
+Clean up old message tracking records.
+
+```bash
+python -m src.cli.main db cleanup [--days N] [--force]
+```
+
+**Options:**
+- `--days, -d` - Delete records older than N days (default: 90)
+- `--force, -f` - Skip confirmation prompt
+
+**Behavior:**
+- Deletes individual message records older than the specified number of days
+- Daily aggregate statistics are preserved (only detailed records are removed)
+- Helps prevent unbounded database growth
+
+**Example:**
+```bash
+# Clean up records older than 90 days (with confirmation)
+python -m src.cli.main db cleanup
+
+# Clean up records older than 30 days, skip confirmation
+python -m src.cli.main db cleanup --days 30 --force
+```
+
 ### Backup Commands
 
 Create and manage system backups.
@@ -385,6 +411,9 @@ python -m src.cli.main kb reingest
 # Initialize database tables (first-time setup)
 python -m src.cli.main db init
 
+# Clean up old message tracking records
+python -m src.cli.main db cleanup --days 90
+
 # Clean up old backups
 python -m src.cli.main backup cleanup --keep 5 --days 7
 ```
@@ -485,7 +514,8 @@ The CLI uses standard exit codes:
    # Weekly: Clean up old backups
    berengario backup cleanup --keep 5 --days 7
 
-   # Monthly: Check statistics
+   # Monthly: Clean up old message records and check statistics
+   berengario db cleanup --days 90 --force
    berengario kb stats
    berengario db stats --days 30
    ```

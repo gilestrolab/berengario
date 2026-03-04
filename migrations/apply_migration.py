@@ -68,7 +68,7 @@ def apply_migration():
     # Apply migration
     try:
         with db_manager.get_session() as session:
-            logger.info(f"Applying migration to {settings.db_type} database...")
+            logger.info(f"Applying migration to {settings.get_database_url()} database...")
 
             # Apply each ALTER TABLE statement
             for i, stmt_group in enumerate(grouped_statements, 1):

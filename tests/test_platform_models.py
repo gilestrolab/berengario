@@ -238,42 +238,6 @@ class TestTenantUser:
         assert data["role"] == "teacher"
         assert isinstance(data["created_at"], str)
 
-    def test_has_permission_admin_can_do_everything(self):
-        """Test admin has all permissions."""
-        user = TenantUser(
-            email="admin@acme.com",
-            tenant_id="test-uuid",
-            role=TenantUserRole.ADMIN,
-        )
-
-        assert user.has_permission(TenantUserRole.QUERIER) is True
-        assert user.has_permission(TenantUserRole.TEACHER) is True
-        assert user.has_permission(TenantUserRole.ADMIN) is True
-
-    def test_has_permission_teacher(self):
-        """Test teacher can query and teach but not admin."""
-        user = TenantUser(
-            email="teacher@acme.com",
-            tenant_id="test-uuid",
-            role=TenantUserRole.TEACHER,
-        )
-
-        assert user.has_permission(TenantUserRole.QUERIER) is True
-        assert user.has_permission(TenantUserRole.TEACHER) is True
-        assert user.has_permission(TenantUserRole.ADMIN) is False
-
-    def test_has_permission_querier(self):
-        """Test querier can only query."""
-        user = TenantUser(
-            email="user@acme.com",
-            tenant_id="test-uuid",
-            role=TenantUserRole.QUERIER,
-        )
-
-        assert user.has_permission(TenantUserRole.QUERIER) is True
-        assert user.has_permission(TenantUserRole.TEACHER) is False
-        assert user.has_permission(TenantUserRole.ADMIN) is False
-
 
 class TestTenantInviteCode:
     """Tests for Tenant invite code generation."""

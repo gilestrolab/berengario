@@ -135,17 +135,19 @@ def show_stats(
         print_header("Database Statistics")
 
         # Get processing stats
-        stats = message_tracker.get_stats()
+        stats = message_tracker.get_stats(days=days)
 
         # Overall stats
         console.print("  [bold cyan]Overall Statistics:[/bold cyan]")
-        print_key_value("Total Messages", str(stats["total_processed"]))
-        print_key_value("Successful", str(stats["successful"]))
-        print_key_value("Errors", str(stats["errors"]))
+        total = stats["total_emails"]
+        errors = stats["total_errors"]
+        successful = total - errors
+        print_key_value("Total Messages", str(total))
+        print_key_value("Successful", str(successful))
+        print_key_value("Errors", str(errors))
 
-        if stats["total_processed"] > 0:
-            success_rate = (stats["successful"] / stats["total_processed"]) * 100
-            print_key_value("Success Rate", f"{success_rate:.1f}%")
+        if total > 0:
+            print_key_value("Success Rate", f"{stats['success_rate']:.1f}%")
 
         # Recent activity (last N days)
         console.print()
@@ -172,9 +174,9 @@ def show_stats(
             for day_stat in recent_stats:
                 table.add_row(
                     str(day_stat.date),
-                    str(day_stat.total_processed),
-                    str(day_stat.successful),
-                    str(day_stat.errors),
+                    str(day_stat.emails_processed),
+                    str(day_stat.emails_processed - day_stat.errors_count),
+                    str(day_stat.errors_count),
                 )
 
             console.print(table)
@@ -212,3 +214,32 @@ def show_stats(
 
     except Exception as e:
         handle_error(e, "getting statistics")
+
+
+@app.command("cleanup")
+def cleanup_records(
+    days: int = typer.Option(
+        90, "--days", "-d", help="Delete records older than N days"
+    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
+):
+    """
+    Clean up old message tracking records.
+
+    Deletes individual message records older than N days to prevent
+    unbounded database growth. Daily aggregate statistics are kept.
+    """
+    try:
+        print_header("Database Cleanup")
+
+        print_info(f"Will delete message records older than {days} days")
+
+        if not force:
+            typer.confirm("Proceed with cleanup?", abort=True)
+
+        deleted = message_tracker.cleanup_old_records(days=days)
+
+        print_success(f"Cleaned up {deleted} old message record(s)")
+
+    except Exception as e:
+        handle_error(e, "cleaning up records")

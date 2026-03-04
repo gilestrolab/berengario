@@ -271,17 +271,3 @@ class TenantComponentFactory:
             query_handler=query_handler,
             conversation_manager=conv_manager,
         )
-
-    def get_default_components(self) -> TenantComponents:
-        """
-        Get components for single-tenant mode (from global settings).
-
-        Convenience method that creates a TenantContext from settings
-        and returns the cached component stack. The conversation_manager
-        uses the global default database.
-
-        Returns:
-            TenantComponents for the default single-tenant configuration.
-        """
-        ctx = TenantContext.from_settings()
-        return self.get_components(ctx)

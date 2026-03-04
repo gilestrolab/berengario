@@ -281,25 +281,6 @@ class TenantUser(PlatformBase):
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
-    def has_permission(self, required_role: TenantUserRole) -> bool:
-        """
-        Check if user has at least the required role level.
-
-        Role hierarchy: admin > teacher > querier
-
-        Args:
-            required_role: Minimum required role.
-
-        Returns:
-            True if user's role meets or exceeds requirement.
-        """
-        hierarchy = {
-            TenantUserRole.QUERIER: 0,
-            TenantUserRole.TEACHER: 1,
-            TenantUserRole.ADMIN: 2,
-        }
-        return hierarchy.get(self.role, 0) >= hierarchy.get(required_role, 0)
-
 
 class JoinRequestStatus(enum.Enum):
     """Status of a tenant join request."""

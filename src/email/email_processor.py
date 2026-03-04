@@ -1192,22 +1192,3 @@ If you believe you should have access, please contact the administrator at {org}
             Dictionary with statistics.
         """
         return self.message_tracker.get_stats(days=days)
-
-
-# Global email processor instance (lazy initialization to avoid circular imports)
-_email_processor_instance = None
-
-
-def get_email_processor() -> EmailProcessor:
-    """
-    Get the global email processor instance.
-
-    Uses lazy initialization to avoid circular import issues.
-
-    Returns:
-        Global EmailProcessor instance.
-    """
-    global _email_processor_instance
-    if _email_processor_instance is None:
-        _email_processor_instance = EmailProcessor()
-    return _email_processor_instance

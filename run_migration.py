@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 def main():
     """Apply migration to add query tracking columns."""
     logger.info("🔧 Applying migration: Add query tracking columns")
-    logger.info(f"   Database: {settings.db_type}")
+    logger.info(f"   Database: {settings.get_database_url()}")
 
     db_manager = DatabaseManager()
 

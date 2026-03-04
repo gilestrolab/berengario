@@ -6,7 +6,6 @@ auto-provisions a default tenant when none exist (ST mode).
 """
 
 import logging
-import re
 from dataclasses import dataclass
 from typing import Optional
 
@@ -29,22 +28,6 @@ class PlatformInfra:
     storage: object  # StorageBackend
     key_manager: Optional[object] = None  # DatabaseKeyManager | None
     provisioner: Optional[object] = None  # TenantProvisioner | None
-
-
-def _slugify(name: str) -> str:
-    """
-    Convert a name to a URL-safe slug.
-
-    Args:
-        name: Human-readable name (e.g., "My Assistant").
-
-    Returns:
-        Lowercase, hyphenated slug (e.g., "my-assistant").
-    """
-    slug = name.lower().strip()
-    slug = re.sub(r"[^a-z0-9]+", "-", slug)
-    slug = slug.strip("-")
-    return slug[:63] if slug else "default"
 
 
 def auto_provision_default_tenant(db_manager, storage, key_manager=None) -> None:
@@ -73,13 +56,13 @@ def auto_provision_default_tenant(db_manager, storage, key_manager=None) -> None
         "No tenants found — auto-provisioning default tenant from .env settings"
     )
 
-    slug = _slugify(settings.instance_name)
+    from src.platform.provisioning import TenantProvisioner, generate_slug
+
+    slug = generate_slug(settings.instance_name)
     name = settings.instance_name
     description = settings.instance_description
     organization = settings.organization or ""
     email_address = settings.email_target_address
-
-    from src.platform.provisioning import TenantProvisioner
 
     provisioner = TenantProvisioner(db_manager, storage, key_manager)
 

@@ -171,51 +171,6 @@ class QueryHandler:
                 "user_email": user_email,
             }
 
-    def format_for_email(self, result: Dict[str, any]) -> str:
-        """
-        Format query result for email response.
-
-        Args:
-            result: Result dictionary from process_query().
-
-        Returns:
-            Formatted email body text.
-        """
-        if not result["success"]:
-            from src.config import settings
-
-            return (
-                "I apologize, but I encountered an error processing your query.\n\n"
-                f"Error: {result.get('error', 'Unknown error')}\n\n"
-                "Please try rephrasing your question or contact support if the issue persists.\n\n"
-                f"Best regards,\n{settings.instance_name}"
-            )
-
-        return self.rag_engine.format_response_for_email(result)
-
-    def format_for_web(self, result: Dict[str, any]) -> Dict[str, any]:
-        """
-        Format query result for web API response.
-
-        Args:
-            result: Result dictionary from process_query().
-
-        Returns:
-            Dictionary formatted for JSON API response.
-        """
-        if not result["success"]:
-            return {
-                "success": False,
-                "error": result.get("error", "Unknown error"),
-                "timestamp": result["timestamp"],
-            }
-
-        web_result = self.rag_engine.format_response_for_web(result)
-        web_result["success"] = True
-        web_result["timestamp"] = result["timestamp"]
-
-        return web_result
-
     def get_stats(self) -> Dict[str, any]:
         """
         Get knowledge base statistics.

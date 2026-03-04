@@ -183,27 +183,6 @@ class ToolRegistry:
         """
         return [tool.to_openai_function() for tool in self._tools.values()]
 
-    def execute_tool(self, name: str, **kwargs) -> Dict[str, Any]:
-        """
-        Execute a tool by name.
-
-        Args:
-            name: Tool name
-            **kwargs: Tool parameters
-
-        Returns:
-            Tool execution result
-
-        Raises:
-            ValueError: If tool not found
-            Exception: If tool execution fails
-        """
-        tool = self.get(name)
-        if not tool:
-            raise ValueError(f"Tool {name} not found in registry")
-
-        return tool.execute(**kwargs)
-
 
 # Global registry instance
 _global_registry = ToolRegistry()

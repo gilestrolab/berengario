@@ -81,17 +81,8 @@ class TestMessageTracker:
             status="success",
         )
 
-        # Verify message is marked
+        # Verify message is marked as processed
         assert test_tracker.is_processed("<test@example.com>") is True
-
-        # Verify details
-        message = test_tracker.get_message("<test@example.com>")
-        assert message is not None
-        assert message["sender"] == "sender@example.com"
-        assert message["subject"] == "Test Subject"
-        assert message["attachment_count"] == 2
-        assert message["chunks_created"] == 5
-        assert message["status"] == "success"
 
     def test_mark_processed_error(self, test_tracker):
         """Test marking a message with error status."""
@@ -103,9 +94,8 @@ class TestMessageTracker:
             error_message="Connection timeout",
         )
 
-        message = test_tracker.get_message("<error@example.com>")
-        assert message["status"] == "error"
-        assert message["error_message"] == "Connection timeout"
+        # Verify message is marked as processed (even with error status)
+        assert test_tracker.is_processed("<error@example.com>") is True
 
     def test_mark_processed_updates_stats(self, test_tracker):
         """Test that marking processed updates daily statistics."""
@@ -130,30 +120,6 @@ class TestMessageTracker:
         assert stats["total_attachments"] == 3
         assert stats["total_chunks"] == 8
         assert stats["total_errors"] == 0
-
-    def test_get_message_not_found(self, test_tracker):
-        """Test getting a message that doesn't exist."""
-        message = test_tracker.get_message("<nonexistent@example.com>")
-        assert message is None
-
-    def test_get_recent_messages(self, test_tracker):
-        """Test getting recently processed messages."""
-        # Add multiple messages
-        for i in range(5):
-            test_tracker.mark_processed(
-                message_id=f"<test{i}@example.com>",
-                sender="sender@example.com",
-                subject=f"Test {i}",
-            )
-
-        # Get recent messages
-        messages = test_tracker.get_recent_messages(limit=3)
-
-        assert len(messages) == 3
-        # Should be most recent first
-        assert messages[0]["subject"] == "Test 4"
-        assert messages[1]["subject"] == "Test 3"
-        assert messages[2]["subject"] == "Test 2"
 
     def test_get_stats_empty(self, test_tracker):
         """Test getting stats when no messages processed."""
@@ -251,73 +217,3 @@ class TestMessageTracker:
         assert test_tracker.is_processed("<recent@example.com>") is True
         # Old should be deleted
         assert test_tracker.is_processed("<old@example.com>") is False
-
-    def test_get_messages_by_sender(self, test_tracker):
-        """Test getting messages from specific sender."""
-        # Add messages from different senders
-        test_tracker.mark_processed(
-            message_id="<test1@example.com>",
-            sender="alice@example.com",
-            subject="From Alice 1",
-        )
-        test_tracker.mark_processed(
-            message_id="<test2@example.com>",
-            sender="alice@example.com",
-            subject="From Alice 2",
-        )
-        test_tracker.mark_processed(
-            message_id="<test3@example.com>",
-            sender="bob@example.com",
-            subject="From Bob",
-        )
-
-        # Get Alice's messages
-        alice_messages = test_tracker.get_messages_by_sender("alice@example.com")
-
-        assert len(alice_messages) == 2
-        assert all(msg["sender"] == "alice@example.com" for msg in alice_messages)
-
-    def test_get_failed_messages(self, test_tracker):
-        """Test getting failed message processing attempts."""
-        # Add successful messages
-        test_tracker.mark_processed(
-            message_id="<success@example.com>",
-            sender="sender@example.com",
-            status="success",
-        )
-
-        # Add failed messages
-        test_tracker.mark_processed(
-            message_id="<error1@example.com>",
-            sender="sender@example.com",
-            status="error",
-            error_message="Error 1",
-        )
-        test_tracker.mark_processed(
-            message_id="<error2@example.com>",
-            sender="sender@example.com",
-            status="error",
-            error_message="Error 2",
-        )
-
-        # Get failed messages
-        failed = test_tracker.get_failed_messages()
-
-        assert len(failed) == 2
-        assert all(msg["status"] == "error" for msg in failed)
-        assert all(msg["error_message"] is not None for msg in failed)
-
-    def test_get_total_count(self, test_tracker):
-        """Test getting total count of processed messages."""
-        # Initially should be 0
-        assert test_tracker.get_total_count() == 0
-
-        # Add some messages
-        for i in range(5):
-            test_tracker.mark_processed(
-                message_id=f"<test{i}@example.com>",
-                sender="sender@example.com",
-            )
-
-        # Should now be 5
-        assert test_tracker.get_total_count() == 5
