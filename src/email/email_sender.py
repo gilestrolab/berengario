@@ -5,6 +5,7 @@ Handles SMTP connection, email composition, and sending with proper error handli
 """
 
 import base64
+import email.utils
 import logging
 import smtplib
 from email import encoders
@@ -106,10 +107,10 @@ def load_custom_footer(
         feedback_plain = f"\n\nWas this response helpful?\nYes: {feedback_urls['positive']}\nNo: {feedback_urls['negative']}"
 
         feedback_html = f"""
-    <div class="feedback" style="margin-top: 20px; padding: 15px; background-color: #F7F2EA; border-radius: 5px;">
-        <p style="margin: 0 0 10px 0; font-weight: bold;">Was this response helpful?</p>
-        <a href="{feedback_urls['positive']}" style="display: inline-block; padding: 8px 16px; margin-right: 10px; background-color: #5B8C7A; color: white; text-decoration: none; border-radius: 4px;">👍 Yes</a>
-        <a href="{feedback_urls['negative']}" style="display: inline-block; padding: 8px 16px; background-color: #A3423A; color: white; text-decoration: none; border-radius: 4px;">👎 No</a>
+    <div style="margin-top: 20px; padding: 10px 0; border-top: 1px solid #ccc; font-size: 13px; color: #666;">
+        <p style="margin: 0;">Was this response helpful?
+        <a href="{feedback_urls['positive']}" style="color: #337ab7; text-decoration: underline; margin-left: 8px;">Yes</a> |
+        <a href="{feedback_urls['negative']}" style="color: #337ab7; text-decoration: underline;">No</a></p>
     </div>"""
 
     # Resolve footer file: explicit param takes priority, then settings
@@ -261,6 +262,10 @@ class EmailSender:
             msg["From"] = f"{effective_name} <{effective_from}>"
             msg["To"] = to_address
             msg["Subject"] = subject
+            msg["Date"] = email.utils.formatdate(localtime=True)
+            msg["Message-ID"] = email.utils.make_msgid(
+                domain=effective_from.split("@")[1]
+            )
 
             # Add threading headers for proper conversation grouping
             # Ensure Message-IDs are properly formatted with angle brackets (RFC 5322)

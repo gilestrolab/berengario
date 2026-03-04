@@ -16,6 +16,7 @@ from src.api.models import (
     UsageAnalyticsResponse,
     UserQueriesResponse,
 )
+from src.api.routes.helpers import resolve_component
 from src.email.db_models import ConversationMessage, MessageType, ResponseFeedback
 
 logger = logging.getLogger(__name__)
@@ -24,11 +25,64 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["analytics"])
 
 
+def _compute_health_score(structural: dict, retrieval: dict) -> dict:
+    """
+    Compute a composite KB health score (0-100) from structural and retrieval data.
+
+    Four equally-weighted factors (25 points each):
+    - has_documents: 25 if KB has any documents, else 0
+    - freshness: scaled by ratio of non-stale docs
+    - citation_coverage: scaled by coverage percentage
+    - relevance_quality: scaled inversely by low-relevance rate
+
+    Args:
+        structural: Output of KBManager.get_kb_health_metrics()
+        retrieval: Output of ConversationManager.get_retrieval_health_metrics()
+
+    Returns:
+        Dictionary with total score and per-factor breakdown.
+    """
+    total_docs = structural.get("total_documents", 0)
+
+    # Factor 1: Has documents (binary)
+    has_docs_score = 25.0 if total_docs > 0 else 0.0
+
+    # Factor 2: Freshness (ratio of non-stale docs)
+    stale_count = structural.get("stale_count", 0)
+    if total_docs > 0:
+        non_stale_ratio = (total_docs - stale_count) / total_docs
+        freshness_score = round(25.0 * non_stale_ratio, 1)
+    else:
+        freshness_score = 0.0
+
+    # Factor 3: Citation coverage
+    coverage_pct = retrieval.get("citation_coverage_pct", 0)
+    citation_score = round(25.0 * coverage_pct / 100, 1)
+
+    # Factor 4: Relevance quality (inverse of low-relevance rate)
+    low_rel_rate = retrieval.get("low_relevance_rate", 0)
+    relevance_score = round(25.0 * (1 - low_rel_rate / 100), 1)
+
+    total = round(has_docs_score + freshness_score + citation_score + relevance_score)
+
+    return {
+        "total": total,
+        "factors": {
+            "has_documents": {"score": has_docs_score, "max": 25},
+            "freshness": {"score": freshness_score, "max": 25},
+            "citation_coverage": {"score": citation_score, "max": 25},
+            "relevance_quality": {"score": relevance_score, "max": 25},
+        },
+    }
+
+
 def create_analytics_router(
     conversation_manager,
     query_handler,
     require_admin,
     component_resolver=None,
+    kb_manager=None,
+    app_settings=None,
 ):
     """
     Create analytics router with dependency injection.
@@ -38,22 +92,25 @@ def create_analytics_router(
         query_handler: QueryHandler instance (for topic clustering)
         require_admin: Admin authentication dependency
         component_resolver: ComponentResolver for MT mode (optional)
+        kb_manager: KnowledgeBaseManager instance (for KB health metrics)
+        app_settings: Application settings (for similarity threshold)
 
     Returns:
         Configured APIRouter
     """
 
     def _get_cm(session):
-        """Get the conversation manager for this session (MT-aware)."""
-        if component_resolver:
-            return component_resolver.resolve(session).conversation_manager
-        return conversation_manager
+        return resolve_component(
+            component_resolver, session, "conversation_manager", conversation_manager
+        )
 
     def _get_qh(session):
-        """Get the query handler for this session (MT-aware)."""
-        if component_resolver:
-            return component_resolver.resolve(session).query_handler
-        return query_handler
+        return resolve_component(
+            component_resolver, session, "query_handler", query_handler
+        )
+
+    def _get_km(session):
+        return resolve_component(component_resolver, session, "kb_manager", kb_manager)
 
     # ============================================================================
     # Usage Analytics
@@ -446,6 +503,84 @@ def create_analytics_router(
             logger.error(f"Error clustering topics: {e}", exc_info=True)
             raise HTTPException(
                 status_code=500, detail=f"Error clustering topics: {str(e)}"
+            )
+
+    # ============================================================================
+    # KB Health Metrics
+    # ============================================================================
+
+    @router.get("/kb/health")
+    async def get_kb_health(
+        days: Optional[int] = None,
+        session=Depends(require_admin),
+    ):
+        """
+        Get knowledge base health metrics combining structural and retrieval data.
+
+        Requires admin privileges.
+
+        Args:
+            days: Number of days for retrieval metrics (None for all time)
+            session: Admin session (injected by dependency)
+
+        Returns:
+            Dictionary with structural metrics, retrieval metrics, and health score.
+
+        Raises:
+            HTTPException: If computation fails.
+        """
+        try:
+            logger.info(
+                f"Admin {session.email} requested KB health metrics (days={days})"
+            )
+
+            km = _get_km(session)
+
+            if km is None:
+                raise HTTPException(
+                    status_code=501,
+                    detail="KB health metrics not available (kb_manager not configured)",
+                )
+
+            # Structural metrics from ChromaDB
+            structural = km.get_kb_health_metrics()
+
+            # Extract filenames for cross-referencing
+            kb_filenames = [
+                doc.get("filename", "")
+                for doc in structural.get("documents", [])
+                if doc.get("filename")
+            ]
+
+            # Retrieval metrics from conversation data
+            sim_threshold = app_settings.similarity_threshold if app_settings else 0.3
+            retrieval = _get_cm(session).get_retrieval_health_metrics(
+                kb_document_filenames=kb_filenames,
+                days=days,
+                similarity_threshold=sim_threshold,
+            )
+
+            # Compute composite health score
+            health_score = _compute_health_score(structural, retrieval)
+
+            # Remove full document list from response (too large)
+            structural_response = {
+                k: v for k, v in structural.items() if k != "documents"
+            }
+
+            return {
+                "health_score": health_score,
+                "structural": structural_response,
+                "retrieval": retrieval,
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting KB health metrics: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error getting KB health metrics: {str(e)}",
             )
 
     return router

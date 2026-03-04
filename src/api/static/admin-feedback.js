@@ -112,9 +112,11 @@ class FeedbackAnalytics {
 // Initialize all admin panel components when page loads
 const adminPanel = new AdminPanel();
 const usageAnalytics = new UsageAnalytics();
+const kbHealth = new KBHealthAnalytics();
 const feedbackAnalytics = new FeedbackAnalytics();
 
 // Expose to global scope for inline onclick handlers
 window.adminPanel = adminPanel;
 window.usageAnalytics = usageAnalytics;
+window.kbHealth = kbHealth;
 window.feedbackAnalytics = feedbackAnalytics;

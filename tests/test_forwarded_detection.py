@@ -93,7 +93,6 @@ class TestForwardedProcessingLogic:
             message_id="123",
             sender=sender,
             subject="Fw: Important document",
-            is_whitelisted=True,
             is_cced=False,  # Direct to bot
             attachment_count=0,
         )
@@ -110,7 +109,6 @@ class TestForwardedProcessingLogic:
             message_id="123",
             sender=sender,
             subject="Fwd: Team update",
-            is_whitelisted=True,
             is_cced=True,
             attachment_count=0,
         )
@@ -120,22 +118,23 @@ class TestForwardedProcessingLogic:
         # Should be processed for KB
         assert parser_with_forward.should_process_for_kb(email) is True
 
-    def test_forwarded_not_whitelisted_rejected(self, parser_with_forward):
-        """Test forwarded email from non-whitelisted sender is rejected."""
+    def test_forwarded_any_sender_is_kb(self, parser_with_forward):
+        """Forwarded email is identified as KB by parser.
+
+        Permission checking is done by TenantEmailRouter, not the parser.
+        """
         sender = EmailAddress(email="spam@example.com")
         email = EmailMessage(
             message_id="123",
             sender=sender,
-            subject="Fw: Spam message",
-            is_whitelisted=False,
+            subject="Fw: Some message",
             is_cced=False,
             attachment_count=0,
         )
 
-        # Should NOT be processed as query
+        # Parser identifies forwarded → KB (permissions checked elsewhere)
         assert parser_with_forward.should_process_as_query(email) is False
-        # Should NOT be processed for KB (not whitelisted)
-        assert parser_with_forward.should_process_for_kb(email) is False
+        assert parser_with_forward.should_process_for_kb(email) is True
 
     def test_regular_direct_email_is_query(self, parser_with_forward):
         """Test regular direct email (not forwarded) is still a query."""
@@ -144,7 +143,6 @@ class TestForwardedProcessingLogic:
             message_id="123",
             sender=sender,
             subject="What is the vacation policy?",
-            is_whitelisted=True,
             is_cced=False,  # Direct to bot
             attachment_count=0,
         )
@@ -161,7 +159,6 @@ class TestForwardedProcessingLogic:
             message_id="123",
             sender=sender,
             subject="Fw: Document",
-            is_whitelisted=True,
             is_cced=False,  # Direct to bot
             attachment_count=0,
         )

@@ -1,14 +1,14 @@
 """
-Email parser with whitelist validation and HTML conversion.
+Email parser with HTML conversion and processing logic.
 
 This module provides parsing of email messages with support for:
 - Header extraction (From, To, CC, Subject, Date, Message-ID)
 - Body extraction (text/plain preferred, text/html fallback)
 - HTML to text conversion
-- Sender whitelist validation
 - Processing logic:
   - Direct emails (To: bot) → Query (send reply)
   - CC/BCC/Forwarded → KB ingestion (add to knowledge base)
+  - Emails addressed to teach address → KB ingestion (always)
 """
 
 import logging
@@ -78,7 +78,6 @@ class EmailMessage(BaseModel):
         date: Email date
         body_text: Plain text body
         body_html: HTML body (if available)
-        is_whitelisted: Whether sender is whitelisted
         is_cced: Whether this is a CC'd message
         attachment_count: Number of attachments
     """
@@ -91,7 +90,6 @@ class EmailMessage(BaseModel):
     date: Optional[datetime] = Field(default=None, description="Email date")
     body_text: str = Field(default="", description="Plain text body")
     body_html: str = Field(default="", description="HTML body")
-    is_whitelisted: bool = Field(default=False, description="Sender is whitelisted")
     is_cced: bool = Field(default=False, description="Is CC'd message")
     attachment_count: int = Field(default=0, description="Number of attachments")
     in_reply_to: Optional[str] = Field(
@@ -147,35 +145,36 @@ class EmailMessage(BaseModel):
 
 class EmailParser:
     """
-    Parses email messages with whitelist validation.
+    Parses email messages and determines processing action.
 
     This class converts imap-tools MailMessage objects into parsed EmailMessage
     models with:
     - Header extraction
     - Body extraction and HTML conversion
-    - Sender whitelist validation
     - CC detection
 
     Attributes:
         target_address: Target email address for KB contributions
-        validator: Whitelist validator instance
         html_converter: HTML to text converter
     """
 
     def __init__(
         self,
         target_address: Optional[str] = None,
-        validator=None,
+        teach_address: Optional[str] = None,
     ):
         """
         Initialize email parser.
 
         Args:
             target_address: Target email for KB contributions (defaults to settings)
-            validator: Whitelist validator (optional, only used for logging is_whitelisted field)
+            teach_address: Dedicated teach address that always triggers KB ingestion
         """
         self.target_address = (target_address or settings.email_target_address).lower()
-        self.validator = validator
+
+        # Configure dedicated teach address
+        teach_addr = teach_address or settings.email_teach_address
+        self.teach_address = teach_addr.lower().strip() if teach_addr else None
 
         # Configure forwarded email detection
         self.forward_to_kb_enabled = settings.forward_to_kb_enabled
@@ -194,6 +193,8 @@ class EmailParser:
         self.html_converter.single_line_break = False
 
         logger.info(f"EmailParser initialized for target: {self.target_address}")
+        if self.teach_address:
+            logger.info(f"Dedicated teach address: {self.teach_address}")
         if self.forward_to_kb_enabled:
             logger.info(
                 f"Forwarded email detection enabled with prefixes: {self.forward_prefixes}"
@@ -413,6 +414,35 @@ class EmailParser:
                 return False  # Target is in To: field
         return True  # Target not in To: field (must be CC'd)
 
+    def is_addressed_to_teach(self, email: "EmailMessage") -> bool:
+        """
+        Check if the email was addressed to the dedicated teach address.
+
+        If a teach address is configured (e.g., teach@berengar.io), any email
+        that has this address in its To: or CC: headers is treated as KB
+        ingestion regardless of other rules.
+
+        Args:
+            email: Parsed EmailMessage
+
+        Returns:
+            True if the teach address appears in To: or CC: headers.
+        """
+        if not self.teach_address:
+            return False
+
+        for addr in email.to:
+            if addr.email.lower() == self.teach_address:
+                logger.debug(f"Teach address {self.teach_address} found in To: field")
+                return True
+
+        for addr in email.cc:
+            if addr.email.lower() == self.teach_address:
+                logger.debug(f"Teach address {self.teach_address} found in CC: field")
+                return True
+
+        return False
+
     def is_forwarded(self, subject: str) -> bool:
         """
         Check if email subject indicates forwarded message.
@@ -478,15 +508,6 @@ class EmailParser:
             if not sender:
                 raise ValueError("Invalid sender address")
 
-            # Check whitelist (for logging only - actual validation done by EmailProcessor)
-            is_whitelisted = (
-                self.validator.is_allowed(sender.email) if self.validator else False
-            )
-            if not is_whitelisted and self.validator:
-                logger.debug(
-                    f"Message from {sender.email} not in parser's whitelist (check EmailProcessor validators)"
-                )
-
             # Parse recipients
             to_addresses = self.parse_email_list(message.to or "")
             cc_addresses = self.parse_email_list(message.cc or "")
@@ -517,7 +538,6 @@ class EmailParser:
                 date=date,
                 body_text=body_text,
                 body_html=body_html,
-                is_whitelisted=is_whitelisted,
                 is_cced=is_cced,
                 attachment_count=attachment_count,
                 in_reply_to=in_reply_to,
@@ -526,7 +546,7 @@ class EmailParser:
 
             logger.info(
                 f"Parsed email: {email_message.message_id} from {sender.email} "
-                f"(whitelisted={is_whitelisted}, cc'd={is_cced})"
+                f"(cc'd={is_cced})"
             )
 
             return email_message
@@ -540,7 +560,7 @@ class EmailParser:
         Determine if email should be processed as a query (send reply).
 
         Queries are direct messages sent TO the bot account (not CC'd),
-        excluding forwarded emails when forward detection is enabled.
+        excluding forwarded emails and emails addressed to the teach address.
 
         Args:
             email: Parsed EmailMessage
@@ -548,6 +568,10 @@ class EmailParser:
         Returns:
             True if should be treated as query, False for KB ingestion.
         """
+        # Emails addressed to the teach address are always KB, never queries
+        if self.is_addressed_to_teach(email):
+            return False
+
         # Check if this is a forwarded email (if enabled)
         if self.is_forwarded(email.subject):
             # Forwarded emails are KB contributions, not queries
@@ -564,9 +588,8 @@ class EmailParser:
         """
         Determine if email should be processed for KB ingestion.
 
-        KB ingestion requires:
-        - Whitelisted sender
-        - CC'd, BCC'd, or forwarded (not direct To: recipient)
+        Checks email structure only (CC/BCC/forward/teach-address).
+        Permission checking is done by the processor via TenantEmailRouter.
 
         Args:
             email: Parsed EmailMessage
@@ -574,8 +597,9 @@ class EmailParser:
         Returns:
             True if should ingest into KB.
         """
-        if not email.is_whitelisted:
-            return False
+        # Emails addressed to the teach address are always KB contributions
+        if self.is_addressed_to_teach(email):
+            return True
 
         # Forwarded emails (when enabled) are always KB contributions
         if self.is_forwarded(email.subject):

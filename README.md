@@ -512,6 +512,7 @@ Berengario includes comprehensive email integration for automatic knowledge base
 - **Direct emails** (To: bot) → RAG-powered query processing + automated reply
 - **CC/BCC emails** → Silent KB ingestion
 - **Forwarded emails** (Fw:, Fwd:) → KB ingestion (configurable)
+- **Teach address emails** (To/CC: teach address) → KB ingestion (optional dedicated address)
 
 **Security (Dual Whitelists):**
 - **Separate permissions** for teaching (KB ingestion) vs querying

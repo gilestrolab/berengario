@@ -119,8 +119,8 @@ class TestAddTeamMember:
         assert result["success"] is False
         assert "Invalid role" in result["message"]
 
-    def test_rejects_non_mt_mode(self):
-        """Return error when tenant_id is None (ST mode)."""
+    def test_rejects_no_tenant_context(self):
+        """Return error when tenant_id is None."""
         set_tool_context(user_email="admin@co.com", is_admin=True)  # no tenant_id
 
         from src.rag.tools.team_tools import add_team_member
@@ -128,8 +128,7 @@ class TestAddTeamMember:
         result = add_team_member(email="user@co.com")
 
         assert result["success"] is False
-        assert "multi-tenant" in result["message"].lower()
-        assert "whitelist" in result["message"].lower()
+        assert "no tenant context" in result["message"].lower()
 
     def test_existing_user(self):
         """Return message when user already exists."""
@@ -273,8 +272,8 @@ class TestRemoveTeamMember:
         assert "not a member" in result["message"].lower()
         mock_session.delete.assert_not_called()
 
-    def test_rejects_non_mt_mode(self):
-        """Return error when not in MT mode."""
+    def test_rejects_no_tenant_context(self):
+        """Return error when tenant_id is None."""
         set_tool_context(user_email="admin@co.com", is_admin=True)  # no tenant_id
 
         from src.rag.tools.team_tools import remove_team_member
@@ -282,7 +281,7 @@ class TestRemoveTeamMember:
         result = remove_team_member(email="user@co.com")
 
         assert result["success"] is False
-        assert "multi-tenant" in result["message"].lower()
+        assert "no tenant context" in result["message"].lower()
 
     def test_non_admin_rejected(self):
         """Non-admin user gets PermissionError."""

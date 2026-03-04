@@ -4,7 +4,7 @@ Tests for RAG search tools.
 Tests explicit knowledge base search functionality with mocked KB manager.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 from src.rag.tools.context import clear_tool_context, get_kb_manager, set_tool_context
 from src.rag.tools.rag_tools import rag_search
@@ -106,7 +106,7 @@ class TestRAGSearch:
         result = rag_search("test", top_k=-1)
         assert result["success"] is True
         # Should be adjusted to 5
-        mock_kb.get_query_engine.assert_called_with(top_k=5)
+        mock_kb.get_query_engine.assert_called_with(top_k=5, llm=ANY)
 
         # Test zero top_k
         result = rag_search("test", top_k=0)
@@ -188,7 +188,7 @@ class TestRAGSearch:
         result = rag_search("test query")
 
         # Should call with top_k=5 (default)
-        mock_kb.get_query_engine.assert_called_with(top_k=5)
+        mock_kb.get_query_engine.assert_called_with(top_k=5, llm=ANY)
         assert result["success"] is True
 
 
@@ -259,7 +259,7 @@ class TestRAGSearchContext:
             assert result["num_results"] == 1
             assert result["documents"][0]["text"] == "Context KB result"
             # Verify the context KB was used, not a new default one
-            mock_kb.get_query_engine.assert_called_once_with(top_k=3)
+            mock_kb.get_query_engine.assert_called_once_with(top_k=3, llm=ANY)
         finally:
             clear_tool_context()
 

@@ -17,13 +17,19 @@ from src.email.db_models import ChannelType, MessageType
 @pytest.fixture
 def conversation_manager():
     """Create conversation manager with test database."""
-    # Setup test database
-    with patch("src.email.db_manager.settings") as mock_settings:
-        mock_settings.db_type = "sqlite"
-        mock_settings.sqlite_db_path = ":memory:"
-        mock_settings.debug = False
-        mock_settings.get_database_url.return_value = "sqlite:///:memory:"
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import StaticPool
 
+    test_engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
+    with (
+        patch.object(DatabaseManager, "_create_engine", return_value=test_engine),
+        patch("src.email.db_manager.settings"),
+    ):
         test_db_manager = DatabaseManager()
         test_db_manager.init_db()
 

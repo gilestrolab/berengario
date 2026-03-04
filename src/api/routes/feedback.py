@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
 from src.api.models import FeedbackRequest, FeedbackResponse
+from src.api.routes.helpers import get_session_email, resolve_component
 from src.email.conversation_manager import MessageType
 
 logger = logging.getLogger(__name__)
@@ -39,10 +40,71 @@ def create_feedback_router(
     """
 
     def _get_cm(session):
-        """Get the conversation manager for this session (MT-aware)."""
-        if component_resolver:
-            return component_resolver.resolve(session).conversation_manager
-        return conversation_manager
+        return resolve_component(
+            component_resolver, session, "conversation_manager", conversation_manager
+        )
+
+    def _upsert_feedback(db_session, message_id, is_positive, comment, user_email=None):
+        """
+        Validate a message and create or update its feedback record.
+
+        Args:
+            db_session: Active SQLAlchemy session.
+            message_id: ID of the message to rate.
+            is_positive: Whether the feedback is positive.
+            comment: Optional comment text.
+            user_email: Rater's email. If None, derived from the
+                message's conversation sender (email-link case).
+
+        Raises:
+            HTTPException: On missing message or wrong message type.
+        """
+        from src.email.db_models import ConversationMessage, ResponseFeedback
+
+        message = (
+            db_session.query(ConversationMessage)
+            .filter(ConversationMessage.id == message_id)
+            .first()
+        )
+
+        if not message:
+            raise HTTPException(status_code=404, detail="Message not found")
+
+        if message.message_type != MessageType.REPLY:
+            raise HTTPException(
+                status_code=400,
+                detail="Can only provide feedback on assistant replies",
+            )
+
+        if user_email is None:
+            user_email = message.conversation.sender
+
+        existing = (
+            db_session.query(ResponseFeedback)
+            .filter(
+                ResponseFeedback.message_id == message_id,
+                ResponseFeedback.user_email == user_email,
+            )
+            .first()
+        )
+
+        if existing:
+            existing.is_positive = is_positive
+            existing.comment = comment
+            existing.submitted_at = datetime.utcnow()
+            db_session.commit()
+            logger.info(f"Updated feedback for message {message_id} from {user_email}")
+        else:
+            new_feedback = ResponseFeedback(
+                message_id=message_id,
+                is_positive=is_positive,
+                comment=comment,
+                user_email=user_email,
+                channel=message.conversation.channel,
+            )
+            db_session.add(new_feedback)
+            db_session.commit()
+            logger.info(f"Stored feedback for message {message_id} from {user_email}")
 
     @router.get("/feedback")
     async def feedback_page():
@@ -69,10 +131,8 @@ def create_feedback_router(
             FeedbackResponse with success status
         """
         try:
-            from src.email.db_models import ConversationMessage, ResponseFeedback
             from src.email.email_sender import decode_feedback_token
 
-            # Extract fields
             token = feedback.get("token")
             message_id = feedback.get("message_id")
             is_positive = feedback.get("is_positive")
@@ -81,64 +141,12 @@ def create_feedback_router(
             if not token or message_id is None:
                 raise HTTPException(status_code=400, detail="Missing required fields")
 
-            # Decode and validate token
             decoded_message_id = decode_feedback_token(token)
             if decoded_message_id != message_id:
                 raise HTTPException(status_code=400, detail="Invalid feedback token")
 
-            # Verify message exists and is a reply
             with conversation_manager.db_manager.get_session() as db_session:
-                message = (
-                    db_session.query(ConversationMessage)
-                    .filter(ConversationMessage.id == message_id)
-                    .first()
-                )
-
-                if not message:
-                    raise HTTPException(status_code=404, detail="Message not found")
-
-                if message.message_type != MessageType.REPLY:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Can only provide feedback on assistant replies",
-                    )
-
-                # Get user email from the conversation
-                user_email = message.conversation.sender
-
-                # Check if feedback already exists for this message from this user
-                existing_feedback = (
-                    db_session.query(ResponseFeedback)
-                    .filter(
-                        ResponseFeedback.message_id == message_id,
-                        ResponseFeedback.user_email == user_email,
-                    )
-                    .first()
-                )
-
-                if existing_feedback:
-                    # Update existing feedback
-                    existing_feedback.is_positive = is_positive
-                    existing_feedback.comment = comment
-                    existing_feedback.submitted_at = datetime.utcnow()
-                    db_session.commit()
-                    logger.info(
-                        f"Updated email feedback for message {message_id} from {user_email}"
-                    )
-                else:
-                    # Create new feedback
-                    new_feedback = ResponseFeedback(
-                        message_id=message_id,
-                        is_positive=is_positive,
-                        comment=comment,
-                        user_email=user_email,
-                        channel=message.conversation.channel,
-                    )
-                    db_session.add(new_feedback)
-                    db_session.commit()
-                    logger.info(
-                        f"Stored email feedback for message {message_id} from {user_email}"
-                    )
+                _upsert_feedback(db_session, message_id, is_positive, comment)
 
             return FeedbackResponse(
                 success=True, message="Feedback submitted successfully"
@@ -168,66 +176,17 @@ def create_feedback_router(
             FeedbackResponse with success status
         """
         try:
-            from src.email.db_models import ConversationMessage, ResponseFeedback
+            user_email = get_session_email(session)
 
-            # Get user email from session
-            user_email = (
-                session.email
-                if hasattr(session, "email") and session.email
-                else f"web_user_{session.session_id[:8]}"
-            )
-
-            # Verify message exists and is a reply
             cm = _get_cm(session)
             with cm.db_manager.get_session() as db_session:
-                message = (
-                    db_session.query(ConversationMessage)
-                    .filter(ConversationMessage.id == feedback.message_id)
-                    .first()
+                _upsert_feedback(
+                    db_session,
+                    feedback.message_id,
+                    feedback.is_positive,
+                    feedback.comment,
+                    user_email=user_email,
                 )
-
-                if not message:
-                    raise HTTPException(status_code=404, detail="Message not found")
-
-                if message.message_type != MessageType.REPLY:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Can only provide feedback on assistant replies",
-                    )
-
-                # Check if feedback already exists for this message from this user
-                existing_feedback = (
-                    db_session.query(ResponseFeedback)
-                    .filter(
-                        ResponseFeedback.message_id == feedback.message_id,
-                        ResponseFeedback.user_email == user_email,
-                    )
-                    .first()
-                )
-
-                if existing_feedback:
-                    # Update existing feedback
-                    existing_feedback.is_positive = feedback.is_positive
-                    existing_feedback.comment = feedback.comment
-                    existing_feedback.submitted_at = datetime.utcnow()
-                    db_session.commit()
-                    logger.info(
-                        f"Updated feedback for message {feedback.message_id} from {user_email}"
-                    )
-                else:
-                    # Create new feedback
-                    new_feedback = ResponseFeedback(
-                        message_id=feedback.message_id,
-                        is_positive=feedback.is_positive,
-                        comment=feedback.comment,
-                        user_email=user_email,
-                        channel=message.conversation.channel,
-                    )
-                    db_session.add(new_feedback)
-                    db_session.commit()
-                    logger.info(
-                        f"Stored feedback for message {feedback.message_id} from {user_email}"
-                    )
 
             return FeedbackResponse(
                 success=True, message="Feedback submitted successfully"

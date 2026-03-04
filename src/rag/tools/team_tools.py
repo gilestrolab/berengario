@@ -1,9 +1,8 @@
 """
-Team management tools for multi-tenant mode.
+Team management tools.
 
-Provides LLM-callable functions to add/remove team members in MT mode.
-In ST mode, these tools return an error directing admins to use the
-whitelist tools instead.
+Provides LLM-callable functions to add/remove team members.
+Uses TenantUser records in the platform database.
 """
 
 import logging
@@ -74,15 +73,11 @@ def add_team_member(email: str, role: str = "querier") -> Dict[str, Any]:
                 "message": f"Invalid role '{role}'. Must be 'querier' or 'teacher'.",
             }
 
-        # Check we're in MT mode
         tenant_id = get_tenant_id()
         if tenant_id is None:
             return {
                 "success": False,
-                "message": (
-                    "This tool is for multi-tenant mode only. "
-                    "Use the whitelist tools (add_to_query_whitelist / add_to_teach_whitelist) instead."
-                ),
+                "message": "No tenant context available. Cannot add team member.",
             }
 
         from src.platform.models import TenantUser, TenantUserRole
@@ -173,10 +168,7 @@ def remove_team_member(email: str) -> Dict[str, Any]:
         if tenant_id is None:
             return {
                 "success": False,
-                "message": (
-                    "This tool is for multi-tenant mode only. "
-                    "Use the whitelist tools (remove_from_query_whitelist / remove_from_teach_whitelist) instead."
-                ),
+                "message": "No tenant context available. Cannot remove team member.",
             }
 
         from src.platform.models import TenantUser
@@ -221,7 +213,7 @@ def remove_team_member(email: str) -> Dict[str, Any]:
 add_team_member_tool = Tool(
     name="add_team_member",
     description=(
-        "Add a user to the team (multi-tenant mode). Creates a team membership with "
+        "Add a user to the team. Creates a team membership with "
         "the specified role. ADMIN ONLY. Use 'querier' for users who should only ask "
         "questions, or 'teacher' for users who can also add content to the knowledge base."
     ),
@@ -247,8 +239,7 @@ add_team_member_tool = Tool(
 remove_team_member_tool = Tool(
     name="remove_team_member",
     description=(
-        "Remove a user from the team (multi-tenant mode). Revokes their access entirely. "
-        "ADMIN ONLY."
+        "Remove a user from the team. Revokes their access entirely. " "ADMIN ONLY."
     ),
     parameters=[
         ToolParameter(

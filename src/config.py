@@ -101,6 +101,19 @@ class Settings(BaseSettings):
         default=10485760, description="Maximum attachment size in bytes (10MB default)"
     )
 
+    # Dedicated Teach Address
+    email_teach_address: Optional[str] = Field(
+        default=None,
+        description="Dedicated email address for KB ingestion (e.g., teach@berengar.io). "
+        "Emails addressed to this address are always treated as teaching, not queries.",
+    )
+
+    # Welcome Emails
+    welcome_email_enabled: bool = Field(
+        default=True,
+        description="Send welcome emails when users are added to a team",
+    )
+
     # Forwarded Email Detection
     forward_to_kb_enabled: bool = Field(
         default=True,
@@ -111,60 +124,7 @@ class Settings(BaseSettings):
         description="Comma-separated case-insensitive subject prefixes for forwarded emails",
     )
 
-    # Email Whitelist (Security) - Dual whitelists for teach vs query permissions
-    # Teaching whitelist (for KB ingestion via CC/BCC/forwarding)
-    email_teach_whitelist: str = Field(
-        default="",
-        description="Comma-separated list of email addresses/domains allowed to add content to KB",
-    )
-    email_teach_whitelist_file: Optional[Path] = Field(
-        default=Path("data/config/allowed_teachers.txt"),
-        description="Path to file with email addresses/domains allowed to teach (one per line)",
-    )
-    email_teach_whitelist_enabled: bool = Field(
-        default=True,
-        description="Enable teaching whitelist validation",
-    )
-
-    # Query whitelist (for asking questions and receiving RAG replies)
-    email_query_whitelist: str = Field(
-        default="",
-        description="Comma-separated list of email addresses/domains allowed to query the KB",
-    )
-    email_query_whitelist_file: Optional[Path] = Field(
-        default=Path("data/config/allowed_queriers.txt"),
-        description="Path to file with email addresses/domains allowed to query (one per line)",
-    )
-    email_query_whitelist_enabled: bool = Field(
-        default=True,
-        description="Enable query whitelist validation",
-    )
-
-    # Admin Whitelist (for web interface admin access)
-    email_admin_whitelist: str = Field(
-        default="",
-        description="Comma-separated list of email addresses/domains with admin access",
-    )
-    email_admin_whitelist_file: Optional[Path] = Field(
-        default=Path("data/config/allowed_admins.txt"),
-        description="Path to file with email addresses/domains with admin access (one per line)",
-    )
-    email_admin_whitelist_enabled: bool = Field(
-        default=True,
-        description="Enable admin whitelist validation",
-    )
-
-    # Database Configuration (Message Tracking)
-    db_type: str = Field(
-        default="sqlite",
-        description="Database type: 'sqlite' or 'mariadb'",
-    )
-    # SQLite settings
-    sqlite_db_path: Path = Field(
-        default=Path("data/message_tracker.db"),
-        description="SQLite database file path",
-    )
-    # MariaDB/MySQL settings
+    # Database Configuration (MariaDB — used for message tracking + platform)
     db_host: str = Field(default="localhost", description="Database host")
     db_port: int = Field(default=3306, description="Database port")
     db_name: str = Field(default="berengario", description="Database name")
@@ -298,7 +258,8 @@ class Settings(BaseSettings):
     # Multi-Tenancy Configuration
     multi_tenant: bool = Field(
         default=False,
-        description="Enable multi-tenant mode. When False, behaves as single-tenant (current behavior).",
+        description="Enable multi-tenant features (tenant creation, onboarding, platform admin). "
+        "Both modes use TenantUser DB for permissions; ST auto-provisions a default tenant.",
     )
     platform_domain: str = Field(
         default="berengar.io",
@@ -407,27 +368,6 @@ class Settings(BaseSettings):
             raise ValueError(f"Log level must be one of {valid_levels}")
         return v_upper
 
-    @field_validator("db_type")
-    @classmethod
-    def validate_db_type(cls, v: str) -> str:
-        """
-        Validate database type is supported.
-
-        Args:
-            v: Database type string.
-
-        Returns:
-            Validated database type.
-
-        Raises:
-            ValueError: If database type is invalid.
-        """
-        valid_types = ["sqlite", "mariadb", "mysql"]
-        v_lower = v.lower()
-        if v_lower not in valid_types:
-            raise ValueError(f"Database type must be one of {valid_types}")
-        return v_lower
-
     @field_validator("storage_backend")
     @classmethod
     def validate_storage_backend(cls, v: str) -> str:
@@ -504,31 +444,24 @@ class Settings(BaseSettings):
 
     def get_database_url(self) -> str:
         """
-        Get SQLAlchemy database URL based on configuration.
+        Get SQLAlchemy database URL for MariaDB.
 
         Returns:
             Database connection URL string.
 
         Examples:
-            SQLite: "sqlite:///data/message_tracker.db"
             MariaDB: "mysql+pymysql://user:pass@host:3306/dbname"
         """
-        if self.db_type == "sqlite":
-            return f"sqlite:///{self.sqlite_db_path}"
-        elif self.db_type in ("mariadb", "mysql"):
-            # Use pymysql driver (pure Python, works in containers)
-            if self.db_password:
-                return (
-                    f"mysql+pymysql://{self.db_user}:{self.db_password}"
-                    f"@{self.db_host}:{self.db_port}/{self.db_name}"
-                )
-            else:
-                return (
-                    f"mysql+pymysql://{self.db_user}"
-                    f"@{self.db_host}:{self.db_port}/{self.db_name}"
-                )
+        if self.db_password:
+            return (
+                f"mysql+pymysql://{self.db_user}:{self.db_password}"
+                f"@{self.db_host}:{self.db_port}/{self.db_name}"
+            )
         else:
-            raise ValueError(f"Unsupported database type: {self.db_type}")
+            return (
+                f"mysql+pymysql://{self.db_user}"
+                f"@{self.db_host}:{self.db_port}/{self.db_name}"
+            )
 
     def ensure_directories(self) -> None:
         """
@@ -539,14 +472,11 @@ class Settings(BaseSettings):
             - ChromaDB storage directory
             - Logs directory
             - Email temp directory
-            - SQLite database directory (if using SQLite)
         """
         self.documents_path.mkdir(parents=True, exist_ok=True)
         self.chroma_db_path.mkdir(parents=True, exist_ok=True)
         self.log_file.parent.mkdir(parents=True, exist_ok=True)
         self.email_temp_dir.mkdir(parents=True, exist_ok=True)
-        if self.db_type == "sqlite":
-            self.sqlite_db_path.parent.mkdir(parents=True, exist_ok=True)
 
 
 # Global settings instance

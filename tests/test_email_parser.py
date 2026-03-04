@@ -1,7 +1,7 @@
 """
 Unit tests for email parser.
 
-Tests email parsing, whitelist integration, and HTML conversion.
+Tests email parsing and HTML conversion.
 
 This module tests the EmailParser class functionality.
 """
@@ -24,21 +24,14 @@ def mock_settings():
     """Mock settings for email configuration."""
     with patch("src.email.email_parser.settings") as mock:
         mock.email_target_address = "bot@example.com"
+        mock.email_teach_address = None
         yield mock
 
 
 @pytest.fixture
-def mock_validator():
-    """Mock whitelist validator."""
-    mock = MagicMock()
-    mock.is_allowed.return_value = True  # Default: allow all
-    return mock
-
-
-@pytest.fixture
-def parser(mock_settings, mock_validator):
-    """Email parser with mock validator."""
-    return EmailParser(validator=mock_validator)
+def parser(mock_settings):
+    """Email parser with mocked settings."""
+    return EmailParser()
 
 
 def create_mock_mail_message(
@@ -152,7 +145,6 @@ class TestEmailMessage:
             cc=cc,
             subject="Test",
             body_text="Body text",
-            is_whitelisted=True,
             is_cced=False,
             attachment_count=2,
         )
@@ -161,7 +153,6 @@ class TestEmailMessage:
         assert len(msg.to) == 1
         assert len(msg.cc) == 1
         assert msg.subject == "Test"
-        assert msg.is_whitelisted is True
         assert msg.attachment_count == 2
 
     def test_clean_subject(self):
@@ -227,18 +218,15 @@ class TestEmailMessage:
 class TestEmailParser:
     """Tests for EmailParser class."""
 
-    def test_init_with_defaults(self, mock_settings, mock_validator):
+    def test_init_with_defaults(self, mock_settings):
         """Test initializing parser with defaults."""
-        parser = EmailParser(validator=mock_validator)
+        parser = EmailParser()
 
         assert parser.target_address == "bot@example.com"
-        assert parser.validator is mock_validator
 
-    def test_init_with_custom_target(self, mock_settings, mock_validator):
+    def test_init_with_custom_target(self, mock_settings):
         """Test initializing with custom target address."""
-        parser = EmailParser(
-            target_address="custom@example.com", validator=mock_validator
-        )
+        parser = EmailParser(target_address="custom@example.com")
 
         assert parser.target_address == "custom@example.com"
 
@@ -369,10 +357,8 @@ class TestEmailParser:
 
         assert is_cced is False  # Should match despite case
 
-    def test_parse_success(self, parser, mock_validator):
+    def test_parse_success(self, parser):
         """Test successful parsing of email."""
-        mock_validator.is_allowed.return_value = True
-
         msg = create_mock_mail_message(
             uid="12345",
             from_="Alice <alice@example.com>",
@@ -392,22 +378,18 @@ class TestEmailParser:
         assert len(email.cc) == 1
         assert email.subject == "Test Subject"
         assert email.body_text == "Body text"
-        assert email.is_whitelisted is True
         assert email.is_cced is False  # Target in To: field
         assert email.attachment_count == 2
 
-    def test_parse_not_whitelisted(self, parser, mock_validator):
-        """Test parsing email from non-whitelisted sender."""
-        mock_validator.is_allowed.return_value = False
-
-        msg = create_mock_mail_message(from_="spam@spam.com")
+    def test_parse_unknown_sender(self, parser):
+        """Test parsing email from unknown sender still works."""
+        msg = create_mock_mail_message(from_="unknown@spam.com")
 
         email = parser.parse(msg)
 
         assert email is not None
-        assert email.is_whitelisted is False
 
-    def test_parse_cced_message(self, parser, mock_validator):
+    def test_parse_cced_message(self, parser):
         """Test parsing CC'd message."""
         msg = create_mock_mail_message(
             to="alice@example.com", cc="bot@example.com"  # Target in CC, not To
@@ -441,7 +423,6 @@ class TestEmailParser:
         email = EmailMessage(
             message_id="12345",
             sender=sender,
-            is_whitelisted=True,
             is_cced=True,
             attachment_count=0,
         )
@@ -454,7 +435,6 @@ class TestEmailParser:
         email = EmailMessage(
             message_id="12345",
             sender=sender,
-            is_whitelisted=True,
             is_cced=False,
             attachment_count=0,
         )
@@ -467,7 +447,6 @@ class TestEmailParser:
         email = EmailMessage(
             message_id="12345",
             sender=sender,
-            is_whitelisted=True,
             is_cced=True,
             attachment_count=2,
         )
@@ -480,7 +459,6 @@ class TestEmailParser:
         email = EmailMessage(
             message_id="12345",
             sender=sender,
-            is_whitelisted=True,
             is_cced=False,
             attachment_count=0,
         )
@@ -493,7 +471,6 @@ class TestEmailParser:
         email = EmailMessage(
             message_id="12345",
             sender=sender,
-            is_whitelisted=False,
             is_cced=False,
             attachment_count=0,
         )
@@ -506,7 +483,6 @@ class TestEmailParser:
         email = EmailMessage(
             message_id="12345",
             sender=sender,
-            is_whitelisted=True,
             is_cced=True,
             attachment_count=2,
         )
@@ -519,7 +495,6 @@ class TestEmailParser:
         email = EmailMessage(
             message_id="12345",
             sender=sender,
-            is_whitelisted=True,
             is_cced=True,
             attachment_count=0,
         )
@@ -555,3 +530,91 @@ class TestEmailParser:
 
         assert email is not None
         assert email.subject == ""
+
+
+class TestTeachAddress:
+    """Tests for dedicated teach address feature."""
+
+    @pytest.fixture
+    def teach_parser(self, mock_settings):
+        """Email parser with teach address configured."""
+        mock_settings.email_teach_address = "teach@berengar.io"
+        return EmailParser()
+
+    def test_email_to_teach_address_is_not_query(self, teach_parser):
+        """Email sent To: teach address should NOT be a query."""
+        email = EmailMessage(
+            message_id="123",
+            sender=EmailAddress(email="alice@example.com"),
+            to=[EmailAddress(email="teach@berengar.io")],
+            is_cced=False,
+        )
+        assert teach_parser.should_process_as_query(email) is False
+
+    def test_email_to_teach_address_is_kb(self, teach_parser):
+        """Email sent To: teach address should be KB ingestion."""
+        email = EmailMessage(
+            message_id="123",
+            sender=EmailAddress(email="alice@example.com"),
+            to=[EmailAddress(email="teach@berengar.io")],
+            is_cced=False,
+        )
+        assert teach_parser.should_process_for_kb(email) is True
+
+    def test_email_cc_teach_address_is_kb(self, teach_parser):
+        """Email with teach address in CC should be KB ingestion."""
+        email = EmailMessage(
+            message_id="123",
+            sender=EmailAddress(email="alice@example.com"),
+            to=[EmailAddress(email="someone@example.com")],
+            cc=[EmailAddress(email="teach@berengar.io")],
+            is_cced=True,
+        )
+        assert teach_parser.should_process_for_kb(email) is True
+        assert teach_parser.should_process_as_query(email) is False
+
+    def test_teach_address_any_sender_is_kb(self, teach_parser):
+        """Any sender to teach address is identified as KB by parser.
+
+        Permission checking is done by TenantEmailRouter, not the parser.
+        """
+        email = EmailMessage(
+            message_id="123",
+            sender=EmailAddress(email="stranger@example.com"),
+            to=[EmailAddress(email="teach@berengar.io")],
+            is_cced=False,
+        )
+        assert teach_parser.should_process_for_kb(email) is True
+
+    def test_email_to_main_address_still_query(self, teach_parser):
+        """Email To: main bot address should still be a query."""
+        email = EmailMessage(
+            message_id="123",
+            sender=EmailAddress(email="alice@example.com"),
+            to=[EmailAddress(email="bot@example.com")],
+            is_cced=False,
+        )
+        assert teach_parser.should_process_as_query(email) is True
+
+    def test_no_teach_address_configured(self, parser):
+        """Without teach address configured, normal rules apply."""
+        email = EmailMessage(
+            message_id="123",
+            sender=EmailAddress(email="alice@example.com"),
+            to=[EmailAddress(email="teach@berengar.io")],
+            is_cced=True,  # Appears as CC since "teach@" != target
+        )
+        # Normal CC rule applies
+        assert parser.should_process_as_query(email) is False
+        assert parser.should_process_for_kb(email) is True
+
+    def test_teach_address_case_insensitive(self, teach_parser):
+        """Teach address matching should be case-insensitive."""
+        email = EmailMessage(
+            message_id="123",
+            sender=EmailAddress(email="alice@example.com"),
+            to=[EmailAddress(email="Teach@Berengar.IO")],
+            is_cced=False,
+        )
+        assert teach_parser.should_process_as_query(email) is False
+        assert teach_parser.should_process_for_kb(email) is True

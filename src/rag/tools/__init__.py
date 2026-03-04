@@ -11,6 +11,7 @@ from .context import (
     clear_tool_context,
     get_conversation_manager,
     get_kb_manager,
+    get_tenant_id,
     get_tool_context,
     get_user_email,
     is_admin,
@@ -21,14 +22,9 @@ from .context import (
 from .database_tools import query_analytics, query_conversation_history
 from .export_tools import create_json_file, create_text_file, export_to_csv
 from .rag_tools import rag_search
+from .team_tools import add_team_member, remove_team_member
 from .tool_executor import ToolExecutor
 from .web_search_tools import web_search
-from .whitelist_tools import (
-    add_to_query_whitelist,
-    add_to_teach_whitelist,
-    remove_from_query_whitelist,
-    remove_from_teach_whitelist,
-)
 
 __all__ = [
     "Tool",
@@ -41,11 +37,11 @@ __all__ = [
     "export_to_csv",
     "create_text_file",
     "create_json_file",
-    "add_to_query_whitelist",
-    "add_to_teach_whitelist",
+    "add_team_member",
     "clear_tool_context",
     "get_conversation_manager",
     "get_kb_manager",
+    "get_tenant_id",
     "get_tool_context",
     "get_user_email",
     "is_admin",
@@ -53,8 +49,7 @@ __all__ = [
     "query_analytics",
     "query_conversation_history",
     "rag_search",
-    "remove_from_query_whitelist",
-    "remove_from_teach_whitelist",
+    "remove_team_member",
     "set_tool_context",
     "validate_admin_access",
     "web_search",

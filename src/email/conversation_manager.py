@@ -816,6 +816,82 @@ class ConversationManager:
                 "sample_optimizations": sample_optimizations,
             }
 
+    def get_retrieval_health_metrics(
+        self,
+        kb_document_filenames: List[str],
+        days: Optional[int] = None,
+        similarity_threshold: float = 0.3,
+    ) -> Dict[str, Any]:
+        """
+        Cross-reference KB documents with retrieval data to compute health metrics.
+
+        Args:
+            kb_document_filenames: List of all document filenames currently in KB.
+            days: Number of days to analyze (None = all time).
+            similarity_threshold: Score below which a retrieval is "low relevance".
+
+        Returns:
+            Dictionary with citation coverage, uncited docs, and low-relevance rate.
+        """
+        with self.db_manager.get_session() as session:
+            # Build query for REPLY messages with sources
+            query = session.query(ConversationMessage).filter(
+                ConversationMessage.message_type == MessageType.REPLY,
+                ConversationMessage.sources_used.isnot(None),
+            )
+
+            if days:
+                from datetime import timedelta
+
+                start_date = datetime.utcnow() - timedelta(days=days)
+                query = query.filter(ConversationMessage.timestamp >= start_date)
+
+            all_replies = query.all()
+
+            # Collect all cited filenames and track low-relevance replies
+            cited_filenames: set = set()
+            low_relevance_count = 0
+
+            for reply in all_replies:
+                if not reply.sources_used:
+                    continue
+                best_score = 0.0
+                for source in reply.sources_used:
+                    fname = source.get("filename")
+                    if fname:
+                        cited_filenames.add(fname)
+                    score = source.get("score", 0)
+                    if score > best_score:
+                        best_score = score
+                if best_score < similarity_threshold:
+                    low_relevance_count += 1
+
+            # Calculate coverage
+            kb_set = set(kb_document_filenames)
+            uncited = sorted(kb_set - cited_filenames)
+            coverage = (
+                round(len(kb_set & cited_filenames) / len(kb_set) * 100, 1)
+                if kb_set
+                else 0.0
+            )
+            low_relevance_rate = (
+                round(low_relevance_count / len(all_replies) * 100, 1)
+                if all_replies
+                else 0.0
+            )
+
+            return {
+                "total_replies_analyzed": len(all_replies),
+                "citation_coverage_pct": coverage,
+                "cited_document_count": len(kb_set & cited_filenames),
+                "total_kb_documents": len(kb_set),
+                "uncited_documents": uncited,
+                "uncited_count": len(uncited),
+                "low_relevance_count": low_relevance_count,
+                "low_relevance_rate": low_relevance_rate,
+                "similarity_threshold": similarity_threshold,
+            }
+
     def get_source_analytics(self, days: Optional[int] = None) -> Dict[str, Any]:
         """
         Get source document usage analytics.

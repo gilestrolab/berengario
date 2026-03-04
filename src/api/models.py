@@ -310,19 +310,6 @@ class OTPEntry:
 # ============================================================================
 
 
-class WhitelistEntryRequest(BaseModel):
-    """Request model for whitelist entry operations."""
-
-    entry: str
-
-
-class WhitelistResponse(BaseModel):
-    """Response model for whitelist data."""
-
-    entries: List[str]
-    whitelist_type: str
-
-
 class AdminActionResponse(BaseModel):
     """Response model for admin actions."""
 

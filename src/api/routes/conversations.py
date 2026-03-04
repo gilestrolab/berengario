@@ -16,6 +16,7 @@ from src.api.models import (
     ConversationsResponse,
     HistoryResponse,
 )
+from src.api.routes.helpers import resolve_component
 from src.email.db_models import Conversation, ConversationMessage
 
 logger = logging.getLogger(__name__)
@@ -44,10 +45,9 @@ def create_conversations_router(
     """
 
     def _get_cm(session):
-        """Get the conversation manager for this session (MT-aware)."""
-        if component_resolver:
-            return component_resolver.resolve(session).conversation_manager
-        return conversation_manager
+        return resolve_component(
+            component_resolver, session, "conversation_manager", conversation_manager
+        )
 
     @router.get("/history", response_model=HistoryResponse)
     async def get_history(

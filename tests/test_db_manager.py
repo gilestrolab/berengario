@@ -2,12 +2,14 @@
 Unit tests for database manager.
 
 Tests database connection management, session handling, and
-database operations for both SQLite and MariaDB backends.
+database operations using MariaDB backend.
 """
 
 from unittest.mock import patch
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
 
 from src.email.db_manager import DatabaseManager
 from src.email.db_models import Base, ProcessedMessage
@@ -15,30 +17,31 @@ from src.email.db_models import Base, ProcessedMessage
 
 @pytest.fixture
 def test_db_manager():
-    """Create a test database manager with in-memory SQLite."""
-    # Override settings to use in-memory SQLite
-    with patch("src.email.db_manager.settings") as mock_settings:
-        mock_settings.db_type = "sqlite"
-        mock_settings.sqlite_db_path = ":memory:"
-        mock_settings.debug = False
-        mock_settings.get_database_url.return_value = "sqlite:///:memory:"
+    """Create a test database manager with in-memory SQLite.
 
-        manager = DatabaseManager()
-        manager.init_db()
+    Patches _create_engine to use in-memory SQLite with StaticPool
+    for test isolation (no real MariaDB needed).
+    """
+    test_engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
 
-        yield manager
-
-        # Cleanup
-        manager.close()
+    with patch.object(DatabaseManager, "_create_engine", return_value=test_engine):
+        with patch("src.email.db_manager.settings"):
+            manager = DatabaseManager()
+            manager.init_db()
+            yield manager
+            manager.close()
 
 
 class TestDatabaseManager:
     """Tests for DatabaseManager class."""
 
-    def test_create_sqlite_engine(self, test_db_manager):
-        """Test creating SQLite engine."""
+    def test_create_engine(self, test_db_manager):
+        """Test engine is created and usable."""
         assert test_db_manager.engine is not None
-        assert "sqlite" in str(test_db_manager.engine.url)
 
     def test_init_db(self, test_db_manager):
         """Test database initialization creates tables."""
@@ -106,7 +109,7 @@ class TestDatabaseManager:
         assert "db_type" in info
         assert "url" in info
         assert "driver" in info
-        assert info["db_type"] == "sqlite"
+        assert info["db_type"] == "mariadb"
 
     def test_test_connection(self, test_db_manager):
         """Test database connection test."""
@@ -163,7 +166,6 @@ class TestDatabaseManagerMariaDB:
     def test_create_mariadb_engine(self):
         """Test creating MariaDB engine configuration."""
         with patch("src.email.db_manager.settings") as mock_settings:
-            mock_settings.db_type = "mariadb"
             mock_settings.db_host = "localhost"
             mock_settings.db_port = 3306
             mock_settings.db_name = "test"
@@ -186,7 +188,6 @@ class TestDatabaseManagerMariaDB:
     def test_mariadb_engine_info(self):
         """Test getting MariaDB engine information."""
         with patch("src.email.db_manager.settings") as mock_settings:
-            mock_settings.db_type = "mariadb"
             mock_settings.db_host = "localhost"
             mock_settings.db_port = 3306
             mock_settings.db_name = "test"

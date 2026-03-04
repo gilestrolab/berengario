@@ -79,7 +79,7 @@ def show_version():
     console.print("[dim]Configuration:[/dim]")
     console.print(f"  LLM Model:       {settings.openrouter_model}")
     console.print(f"  Embedding Model: {settings.openai_embedding_model}")
-    console.print(f"  Database Type:   {settings.db_type}")
+    console.print("  Database Type:   MariaDB")
     console.print(f"  KB Path:         {settings.chroma_db_path}")
     console.print()
 
@@ -116,13 +116,10 @@ def show_info():
     # Database info
     console.print()
     console.print("  [bold cyan]Database:[/bold cyan]")
-    print_key_value("  Type", settings.db_type)
-    if settings.db_type == "mariadb":
-        print_key_value("  Host", settings.db_host)
-        print_key_value("  Port", str(settings.db_port))
-        print_key_value("  Database", settings.db_name)
-    else:
-        print_key_value("  SQLite Path", str(settings.sqlite_db_path))
+    print_key_value("  Type", "MariaDB")
+    print_key_value("  Host", settings.db_host)
+    print_key_value("  Port", str(settings.db_port))
+    print_key_value("  Database", settings.db_name)
 
     # Paths
     console.print()

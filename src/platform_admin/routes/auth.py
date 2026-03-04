@@ -127,22 +127,16 @@ def create_admin_auth_router(
     router = APIRouter(prefix="/api/auth", tags=["admin-auth"])
 
     async def _send_otp_email(email: str, otp_code: str):
-        """Send OTP code via email."""
-        subject = f"{settings.instance_name} Platform Admin - Login Code"
-        body = (
-            f"Your platform admin login code is:\n\n"
-            f"{otp_code}\n\n"
-            f"This code will expire in 5 minutes.\n\n"
-            f"If you didn't request this code, please ignore this email.\n\n"
-            f"---\n{settings.instance_name} Platform Admin"
+        """Send OTP code via email using shared helper."""
+        from src.api.auth.otp_email import send_otp_email
+
+        await send_otp_email(
+            email_sender=email_sender,
+            to_address=email,
+            otp_code=otp_code,
+            instance_name=settings.instance_name,
+            admin_mode=True,
         )
-        try:
-            email_sender.send_reply(
-                to_address=email, subject=subject, body_text=body, body_html=None
-            )
-            logger.info(f"Admin OTP email sent to {email}")
-        except Exception as e:
-            logger.error(f"Failed to send admin OTP email to {email}: {e}")
 
     def _get_session_id(request: Request) -> Optional[str]:
         """Extract session ID from cookie."""

@@ -19,6 +19,7 @@ from fastapi import (
 from fastapi.responses import FileResponse
 
 from src.api.models import QueryRequest, QueryResponse
+from src.api.routes.helpers import get_session_email
 from src.email.conversation_manager import MessageType
 from src.email.db_models import ChannelType
 
@@ -90,11 +91,7 @@ def create_query_router(
             qh = query_handler
             cm = conversation_manager
 
-        user_identifier = (
-            session.email
-            if hasattr(session, "email") and session.email
-            else f"web_user_{session.session_id[:8]}"
-        )
+        user_identifier = get_session_email(session)
 
         # Determine thread_id: use existing conversation or create new
         thread_id = None

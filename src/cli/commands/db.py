@@ -109,13 +109,10 @@ def show_info():
         console.print()
         console.print("  [bold cyan]Configuration:[/bold cyan]")
 
-        if settings.db_type == "mariadb":
-            print_key_value("  Host", settings.db_host)
-            print_key_value("  Port", str(settings.db_port))
-            print_key_value("  Database", settings.db_name)
-            print_key_value("  User", settings.db_user)
-        else:
-            print_key_value("  SQLite Path", str(settings.sqlite_db_path))
+        print_key_value("  Host", settings.db_host)
+        print_key_value("  Port", str(settings.db_port))
+        print_key_value("  Database", settings.db_name)
+        print_key_value("  User", settings.db_user)
 
         print_success("Database information displayed")
 

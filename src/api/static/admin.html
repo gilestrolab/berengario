@@ -2031,8 +2031,8 @@
 
         <div class="tabs">
             <button class="tab" data-tab="team" id="team-tab-btn" style="display:none;">Team</button>
-            <button class="tab active" data-tab="whitelists" id="whitelists-tab-btn">Whitelists</button>
-            <button class="tab" data-tab="usage">Usage Analytics</button>
+            <button class="tab active" data-tab="usage">Usage Analytics</button>
+            <button class="tab" data-tab="kbhealth">KB Health</button>
             <button class="tab" data-tab="feedback">Feedback</button>
             <button class="tab" data-tab="documents">Documents</button>
             <button class="tab" data-tab="webcrawl">Web Crawling</button>
@@ -2133,53 +2133,8 @@
             </div>
         </div>
 
-        <!-- Whitelists Tab -->
-        <div id="whitelists-tab" class="tab-content active">
-            <div class="whitelist-section">
-                <h3>Query Whitelist</h3>
-                <p style="margin-bottom: 1rem; color: var(--text-secondary, #8C8279); font-size: 0.875rem;">
-                    Users who can query the knowledge base
-                </p>
-                <div class="whitelist-controls">
-                    <input type="email" id="queriers-input" placeholder="email@example.com or @domain.com">
-                    <button onclick="adminPanel.addWhitelistEntry('queriers')">Add</button>
-                </div>
-                <div class="whitelist-list" id="queriers-list">
-                    <div class="loading">Loading...</div>
-                </div>
-            </div>
-
-            <div class="whitelist-section">
-                <h3>Teacher Whitelist</h3>
-                <p style="margin-bottom: 1rem; color: var(--text-secondary, #8C8279); font-size: 0.875rem;">
-                    Users who can add documents to the knowledge base
-                </p>
-                <div class="whitelist-controls">
-                    <input type="email" id="teachers-input" placeholder="email@example.com or @domain.com">
-                    <button onclick="adminPanel.addWhitelistEntry('teachers')">Add</button>
-                </div>
-                <div class="whitelist-list" id="teachers-list">
-                    <div class="loading">Loading...</div>
-                </div>
-            </div>
-
-            <div class="whitelist-section">
-                <h3>Admin Whitelist</h3>
-                <p style="margin-bottom: 1rem; color: var(--text-secondary, #8C8279); font-size: 0.875rem;">
-                    Users with full admin access
-                </p>
-                <div class="whitelist-controls">
-                    <input type="email" id="admins-input" placeholder="email@example.com or @domain.com">
-                    <button onclick="adminPanel.addWhitelistEntry('admins')">Add</button>
-                </div>
-                <div class="whitelist-list" id="admins-list">
-                    <div class="loading">Loading...</div>
-                </div>
-            </div>
-        </div>
-
         <!-- Usage Analytics Tab -->
-        <div id="usage-tab" class="tab-content">
+        <div id="usage-tab" class="tab-content active">
             <!-- Time Range Filter -->
             <div class="usage-controls">
                 <div class="time-range-buttons">
@@ -2285,6 +2240,57 @@
                 <h3>Source Document Usage</h3>
                 <div id="sources-container">
                     <p class="loading">Loading source analytics...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- KB Health Tab -->
+        <div id="kbhealth-tab" class="tab-content">
+            <!-- Time Range Filter -->
+            <div class="usage-controls">
+                <div class="time-range-buttons">
+                    <button class="kbhealth-time-btn active" data-days="7">Last 7 Days</button>
+                    <button class="kbhealth-time-btn" data-days="30">Last 30 Days</button>
+                    <button class="kbhealth-time-btn" data-days="90">Last 90 Days</button>
+                    <button class="kbhealth-time-btn" data-days="all">All Time</button>
+                </div>
+                <button class="btn-refresh" onclick="kbHealth.refresh()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+
+            <!-- Health Score -->
+            <div id="kbhealth-score-container" class="section-card" style="margin-bottom: 1.5rem;">
+                <h3><i class="fas fa-heartbeat"></i> Health Score</h3>
+                <div id="kbhealth-score-content">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Structural Metrics -->
+            <div id="kbhealth-structural-container" class="section-card" style="margin-bottom: 1.5rem;">
+                <h3><i class="fas fa-database"></i> Structural Metrics</h3>
+                <div id="kbhealth-structural-content">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Retrieval Metrics -->
+            <div id="kbhealth-retrieval-container" class="section-card" style="margin-bottom: 1.5rem;">
+                <h3><i class="fas fa-search"></i> Retrieval Performance</h3>
+                <div id="kbhealth-retrieval-content">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Uncited Documents -->
+            <div id="kbhealth-uncited-container" class="section-card">
+                <h3><i class="fas fa-file-excel"></i> Uncited Documents</h3>
+                <p style="margin-bottom: 1rem; color: var(--text-secondary, #8C8279); font-size: 0.875rem;">
+                    Documents in the KB that have never been cited in a response
+                </p>
+                <div id="kbhealth-uncited-content">
+                    <div class="loading">Loading...</div>
                 </div>
             </div>
         </div>
@@ -2556,6 +2562,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="/static/admin.js?v=20260228-2"></script>
     <script src="/static/admin-usage.js?v=20260228-2"></script>
+    <script src="/static/admin-kb-health.js?v=20260303-1"></script>
     <script src="/static/admin-feedback.js?v=20260228-2"></script>
 </body>
 </html>

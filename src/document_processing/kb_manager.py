@@ -474,6 +474,174 @@ class KnowledgeBaseManager:
             logger.error(f"Error getting unique documents: {e}")
             return []
 
+    def get_kb_health_metrics(self) -> dict:
+        """
+        Compute structural health metrics for the knowledge base.
+
+        Performs a single pass over all chunk metadata to produce:
+        - Size metrics (documents, chunks, avg chunks per doc)
+        - File type breakdown
+        - Source type breakdown
+        - Enhancement status
+        - Freshness / staleness
+        - Chunk distribution stats
+
+        Returns:
+            Dictionary with structural KB health metrics.
+        """
+        import statistics
+        import time
+
+        try:
+            results = self.collection.get(include=["metadatas"])
+            all_metadata = results.get("metadatas", [])
+            total_chunks = len(all_metadata)
+
+            if total_chunks == 0:
+                return {
+                    "total_documents": 0,
+                    "total_chunks": 0,
+                    "avg_chunks_per_doc": 0,
+                    "file_type_breakdown": {},
+                    "source_type_breakdown": {},
+                    "enhanced_count": 0,
+                    "enhanced_percentage": 0.0,
+                    "newest_timestamp": None,
+                    "oldest_timestamp": None,
+                    "avg_age_days": 0,
+                    "stale_count": 0,
+                    "stale_threshold_days": 90,
+                    "chunk_distribution": {
+                        "min": 0,
+                        "max": 0,
+                        "avg": 0,
+                        "median": 0,
+                    },
+                    "documents": [],
+                }
+
+            # Single pass: group chunks by document (file_hash)
+            doc_chunks: dict[str, int] = {}
+            doc_meta: dict[str, dict] = {}
+
+            for meta in all_metadata:
+                if not meta:
+                    continue
+                file_hash = meta.get("file_hash", "unknown")
+                doc_chunks[file_hash] = doc_chunks.get(file_hash, 0) + 1
+                if file_hash not in doc_meta:
+                    doc_meta[file_hash] = meta
+
+            total_documents = len(doc_meta)
+            avg_chunks = total_chunks / total_documents if total_documents else 0
+
+            # Breakdowns and freshness in one pass over unique docs
+            file_type_counts: dict[str, int] = {}
+            source_type_counts: dict[str, int] = {}
+            enhanced_count = 0
+            timestamps: list[float] = []
+            now = time.time()
+            stale_threshold_days = 90
+            stale_count = 0
+            doc_list: list[dict] = []
+
+            for file_hash, meta in doc_meta.items():
+                # File type
+                ft = meta.get("file_type", "unknown")
+                file_type_counts[ft] = file_type_counts.get(ft, 0) + 1
+
+                # Source type
+                st = meta.get("source_type", "file")
+                source_type_counts[st] = source_type_counts.get(st, 0) + 1
+
+                # Enhancement
+                if meta.get("enhanced"):
+                    enhanced_count += 1
+
+                # Timestamps
+                ts = meta.get("file_mtime") or meta.get("last_crawled")
+                if ts:
+                    try:
+                        ts_float = float(ts)
+                        timestamps.append(ts_float)
+                        age_days = (now - ts_float) / 86400
+                        if age_days > stale_threshold_days:
+                            stale_count += 1
+                    except (ValueError, TypeError):
+                        pass
+
+                doc_list.append(
+                    {
+                        "filename": meta.get("filename", "Unknown"),
+                        "file_hash": file_hash,
+                        "file_type": ft,
+                        "source_type": st,
+                        "chunks": doc_chunks[file_hash],
+                        "enhanced": bool(meta.get("enhanced")),
+                        "timestamp": ts,
+                    }
+                )
+
+            # Chunk distribution
+            chunk_counts = list(doc_chunks.values())
+            chunk_dist = {
+                "min": min(chunk_counts),
+                "max": max(chunk_counts),
+                "avg": round(statistics.mean(chunk_counts), 1),
+                "median": round(statistics.median(chunk_counts), 1),
+            }
+
+            # Freshness
+            newest = max(timestamps) if timestamps else None
+            oldest = min(timestamps) if timestamps else None
+            avg_age_days = 0.0
+            if timestamps:
+                avg_age_days = round(
+                    sum((now - t) / 86400 for t in timestamps) / len(timestamps), 1
+                )
+
+            enhanced_pct = (
+                round(enhanced_count / total_documents * 100, 1)
+                if total_documents
+                else 0.0
+            )
+
+            return {
+                "total_documents": total_documents,
+                "total_chunks": total_chunks,
+                "avg_chunks_per_doc": round(avg_chunks, 1),
+                "file_type_breakdown": file_type_counts,
+                "source_type_breakdown": source_type_counts,
+                "enhanced_count": enhanced_count,
+                "enhanced_percentage": enhanced_pct,
+                "newest_timestamp": newest,
+                "oldest_timestamp": oldest,
+                "avg_age_days": avg_age_days,
+                "stale_count": stale_count,
+                "stale_threshold_days": stale_threshold_days,
+                "chunk_distribution": chunk_dist,
+                "documents": doc_list,
+            }
+
+        except Exception as e:
+            logger.error(f"Error computing KB health metrics: {e}", exc_info=True)
+            return {
+                "total_documents": 0,
+                "total_chunks": 0,
+                "avg_chunks_per_doc": 0,
+                "file_type_breakdown": {},
+                "source_type_breakdown": {},
+                "enhanced_count": 0,
+                "enhanced_percentage": 0.0,
+                "newest_timestamp": None,
+                "oldest_timestamp": None,
+                "avg_age_days": 0,
+                "stale_count": 0,
+                "stale_threshold_days": 90,
+                "chunk_distribution": {"min": 0, "max": 0, "avg": 0, "median": 0},
+                "documents": [],
+            }
+
     def clear_all(self) -> None:
         """
         Clear all documents from the knowledge base.

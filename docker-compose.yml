@@ -6,10 +6,10 @@ services:
     restart: unless-stopped
 
     environment:
-      MYSQL_ROOT_PASSWORD: test_root_password
-      MYSQL_DATABASE: berengario
-      MYSQL_USER: berengario
-      MYSQL_PASSWORD: test_password
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
 
     volumes:
       - berengario-db-data:/var/lib/mysql
@@ -41,19 +41,6 @@ services:
 
     env_file:
       - .env
-
-    environment:
-      DB_TYPE: mariadb
-      DB_HOST: mariadb
-      DB_PORT: 3306
-      DB_NAME: berengario
-      DB_USER: berengario
-      DB_PASSWORD: test_password
-      # Multi-tenancy: platform DB uses same MariaDB server
-      PLATFORM_DB_HOST: mariadb
-      PLATFORM_DB_PORT: 3306
-      PLATFORM_DB_USER: berengario
-      PLATFORM_DB_PASSWORD: test_password
 
     volumes:
       - ./src:/app/src  # Mount src for live code changes
@@ -87,24 +74,6 @@ services:
 
     env_file:
       - .env
-
-    # Override DB settings for MariaDB
-    # Multi-tenancy settings are loaded from .env file.
-    # See .env.example for MULTI_TENANT, PLATFORM_DB_*, STORAGE_BACKEND, etc.
-    environment:
-      DB_TYPE: mariadb
-      DB_HOST: mariadb
-      DB_PORT: 3306
-      DB_NAME: berengario
-      DB_USER: berengario
-      DB_PASSWORD: test_password
-      # Multi-tenancy: platform DB uses same MariaDB server
-      PLATFORM_DB_HOST: mariadb
-      PLATFORM_DB_PORT: 3306
-      PLATFORM_DB_USER: berengario
-      PLATFORM_DB_PASSWORD: test_password
-      GIT_BRANCH: ${GIT_BRANCH:-unknown}
-      GIT_COMMIT: ${GIT_COMMIT:-unknown}
 
     volumes:
       - ./src:/app/src  # Mount src for live code changes during development
@@ -154,24 +123,6 @@ services:
 
     env_file:
       - .env
-
-    # Override DB settings for MariaDB
-    # Multi-tenancy settings are loaded from .env file.
-    # See .env.example for MULTI_TENANT, PLATFORM_DB_*, STORAGE_BACKEND, etc.
-    environment:
-      DB_TYPE: mariadb
-      DB_HOST: mariadb
-      DB_PORT: 3306
-      DB_NAME: berengario
-      DB_USER: berengario
-      DB_PASSWORD: test_password
-      # Multi-tenancy: platform DB uses same MariaDB server
-      PLATFORM_DB_HOST: mariadb
-      PLATFORM_DB_PORT: 3306
-      PLATFORM_DB_USER: berengario
-      PLATFORM_DB_PASSWORD: test_password
-      GIT_BRANCH: ${GIT_BRANCH:-unknown}
-      GIT_COMMIT: ${GIT_COMMIT:-unknown}
 
     volumes:
       - ./src:/app/src  # Mount src for live code changes during development
@@ -227,18 +178,6 @@ services:
     env_file:
       - .env
 
-    environment:
-      DB_TYPE: mariadb
-      DB_HOST: mariadb
-      DB_PORT: 3306
-      DB_NAME: berengario
-      DB_USER: berengario
-      DB_PASSWORD: test_password
-      PLATFORM_DB_HOST: mariadb
-      PLATFORM_DB_PORT: 3306
-      PLATFORM_DB_USER: berengario
-      PLATFORM_DB_PASSWORD: test_password
-
     volumes:
       - ./src:/app/src
       - ./.git:/app/.git:ro
@@ -272,8 +211,8 @@ services:
     command: server /data --console-address ":9001"
 
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
 
     ports:
       - "9000:9000"   # S3 API

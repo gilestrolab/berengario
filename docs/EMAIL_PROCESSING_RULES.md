@@ -89,6 +89,35 @@ Subject: Fwd: Department meeting notes
 
 ---
 
+### Teach Address Emails (Optional)
+
+**When a dedicated teach address is configured** (`EMAIL_TEACH_ADDRESS`):
+
+Emails addressed To: or CC: the teach address are **always** treated as KB ingestion, regardless of other routing rules. This takes highest priority in the decision tree.
+
+- 📚 **Treated as**: Knowledge Base contribution
+- 🤖 **Action**: Add to vector database (no reply sent)
+- 📝 **Content used**: Email body + attachments
+- 📎 **Attachments**: Processed and ingested
+- 🔒 **Whitelist**: Required (teaching whitelist)
+
+**Example scenarios**:
+```
+To: teach@berengar.io
+From: alice@imperial.ac.uk
+Subject: New vacation policy
+Attachments: vacation_policy_2025.pdf
+
+→ Email body and PDF added to knowledge base
+→ No reply sent
+```
+
+**Configuration**:
+- `EMAIL_TEACH_ADDRESS=teach@berengar.io` - Dedicated address for KB ingestion (optional)
+- When not set, the main email address is used for both queries and teaching (via CC/forward)
+
+---
+
 ## Decision Tree
 
 ```
@@ -97,38 +126,44 @@ Subject: Fwd: Department meeting notes
 └────────────┬────────────────────┘
              │
              ▼
-    ┌────────────────────────┐
-    │ Check recipient field  │
-    └─────┬────────┬─────────┘
-          │        │
-     To: bot?   CC/BCC?
-          │        │
-          ▼        ▼
-  ┌───────────────────────┐  ┌────────────────────────┐
-  │ Forwarded email?      │  │ Check TEACH whitelist  │
-  │ (Fw:, Fwd:, etc)      │  │ (allowed_teachers.txt) │
-  └────┬────────┬─────────┘  └────┬───────────┬───────┘
-       │ Yes    │ No              │ Yes       │ No
-       ▼        ▼                 ▼           ▼
-  ┌──────────┐ ┌──────────────┐  │      ┌─────────┐
-  │ Check    │ │ Check QUERY  │  │      │ Reject  │
-  │ TEACH    │ │  whitelist   │  │      └─────────┘
-  │whitelist │ │ (allowed_    │  │
-  └──┬───┬───┘ │ queriers.txt)│  │
-     │Yes│No   └─┬────────┬───┘  │
-     ▼   ▼      │ Yes    │ No    ▼
-  ┌────┐┌────┐  ▼        ▼    ┌──────────────┐
-  │ KB ││Rej.│┌────┐┌────────┐│ KB INGESTION │
-  │ING.││    ││QRY ││ Reject ││    MODE      │
-  └────┘└────┘│MODE││        │└──────┬───────┘
-              └──┬─┘└────────┘       │
-                 │                   │
-                 ▼                   ▼
-          Send RAG reply    Add to vector DB
-                            (body + attachments)
+    ┌─────────────────────────────┐
+    │ Teach address configured    │
+    │ AND email addressed to it?  │
+    └────┬──────────────┬─────────┘
+         │ Yes          │ No
+         ▼              ▼
+  ┌──────────────┐  ┌────────────────────────┐
+  │ Check TEACH  │  │ Check recipient field  │
+  │  whitelist   │  └─────┬────────┬─────────┘
+  └──┬───────┬───┘        │        │
+     │Yes    │No     To: bot?   CC/BCC?
+     ▼       ▼            │        │
+  ┌────┐ ┌────┐           ▼        ▼
+  │ KB │ │Rej.│   ┌──────────────┐  ┌────────────────────────┐
+  │ING.│ └────┘   │ Forwarded?   │  │ Check TEACH whitelist  │
+  └────┘          │ (Fw:, Fwd:)  │  │ (allowed_teachers.txt) │
+                  └──┬────────┬──┘  └────┬───────────┬───────┘
+                     │ Yes   │ No       │ Yes       │ No
+                     ▼       ▼          ▼           ▼
+               ┌──────────┐ ┌────────┐  │      ┌─────────┐
+               │ Check    │ │ Check  │  │      │ Reject  │
+               │ TEACH    │ │ QUERY  │  │      └─────────┘
+               │whitelist │ │whitelist│  │
+               └──┬───┬───┘ └─┬────┬─┘  │
+                  │Yes│No    │Yes │No    ▼
+                  ▼   ▼      ▼    ▼   ┌──────────────┐
+               ┌────┐┌────┐┌────┐┌──┐│ KB INGESTION │
+               │ KB ││Rej.││QRY ││Rj││    MODE      │
+               │ING.││    ││MODE││  │└──────┬───────┘
+               └────┘└────┘└──┬─┘└──┘       │
+                              │              │
+                              ▼              ▼
+                       Send RAG reply  Add to vector DB
+                                       (body + attachments)
 ```
 
 **Key Points**:
+- **Teach address takes highest priority**: If configured, emails to the teach address are always KB ingestion
 - **Two separate whitelist checks**: Teaching whitelist for KB ingestion, Query whitelist for queries
 - **Hierarchical**: Admins and teachers can also query (parent validator pattern)
 - **Forwarded emails** (To: bot) check teaching whitelist, not query whitelist
@@ -337,6 +372,12 @@ A: If forwarded detection is enabled (default), they're added to KB instead of t
 **Q: Can I customize which languages' forwarding prefixes are detected?**
 A: Yes! Set `FORWARD_SUBJECT_PREFIXES=fw,fwd,i,rv` for multi-language support (English: fw/fwd, Italian: i, Spanish: rv, etc.).
 
+**Q: What is the teach address?**
+A: An optional second email address (e.g., `teach@berengar.io`) dedicated to KB ingestion. Any email sent To: or CC: this address is always treated as teaching content, never as a query. Set it via `EMAIL_TEACH_ADDRESS` in `.env`.
+
+**Q: Can the teach address be the same as the main address?**
+A: No, that would make all direct emails become KB ingestion instead of queries. Use a different address, or rely on CC/forward for teaching.
+
 **Q: Does the bot reply to CC'd emails?**
 A: No. CC'd/BCC'd emails are silent KB ingestion with no reply.
 
@@ -364,6 +405,9 @@ A: The email body text is processed and added to the KB as a text document.
 # Email service
 EMAIL_TARGET_ADDRESS=dolsbot@ic.ac.uk
 EMAIL_CHECK_INTERVAL=300  # seconds
+
+# Dedicated teach address (optional)
+# EMAIL_TEACH_ADDRESS=teach@berengar.io  # Separate address for KB ingestion
 
 # Forwarded email detection
 FORWARD_TO_KB_ENABLED=true  # Treat forwarded emails as KB content

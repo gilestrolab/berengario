@@ -11,7 +11,6 @@ from src.email.email_parser import EmailParser
 from src.email.email_processor import EmailProcessor, get_email_processor
 from src.email.email_sender import EmailSender, email_sender, format_response_email
 from src.email.message_tracker import MessageTracker
-from src.email.whitelist_validator import WhitelistValidator
 
 __all__ = [
     "AttachmentHandler",
@@ -24,5 +23,4 @@ __all__ = [
     "email_sender",
     "format_response_email",
     "MessageTracker",
-    "WhitelistValidator",
 ]

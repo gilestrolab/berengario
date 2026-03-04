@@ -18,9 +18,8 @@ from src.api.models import (
     CrawledUrlResponse,
     CrawlRequest,
     DocumentListResponse,
-    WhitelistEntryRequest,
-    WhitelistResponse,
 )
+from src.api.routes.helpers import resolve_component
 from src.rag.rag_engine import get_system_prompt
 
 logger = logging.getLogger(__name__)
@@ -30,8 +29,6 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
 def create_admin_router(
-    whitelist_manager,
-    whitelist_validators,
     audit_logger,
     kb_manager,
     document_manager,
@@ -48,8 +45,6 @@ def create_admin_router(
     Create admin router with dependency injection.
 
     Args:
-        whitelist_manager: Whitelist manager instance
-        whitelist_validators: Dict mapping whitelist types to validators
         audit_logger: Audit logger instance
         kb_manager: Knowledge base manager instance
         document_manager: Document manager instance
@@ -59,29 +54,25 @@ def create_admin_router(
         query_handler: Query handler instance
         settings: Settings instance
         require_admin: Admin authentication dependency function
-        component_resolver: ComponentResolver for MT mode (optional)
+        component_resolver: ComponentResolver for tenant-aware operations
+        storage_backend: StorageBackend for file operations
 
     Returns:
         Configured APIRouter instance
     """
 
     def _get_kb(session):
-        """Get the KB manager for this session (MT-aware)."""
-        if component_resolver:
-            return component_resolver.resolve(session).kb_manager
-        return kb_manager
+        return resolve_component(component_resolver, session, "kb_manager", kb_manager)
 
     def _get_dp(session):
-        """Get the document processor for this session (MT-aware)."""
-        if component_resolver:
-            return component_resolver.resolve(session).doc_processor
-        return document_processor
+        return resolve_component(
+            component_resolver, session, "doc_processor", document_processor
+        )
 
     def _get_qh(session):
-        """Get the query handler for this session (MT-aware)."""
-        if component_resolver:
-            return component_resolver.resolve(session).query_handler
-        return query_handler
+        return resolve_component(
+            component_resolver, session, "query_handler", query_handler
+        )
 
     def _get_desc_gen(session):
         """Get a DescriptionGenerator scoped to the correct tenant DB."""
@@ -95,6 +86,15 @@ def create_admin_router(
                 return DescriptionGenerator(db_manager=tenant_db)
         return DescriptionGenerator()
 
+    def _get_doc_mgr(session):
+        """Get a DocumentManager scoped to the current tenant's KB."""
+        from src.api.admin.document_manager import DocumentManager
+
+        return DocumentManager(
+            kb_manager=_get_kb(session),
+            document_processor=_get_dp(session),
+        )
+
     def _get_questions_path(session):
         """Get tenant-scoped example questions file path (None = ST default)."""
         if component_resolver:
@@ -104,236 +104,6 @@ def create_admin_router(
             tenant_config = ctx.documents_path.parent / "config"
             return tenant_config / "example_questions.json"
         return None
-
-    # ============================================================================
-    # Whitelist Management
-    # ============================================================================
-
-    @router.get("/whitelists/{whitelist_type}", response_model=WhitelistResponse)
-    async def get_whitelist(
-        whitelist_type: str,
-        session=Depends(require_admin),
-    ):
-        """
-        Get whitelist entries.
-
-        Requires admin privileges.
-
-        Args:
-            whitelist_type: Type of whitelist (queriers, teachers, admins)
-            session: Admin session (injected by dependency)
-
-        Returns:
-            WhitelistResponse with entries
-
-        Raises:
-            HTTPException: If whitelist type is invalid
-        """
-        try:
-            data = whitelist_manager.read_whitelist(whitelist_type)
-            logger.info(
-                f"Admin {session.email} read {whitelist_type} whitelist "
-                f"({len(data['entries'])} entries)"
-            )
-            return WhitelistResponse(
-                entries=data["entries"],
-                whitelist_type=whitelist_type,
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except Exception as e:
-            logger.error(f"Error reading whitelist {whitelist_type}: {e}")
-            raise HTTPException(
-                status_code=500, detail=f"Error reading whitelist: {str(e)}"
-            )
-
-    @router.post("/whitelists/{whitelist_type}/add", response_model=AdminActionResponse)
-    async def add_whitelist_entry(
-        whitelist_type: str,
-        request: WhitelistEntryRequest,
-        background_tasks: BackgroundTasks,
-        session=Depends(require_admin),
-    ):
-        """
-        Add entry to whitelist.
-
-        Requires admin privileges.
-
-        Args:
-            whitelist_type: Type of whitelist (queriers, teachers, admins)
-            request: Entry to add
-            background_tasks: FastAPI background tasks
-            session: Admin session (injected by dependency)
-
-        Returns:
-            AdminActionResponse with success status
-
-        Raises:
-            HTTPException: If entry is invalid or operation fails
-        """
-        try:
-            added = whitelist_manager.add_entry(whitelist_type, request.entry)
-
-            # Reload the corresponding validator to pick up changes
-            if whitelist_type in whitelist_validators:
-                whitelist_validators[whitelist_type].reload()
-                logger.debug(f"Reloaded {whitelist_type} whitelist validator")
-
-            # Log the action
-            audit_logger.log_whitelist_add(
-                session.email,
-                whitelist_type,
-                request.entry,
-                success=True,
-            )
-
-            message = (
-                f"Entry '{request.entry}' added to {whitelist_type} whitelist"
-                if added
-                else f"Entry '{request.entry}' already exists in {whitelist_type} whitelist"
-            )
-
-            logger.info(f"Admin {session.email}: {message}")
-
-            # Send welcome email for newly added individual addresses (not domain wildcards)
-            if added and not request.entry.startswith("@"):
-                from src.email.email_sender import send_welcome_email
-
-                role_map = {
-                    "queriers": "querier",
-                    "teachers": "teacher",
-                    "admins": "admin",
-                }
-                role = role_map.get(whitelist_type, "querier")
-
-                # Get admin emails for the "Need help?" section
-                try:
-                    admin_data = whitelist_manager.read_whitelist("admins")
-                    admin_list = admin_data.get("entries", [])
-                except Exception:
-                    admin_list = None
-
-                # Resolve tenant details when in MT mode
-                welcome_instance = None
-                welcome_org = None
-                welcome_desc = None
-                if component_resolver:
-                    try:
-                        ctx = component_resolver.resolve(session).context
-                        welcome_instance = ctx.instance_name
-                        welcome_org = ctx.organization
-                        welcome_desc = ctx.instance_description
-                    except Exception:
-                        pass
-
-                background_tasks.add_task(
-                    send_welcome_email,
-                    sender_instance=email_sender,
-                    to_email=request.entry,
-                    role=role,
-                    instance_name=welcome_instance,
-                    organization=welcome_org,
-                    instance_description=welcome_desc,
-                    admin_emails=admin_list,
-                )
-
-            return AdminActionResponse(
-                success=True,
-                message=message,
-                details={"entry": request.entry, "was_new": added},
-            )
-
-        except ValueError as e:
-            audit_logger.log_whitelist_add(
-                session.email,
-                whitelist_type,
-                request.entry,
-                success=False,
-            )
-            raise HTTPException(status_code=400, detail=str(e))
-        except Exception as e:
-            audit_logger.log_whitelist_add(
-                session.email,
-                whitelist_type,
-                request.entry,
-                success=False,
-            )
-            logger.error(f"Error adding to whitelist {whitelist_type}: {e}")
-            raise HTTPException(status_code=500, detail=f"Error adding entry: {str(e)}")
-
-    @router.delete(
-        "/whitelists/{whitelist_type}/remove", response_model=AdminActionResponse
-    )
-    async def remove_whitelist_entry(
-        whitelist_type: str,
-        request: WhitelistEntryRequest,
-        session=Depends(require_admin),
-    ):
-        """
-        Remove entry from whitelist.
-
-        Requires admin privileges.
-
-        Args:
-            whitelist_type: Type of whitelist (queriers, teachers, admins)
-            request: Entry to remove
-            session: Admin session (injected by dependency)
-
-        Returns:
-            AdminActionResponse with success status
-
-        Raises:
-            HTTPException: If entry not found or operation fails
-        """
-        try:
-            removed = whitelist_manager.remove_entry(whitelist_type, request.entry)
-
-            # Reload the corresponding validator to pick up changes
-            if whitelist_type in whitelist_validators:
-                whitelist_validators[whitelist_type].reload()
-                logger.debug(f"Reloaded {whitelist_type} whitelist validator")
-
-            # Log the action
-            audit_logger.log_whitelist_remove(
-                session.email,
-                whitelist_type,
-                request.entry,
-                success=True,
-            )
-
-            message = (
-                f"Entry '{request.entry}' removed from {whitelist_type} whitelist"
-                if removed
-                else f"Entry '{request.entry}' not found in {whitelist_type} whitelist"
-            )
-
-            logger.info(f"Admin {session.email}: {message}")
-
-            return AdminActionResponse(
-                success=True,
-                message=message,
-                details={"entry": request.entry, "was_removed": removed},
-            )
-
-        except ValueError as e:
-            audit_logger.log_whitelist_remove(
-                session.email,
-                whitelist_type,
-                request.entry,
-                success=False,
-            )
-            raise HTTPException(status_code=400, detail=str(e))
-        except Exception as e:
-            audit_logger.log_whitelist_remove(
-                session.email,
-                whitelist_type,
-                request.entry,
-                success=False,
-            )
-            logger.error(f"Error removing from whitelist {whitelist_type}: {e}")
-            raise HTTPException(
-                status_code=500, detail=f"Error removing entry: {str(e)}"
-            )
 
     # ============================================================================
     # Document Management
@@ -355,7 +125,8 @@ def create_admin_router(
             DocumentListResponse with document list
         """
         try:
-            documents = document_manager.list_documents()
+            doc_mgr = _get_doc_mgr(session)
+            documents = doc_mgr.list_documents()
             logger.info(
                 f"Admin {session.email} listed documents ({len(documents)} found)"
             )
@@ -423,7 +194,8 @@ def create_admin_router(
             HTTPException: If document not found or operation fails
         """
         try:
-            result = document_manager.delete_document(file_hash, archive=archive)
+            doc_mgr = _get_doc_mgr(session)
+            result = doc_mgr.delete_document(file_hash, archive=archive)
 
             # Log the action
             audit_logger.log_document_delete(
@@ -483,7 +255,8 @@ def create_admin_router(
         """
         try:
             # Get document info
-            documents = document_manager.list_documents()
+            doc_mgr = _get_doc_mgr(session)
+            documents = doc_mgr.list_documents()
             doc = next((d for d in documents if d.get("file_hash") == file_hash), None)
 
             if not doc:
@@ -550,7 +323,8 @@ def create_admin_router(
         """
         try:
             # Get document info
-            documents = document_manager.list_documents()
+            doc_mgr = _get_doc_mgr(session)
+            documents = doc_mgr.list_documents()
             doc = next((d for d in documents if d.get("file_hash") == file_hash), None)
 
             if not doc:
@@ -568,7 +342,7 @@ def create_admin_router(
                 )
 
             filename = doc["filename"]
-            file_path = document_manager.documents_path / filename
+            file_path = doc_mgr.documents_path / filename
 
             if not file_path.exists():
                 raise HTTPException(

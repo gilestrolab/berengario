@@ -38,3 +38,16 @@
 - **Problem**: `from src.config import settings` triggers `settings.ensure_directories()` at module level, which creates `data/kb/documents` etc. In Docker containers where data/ is root-owned, this causes `PermissionError`.
 - **Fix**: For tests that don't need `settings`, avoid import chains that reach `src.config`. For example, import `OTPManager` directly from the module file instead of through `src.api.auth.__init__` (which re-exports SessionManager → settings). Or use a SimpleOTPManager test double.
 - **Broader pattern**: Module-level side effects (like `ensure_directories()`) should be deferred or guarded.
+
+## 2026-03-02: Welcome Emails + Teach Address Documentation
+
+### Docker container selection matters for test sends
+- **Problem**: `docker-compose run --rm` containers can't resolve SMTP hostnames (DNS issue). `berengario-email` production image doesn't have volume-mounted source code.
+- **Fix**: Use `docker exec berengario-web` for ad-hoc Python scripts — it has volume mounts AND proper DNS.
+
+### Welcome emails should be warm and human, not bullet-point lists
+- **Lesson**: First draft was dry bullet points. Users want narrative tone explaining what the system is and how to use it naturally. Use friendly role labels (member/contributor/administrator instead of querier/teacher/admin).
+
+### teach_address vs query_address in email instructions
+- **Pattern**: Teaching instructions (CC, BCC, forward) should reference `teach_address` when configured, falling back to `query_address`. Use: `kb_address = teach_address or query_address`.
+- **Important**: The `.env` file must actually set `EMAIL_TEACH_ADDRESS` for it to work — code defaults to `None`.

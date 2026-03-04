@@ -64,10 +64,6 @@ def _create_test_app(settings_override=None, platform_db=None):
     otp_manager.generate_otp.return_value = "123456"
     otp_manager.verify_otp.return_value = (True, "OK")
     email_sender = MagicMock()
-    query_whitelist = MagicMock()
-    query_whitelist.is_allowed.return_value = False
-    admin_whitelist = MagicMock()
-    admin_whitelist.is_allowed.return_value = False
 
     def get_session_id(request):
         return request.cookies.get("session_id")
@@ -78,8 +74,6 @@ def _create_test_app(settings_override=None, platform_db=None):
     router = create_auth_router(
         session_manager=session_manager,
         otp_manager=otp_manager,
-        query_whitelist=query_whitelist,
-        admin_whitelist=admin_whitelist,
         email_sender=email_sender,
         get_session_id=get_session_id,
         set_session_cookie=set_session_cookie,

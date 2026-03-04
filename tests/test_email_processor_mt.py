@@ -1,7 +1,7 @@
 """
-Unit tests for multi-tenant email processing.
+Unit tests for email processing.
 
-Tests the MT dispatch path in EmailProcessor: sender resolution,
+Tests the dispatch path in EmailProcessor: sender resolution,
 permission checking, tenant-specific component injection, and
 partial failure handling.
 """
@@ -21,7 +21,6 @@ def mock_email():
     email.message_id = "<test-msg-1@example.com>"
     email.sender.email = "alice@example.com"
     email.subject = "Test Subject"
-    email.is_whitelisted = True
     email.is_cced = False
     email.in_reply_to = None
     email.references = []
@@ -66,84 +65,33 @@ def mock_components():
 
 
 @pytest.fixture
-def mt_processor(mock_router):
-    """Create an EmailProcessor in MT mode with mocked dependencies."""
+def processor(mock_router):
+    """Create an EmailProcessor with mocked dependencies."""
     return EmailProcessor(
         email_client=MagicMock(),
         parser=MagicMock(),
         attachment_handler=MagicMock(),
-        doc_processor=MagicMock(),
-        kb_manager=MagicMock(),
         message_tracker=MagicMock(),
         email_sender=MagicMock(),
-        query_handler=MagicMock(),
-        teach_validator=MagicMock(),
-        query_validator=MagicMock(),
-        admin_validator=MagicMock(),
         tenant_email_router=mock_router,
     )
 
 
-@pytest.fixture
-def st_processor():
-    """Create an EmailProcessor in ST mode (no router)."""
-    return EmailProcessor(
-        email_client=MagicMock(),
-        parser=MagicMock(),
-        attachment_handler=MagicMock(),
-        doc_processor=MagicMock(),
-        kb_manager=MagicMock(),
-        message_tracker=MagicMock(),
-        email_sender=MagicMock(),
-        query_handler=MagicMock(),
-        teach_validator=MagicMock(),
-        query_validator=MagicMock(),
-        admin_validator=MagicMock(),
-    )
+class TestDispatch:
+    """Test dispatch in process_message."""
 
+    def test_has_router(self, processor, mock_router):
+        """Processor should have the router set."""
+        assert processor.tenant_email_router is mock_router
 
-class TestSTModeUnchanged:
-    """Verify single-tenant mode is unaffected by MT additions."""
-
-    def test_st_mode_has_no_router(self, st_processor):
-        """ST processor should have tenant_email_router = None."""
-        assert st_processor.tenant_email_router is None
-
-    def test_st_process_message_uses_st_path(self, st_processor, mock_mail_message):
-        """ST mode should use whitelist-based validation, not tenant routing."""
-        st_processor.parser.parse.return_value = None
-        result = st_processor.process_message(mock_mail_message)
-
-        # Should get parse error (our mock returns None)
-        assert result.action == "parse_error"
-        assert not result.success
-
-    def test_st_duplicate_detection(self, st_processor, mock_mail_message, mock_email):
-        """ST mode should detect duplicates via message tracker."""
-        st_processor.parser.parse.return_value = mock_email
-        st_processor.message_tracker.is_processed.return_value = True
-
-        result = st_processor.process_message(mock_mail_message)
-
-        assert result.action == "duplicate"
-        assert result.success
-
-
-class TestMTDispatch:
-    """Test multi-tenant dispatch in process_message."""
-
-    def test_mt_mode_has_router(self, mt_processor, mock_router):
-        """MT processor should have the router set."""
-        assert mt_processor.tenant_email_router is mock_router
-
-    def test_mt_routes_query_to_single_tenant(
-        self, mt_processor, mock_router, mock_mail_message, mock_email, mock_components
+    def test_routes_query_to_single_tenant(
+        self, processor, mock_router, mock_mail_message, mock_email, mock_components
     ):
-        """MT should route a query to the resolved tenant."""
-        mt_processor.parser.parse.return_value = mock_email
-        mt_processor.message_tracker.is_processed.return_value = False
-        mt_processor.parser.should_process_as_query.return_value = True
-        mt_processor.parser.should_process_for_kb.return_value = False
+        """Should route a query to the resolved tenant."""
+        processor.parser.parse.return_value = mock_email
+        processor.message_tracker.is_processed.return_value = False
+        processor.parser.should_process_as_query.return_value = True
+        processor.parser.should_process_for_kb.return_value = False
 
         mock_router.resolve_sender.return_value = [
             {
@@ -170,24 +118,23 @@ class TestMTDispatch:
         mock_components.conversation_manager.format_conversation_context.return_value = (
             ""
         )
-        mt_processor.email_sender.send_reply.return_value = True
-        mt_processor.admin_validator.is_allowed.return_value = False
+        processor.email_sender.send_reply.return_value = True
 
-        result = mt_processor.process_message(mock_mail_message)
+        result = processor.process_message(mock_mail_message)
 
         assert result.success
         assert result.action == "query"
         mock_router.resolve_sender.assert_called_once_with("alice@example.com")
         mock_router.get_components.assert_called_once_with("acme")
 
-    def test_mt_routes_to_multiple_tenants_kb(
-        self, mt_processor, mock_router, mock_mail_message, mock_email
+    def test_routes_to_multiple_tenants_kb(
+        self, processor, mock_router, mock_mail_message, mock_email
     ):
-        """MT should process KB ingestion for all matching tenants."""
-        mt_processor.parser.parse.return_value = mock_email
-        mt_processor.message_tracker.is_processed.return_value = False
-        mt_processor.parser.should_process_as_query.return_value = False
-        mt_processor.parser.should_process_for_kb.return_value = True
+        """Should process KB ingestion for all matching tenants."""
+        processor.parser.parse.return_value = mock_email
+        processor.message_tracker.is_processed.return_value = False
+        processor.parser.should_process_as_query.return_value = False
+        processor.parser.should_process_for_kb.return_value = True
 
         mock_router.resolve_sender.return_value = [
             {
@@ -225,40 +172,40 @@ class TestMTDispatch:
         }[slug]
 
         # Mock attachment handler to return no attachments (body processing)
-        mt_processor.attachment_handler.extract_attachments.return_value = []
+        processor.attachment_handler.extract_attachments.return_value = []
         mock_email.get_body.return_value = ""  # No body either - simplest case
 
-        result = mt_processor.process_message(mock_mail_message)
+        result = processor.process_message(mock_mail_message)
 
         # Both tenants processed
         assert mock_router.get_components.call_count == 2
         assert result.success
 
-    def test_mt_sender_not_found_rejected(
-        self, mt_processor, mock_router, mock_mail_message, mock_email
+    def test_sender_not_found_rejected(
+        self, processor, mock_router, mock_mail_message, mock_email
     ):
-        """MT should reject if sender not found in any tenant."""
-        mt_processor.parser.parse.return_value = mock_email
-        mt_processor.message_tracker.is_processed.return_value = False
-        mt_processor.parser.should_process_as_query.return_value = True
-        mt_processor.parser.should_process_for_kb.return_value = False
+        """Should reject if sender not found in any tenant."""
+        processor.parser.parse.return_value = mock_email
+        processor.message_tracker.is_processed.return_value = False
+        processor.parser.should_process_as_query.return_value = True
+        processor.parser.should_process_for_kb.return_value = False
 
         mock_router.resolve_sender.return_value = []
 
-        result = mt_processor.process_message(mock_mail_message)
+        result = processor.process_message(mock_mail_message)
 
         assert not result.success
         assert result.action == "rejected"
-        mt_processor.message_tracker.mark_processed.assert_called()
+        processor.message_tracker.mark_processed.assert_called()
 
-    def test_mt_querier_cannot_teach(
-        self, mt_processor, mock_router, mock_mail_message, mock_email
+    def test_querier_cannot_teach(
+        self, processor, mock_router, mock_mail_message, mock_email
     ):
-        """MT should skip tenant where querier tries to teach."""
-        mt_processor.parser.parse.return_value = mock_email
-        mt_processor.message_tracker.is_processed.return_value = False
-        mt_processor.parser.should_process_as_query.return_value = False
-        mt_processor.parser.should_process_for_kb.return_value = True
+        """Should skip tenant where querier tries to teach."""
+        processor.parser.parse.return_value = mock_email
+        processor.message_tracker.is_processed.return_value = False
+        processor.parser.should_process_as_query.return_value = False
+        processor.parser.should_process_for_kb.return_value = True
 
         mock_router.resolve_sender.return_value = [
             {
@@ -269,36 +216,34 @@ class TestMTDispatch:
             },
         ]
 
-        result = mt_processor.process_message(mock_mail_message)
+        result = processor.process_message(mock_mail_message)
 
         # Querier can't teach, no tenants processed successfully
         mock_router.get_components.assert_not_called()
-        # Result is "success" with 0 successes and 0 failures (just skipped)
-        # Actually, since no tenant processed, successes=0, so it's a failure
         assert not result.success
 
-    def test_mt_duplicate_detection_global(
-        self, mt_processor, mock_router, mock_mail_message, mock_email
+    def test_duplicate_detection_global(
+        self, processor, mock_router, mock_mail_message, mock_email
     ):
-        """Duplicate detection should happen globally, before MT dispatch."""
-        mt_processor.parser.parse.return_value = mock_email
-        mt_processor.message_tracker.is_processed.return_value = True
+        """Duplicate detection should happen globally, before dispatch."""
+        processor.parser.parse.return_value = mock_email
+        processor.message_tracker.is_processed.return_value = True
 
-        result = mt_processor.process_message(mock_mail_message)
+        result = processor.process_message(mock_mail_message)
 
         assert result.action == "duplicate"
         assert result.success
         # Router should NOT be called for duplicates
         mock_router.resolve_sender.assert_not_called()
 
-    def test_mt_partial_failure(
-        self, mt_processor, mock_router, mock_mail_message, mock_email
+    def test_partial_failure(
+        self, processor, mock_router, mock_mail_message, mock_email
     ):
-        """MT should succeed if at least one tenant processes OK."""
-        mt_processor.parser.parse.return_value = mock_email
-        mt_processor.message_tracker.is_processed.return_value = False
-        mt_processor.parser.should_process_as_query.return_value = True
-        mt_processor.parser.should_process_for_kb.return_value = False
+        """Should succeed if at least one tenant processes OK."""
+        processor.parser.parse.return_value = mock_email
+        processor.message_tracker.is_processed.return_value = False
+        processor.parser.should_process_as_query.return_value = True
+        processor.parser.should_process_for_kb.return_value = False
 
         mock_router.resolve_sender.return_value = [
             {
@@ -316,10 +261,7 @@ class TestMTDispatch:
         ]
 
         # First tenant succeeds, second fails
-        call_count = [0]
-
         def mock_get_components(slug):
-            call_count[0] += 1
             if slug == "acme":
                 comp = MagicMock()
                 comp.context.instance_name = "Acme"
@@ -339,35 +281,41 @@ class TestMTDispatch:
                 raise ValueError("Globex DB unavailable")
 
         mock_router.get_components.side_effect = mock_get_components
-        mt_processor.email_sender.send_reply.return_value = True
-        mt_processor.admin_validator.is_allowed.return_value = False
+        processor.email_sender.send_reply.return_value = True
 
-        result = mt_processor.process_message(mock_mail_message)
+        result = processor.process_message(mock_mail_message)
 
         # Should succeed because acme processed OK
         assert result.success
         assert result.action == "query"
 
-    def test_mt_skipped_action(
-        self, mt_processor, mock_router, mock_mail_message, mock_email
+    def test_skipped_action(
+        self, processor, mock_router, mock_mail_message, mock_email
     ):
-        """MT should handle messages that don't match query or KB criteria."""
-        mt_processor.parser.parse.return_value = mock_email
-        mt_processor.message_tracker.is_processed.return_value = False
-        mt_processor.parser.should_process_as_query.return_value = False
-        mt_processor.parser.should_process_for_kb.return_value = False
+        """Should handle messages that don't match query or KB criteria."""
+        processor.parser.parse.return_value = mock_email
+        processor.message_tracker.is_processed.return_value = False
+        processor.parser.should_process_as_query.return_value = False
+        processor.parser.should_process_for_kb.return_value = False
 
-        result = mt_processor.process_message(mock_mail_message)
+        result = processor.process_message(mock_mail_message)
 
         assert result.success
         assert result.action == "skipped"
         mock_router.resolve_sender.assert_not_called()
 
+    def test_parse_error(self, processor, mock_mail_message):
+        """Should return parse_error when parser returns None."""
+        processor.parser.parse.return_value = None
+        result = processor.process_message(mock_mail_message)
+        assert result.action == "parse_error"
+        assert not result.success
+
 
 class TestProcessQueryWith:
     """Test _process_query_with() parameterized method."""
 
-    def test_query_uses_injected_components(self, mt_processor, mock_email):
+    def test_query_uses_injected_components(self, processor, mock_email):
         """_process_query_with should use injected query_handler and conv_manager."""
         mock_qh = MagicMock()
         mock_cm = MagicMock()
@@ -384,9 +332,8 @@ class TestProcessQueryWith:
         }
         mock_cm.add_message.return_value = 99
         mock_sender.send_reply.return_value = True
-        mt_processor.admin_validator.is_allowed.return_value = False
 
-        result = mt_processor._process_query_with(
+        result = processor._process_query_with(
             email=mock_email,
             query_handler=mock_qh,
             conv_manager=mock_cm,

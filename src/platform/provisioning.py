@@ -130,6 +130,7 @@ class TenantProvisioner:
         organization: Optional[str] = None,
         custom_prompt: Optional[str] = None,
         llm_model: Optional[str] = None,
+        email_address: Optional[str] = None,
     ) -> Tenant:
         """
         Provision a new tenant with all required resources.
@@ -152,6 +153,7 @@ class TenantProvisioner:
             organization: Optional organization name.
             custom_prompt: Optional custom RAG system prompt.
             llm_model: Optional per-tenant LLM model override.
+            email_address: Optional tenant email override (defaults to slug@platform_domain).
 
         Returns:
             Created and activated Tenant model.
@@ -168,7 +170,7 @@ class TenantProvisioner:
             )
 
         db_name = f"berengario_tenant_{slug.replace('-', '_')}"
-        email_address = f"{slug}@{settings.platform_domain}"
+        email_address = email_address or f"{slug}@{settings.platform_domain}"
         storage_path = f"tenants/{slug}"
 
         logger.info(f"Provisioning tenant: slug={slug}, name={name}")

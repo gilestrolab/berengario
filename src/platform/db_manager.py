@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from typing import Generator, Optional
 
 from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, make_transient, sessionmaker
 
 from src.config import settings
 from src.email.db_models import Base as TenantBase
@@ -309,6 +309,9 @@ class TenantDBManager:
             tenant = session.query(Tenant).filter(Tenant.slug == slug).first()
             if tenant:
                 session.expunge(tenant)
+                # Reason: make_transient prevents DetachedInstanceError when
+                # accessing attributes after the session closes
+                make_transient(tenant)
             return tenant
 
     def get_tenant_by_email(self, email_address: str) -> Optional[Tenant]:
@@ -329,6 +332,7 @@ class TenantDBManager:
             )
             if tenant:
                 session.expunge(tenant)
+                make_transient(tenant)
             return tenant
 
     def get_active_tenants(self) -> list:
@@ -346,6 +350,7 @@ class TenantDBManager:
             )
             for t in tenants:
                 session.expunge(t)
+                make_transient(t)
             return tenants
 
     def test_platform_connection(self) -> bool:

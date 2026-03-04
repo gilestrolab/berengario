@@ -19,6 +19,7 @@ _kb_manager: ContextVar[Optional[Any]] = ContextVar("kb_manager", default=None)
 _conversation_manager: ContextVar[Optional[Any]] = ContextVar(
     "conversation_manager", default=None
 )
+_tenant_id: ContextVar[Optional[str]] = ContextVar("tenant_id", default=None)
 
 
 def set_tool_context(
@@ -27,6 +28,7 @@ def set_tool_context(
     is_email_request: bool = False,
     kb_manager: Optional[Any] = None,
     conversation_manager: Optional[Any] = None,
+    tenant_id: Optional[str] = None,
 ) -> None:
     """
     Set the context for tool execution (called before tool execution).
@@ -40,14 +42,16 @@ def set_tool_context(
         is_email_request: Whether this request is from email (requires confirmation)
         kb_manager: Optional KnowledgeBaseManager instance (for MT per-tenant KB)
         conversation_manager: Optional ConversationManager instance (for MT per-tenant DB)
+        tenant_id: Optional tenant ID for multi-tenant mode
     """
     _user_email.set(user_email)
     _is_admin.set(is_admin)
     _is_email_request.set(is_email_request)
     _kb_manager.set(kb_manager)
     _conversation_manager.set(conversation_manager)
+    _tenant_id.set(tenant_id)
     logger.debug(
-        f"Tool context set: user={user_email}, admin={is_admin}, email={is_email_request}"
+        f"Tool context set: user={user_email}, admin={is_admin}, email={is_email_request}, tenant={tenant_id}"
     )
 
 
@@ -81,6 +85,7 @@ def clear_tool_context() -> None:
     _is_email_request.set(False)
     _kb_manager.set(None)
     _conversation_manager.set(None)
+    _tenant_id.set(None)
     logger.debug("Tool context cleared")
 
 
@@ -124,3 +129,8 @@ def get_kb_manager() -> Optional[Any]:
 def get_conversation_manager() -> Optional[Any]:
     """Get the current context's ConversationManager (None in ST mode)."""
     return _conversation_manager.get()
+
+
+def get_tenant_id() -> Optional[str]:
+    """Get the current context's tenant ID (None in ST mode)."""
+    return _tenant_id.get()

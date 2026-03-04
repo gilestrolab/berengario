@@ -95,12 +95,18 @@ class QueryHandler:
                 raise ValueError("Query text cannot be empty")
 
             # Set tool context for admin-only tools and MT KB/DB routing
+            tenant_id = (
+                getattr(self.tenant_context, "tenant_id", None)
+                if self.tenant_context
+                else None
+            )
             set_tool_context(
                 user_email=user_email or "unknown",
                 is_admin=is_admin,
                 is_email_request=is_email_request,
                 kb_manager=self.rag_engine.kb_manager,
                 conversation_manager=self.conversation_manager,
+                tenant_id=tenant_id,
             )
 
             try:

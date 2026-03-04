@@ -20,6 +20,7 @@ The system has **dual whitelist validation** with separate permissions for teach
 
 - **Direct emails (To: bot)** → RAG query processing + automated reply (if sender in query whitelist)
   - Exception: Forwarded emails (Fw:/Fwd: prefix) → KB ingestion (configurable via `FORWARD_TO_KB_ENABLED`)
+- **Teach address emails** (To/CC: teach address) → KB ingestion (if `EMAIL_TEACH_ADDRESS` is configured, takes highest priority)
 - **CC/BCC emails** → Silent KB ingestion (if sender in teach whitelist)
 - **Forwarded emails** → KB ingestion (if sender in teach whitelist and `FORWARD_TO_KB_ENABLED=true`)
 
@@ -592,8 +593,10 @@ Key environment variables (see `.env.example` for full list):
 - **IMAP**: `IMAP_SERVER`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASSWORD`, `IMAP_USE_SSL`
 - **SMTP**: `SMTP_SERVER`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_USE_TLS`
 - `EMAIL_TARGET_ADDRESS` - Bot's email address
+- `EMAIL_TEACH_ADDRESS` - Dedicated email address for KB ingestion (optional)
 - `EMAIL_DISPLAY_NAME` - Display name in emails
 - `EMAIL_CHECK_INTERVAL` - Polling frequency (seconds)
+- `WELCOME_EMAIL_ENABLED` - Send welcome emails to new users (default: true)
 
 ### Whitelist Configuration (Dual Lists)
 - **Teaching**: `EMAIL_TEACH_WHITELIST_FILE`, `EMAIL_TEACH_WHITELIST_ENABLED`

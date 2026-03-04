@@ -1,15 +1,10 @@
 /**
  * Admin Panel JavaScript
- * Handles whitelist management and document operations
+ * Handles team management and document operations
  */
 
 class AdminPanel {
     constructor() {
-        this.whitelists = {
-            queriers: [],
-            teachers: [],
-            admins: []
-        };
         this.documents = [];
         this.crawledUrls = [];
         this.backups = [];
@@ -28,7 +23,6 @@ class AdminPanel {
         this.setupEventListeners();
 
         // Load initial data
-        await this.loadAllWhitelists();
         await this.loadDocuments();
         await this.loadBackups();
         await this.loadSettings();
@@ -83,14 +77,11 @@ class AdminPanel {
                 document.getElementById('admin-title').textContent = headerText;
             }
 
-            // Multi-tenant mode: show Team tab, hide Whitelists tab
+            // Multi-tenant mode: show Team tab
             if (config.multi_tenant) {
                 this.multiTenant = true;
                 const teamTabBtn = document.getElementById('team-tab-btn');
-                const whitelistsTabBtn = document.getElementById('whitelists-tab-btn');
                 if (teamTabBtn) teamTabBtn.style.display = '';
-                if (whitelistsTabBtn) whitelistsTabBtn.style.display = 'none';
-                // Auto-select Team tab instead of Whitelists
                 this.switchTab('team');
                 this.loadTeamData();
             }
@@ -103,18 +94,6 @@ class AdminPanel {
         // Tab switching
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
-        });
-
-        // Enter key for whitelist inputs
-        ['queriers', 'teachers', 'admins'].forEach(type => {
-            const input = document.getElementById(`${type}-input`);
-            if (input) {
-                input.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        this.addWhitelistEntry(type);
-                    }
-                });
-            }
         });
 
         // File upload selection handler
@@ -163,117 +142,6 @@ class AdminPanel {
         // Load data for specific tabs on first switch
         if (tabName === 'webcrawl' && this.crawledUrls.length === 0) {
             this.loadCrawledUrls();
-        }
-    }
-
-    async loadAllWhitelists() {
-        await Promise.all([
-            this.loadWhitelist('queriers'),
-            this.loadWhitelist('teachers'),
-            this.loadWhitelist('admins')
-        ]);
-    }
-
-    async loadWhitelist(type) {
-        try {
-            const response = await fetch(`/api/admin/whitelists/${type}`);
-
-            if (!response.ok) {
-                throw new Error(`Failed to load ${type} whitelist`);
-            }
-
-            const data = await response.json();
-            this.whitelists[type] = data.entries;
-            this.renderWhitelist(type);
-        } catch (error) {
-            console.error(`Error loading ${type} whitelist:`, error);
-            this.renderWhitelistError(type, error.message);
-        }
-    }
-
-    renderWhitelist(type) {
-        const container = document.getElementById(`${type}-list`);
-        if (!container) return;
-
-        if (this.whitelists[type].length === 0) {
-            container.innerHTML = '<div class="empty-state">No entries yet</div>';
-            return;
-        }
-
-        container.innerHTML = this.whitelists[type].map(entry => `
-            <div class="whitelist-item">
-                <span>${this.escapeHtml(entry)}</span>
-                <button onclick="adminPanel.removeWhitelistEntry('${type}', '${this.escapeHtml(entry)}')">Remove</button>
-            </div>
-        `).join('');
-    }
-
-    renderWhitelistError(type, message) {
-        const container = document.getElementById(`${type}-list`);
-        if (!container) return;
-
-        container.innerHTML = `<div class="error-message">Error: ${this.escapeHtml(message)}</div>`;
-    }
-
-    async addWhitelistEntry(type) {
-        const input = document.getElementById(`${type}-input`);
-        if (!input) return;
-
-        const entry = input.value.trim();
-        if (!entry) {
-            this.showToast('Please enter an email or domain', 'error');
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/admin/whitelists/${type}/add`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ entry }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.detail || 'Failed to add entry');
-            }
-
-            this.showToast(data.message, 'success');
-            input.value = '';
-            await this.loadWhitelist(type);
-        } catch (error) {
-            console.error('Error adding whitelist entry:', error);
-            this.showToast(error.message, 'error');
-        }
-    }
-
-    async removeWhitelistEntry(type, entry) {
-        if (!confirm(`Remove "${entry}" from ${type} whitelist?`)) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/admin/whitelists/${type}/remove`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ entry }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.detail || 'Failed to remove entry');
-            }
-
-            this.showToast(data.message, 'success');
-            await this.loadWhitelist(type);
-        } catch (error) {
-            console.error('Error removing whitelist entry:', error);
-            this.showToast(error.message, 'error');
         }
     }
 

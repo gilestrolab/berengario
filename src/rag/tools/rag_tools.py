@@ -48,7 +48,20 @@ def rag_search(query: str, top_k: int = 5) -> Dict[str, Any]:
 
         # Use context KB manager (MT mode) or create default (ST mode)
         kb_manager = get_kb_manager() or KnowledgeBaseManager()
-        query_engine = kb_manager.get_query_engine(top_k=top_k)
+
+        # Build LLM matching RAGEngine config so LlamaIndex doesn't fall back
+        # to its default gpt-3.5-turbo (which may not exist on the API proxy)
+        from llama_index.llms.openai import OpenAI as LlamaOpenAI
+
+        llm = LlamaOpenAI(
+            model="gpt-4",  # Dummy for validation
+            api_key=settings.openrouter_api_key,
+            api_base=settings.openrouter_api_base,
+            temperature=0.1,
+            is_chat_model=True,
+            additional_kwargs={"model": settings.openrouter_model},
+        )
+        query_engine = kb_manager.get_query_engine(top_k=top_k, llm=llm)
 
         # Execute query
         response = query_engine.query(query)

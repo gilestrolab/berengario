@@ -42,19 +42,14 @@ class EmailService:
         """
         Initialize email service.
 
-        In multi-tenant mode and when no processor is provided, creates
-        a tenant-aware EmailProcessor with TenantEmailRouter.
+        Creates a tenant-aware EmailProcessor with TenantEmailRouter
+        when no processor is provided.
 
         Args:
             processor: EmailProcessor instance (defaults to new instance)
             check_interval: Seconds between checks (defaults to settings)
         """
-        if processor:
-            self.processor = processor
-        elif settings.multi_tenant:
-            self.processor = self._create_mt_processor()
-        else:
-            self.processor = EmailProcessor()
+        self.processor = processor or self._create_processor()
         self.check_interval = check_interval or settings.email_check_interval
         self.running = False
         self.failure_count = 0
@@ -82,39 +77,37 @@ class EmailService:
         self.stop()
 
     @staticmethod
-    def _create_mt_processor() -> EmailProcessor:
+    def _create_processor() -> EmailProcessor:
         """
-        Create a multi-tenant EmailProcessor with TenantEmailRouter.
+        Create an EmailProcessor with TenantEmailRouter.
 
         Initializes the platform DB, storage backend, component factory,
         and tenant email router, then wires them into an EmailProcessor.
 
         Returns:
-            EmailProcessor configured for multi-tenant operation.
+            Configured EmailProcessor instance.
         """
         from src.email.tenant_email_router import TenantEmailRouter
+        from src.platform.bootstrap import bootstrap_platform
         from src.platform.component_factory import TenantComponentFactory
-        from src.platform.db_manager import TenantDBManager
-        from src.platform.storage import create_storage_backend
 
-        logger.info("Creating multi-tenant EmailProcessor...")
+        logger.info("Creating EmailProcessor with TenantEmailRouter...")
 
-        db_manager = TenantDBManager()
-        storage_backend = create_storage_backend()
+        infra = bootstrap_platform()
         component_factory = TenantComponentFactory(
-            storage_backend=storage_backend,
-            db_manager=db_manager,
+            storage_backend=infra.storage,
+            db_manager=infra.db_manager,
         )
         router = TenantEmailRouter(
-            db_manager=db_manager,
+            db_manager=infra.db_manager,
             component_factory=component_factory,
         )
 
         processor = EmailProcessor(
             tenant_email_router=router,
-            storage_backend=storage_backend,
+            storage_backend=infra.storage,
         )
-        logger.info("Multi-tenant EmailProcessor created successfully")
+        logger.info("EmailProcessor created successfully")
         return processor
 
     def _calculate_backoff_delay(self) -> int:
@@ -218,12 +211,6 @@ class EmailService:
 
                 if not self.running:
                     break
-
-                # Reload whitelists to pick up any changes made via admin interface
-                try:
-                    self.processor.reload_whitelists()
-                except Exception as e:
-                    logger.warning(f"Failed to reload whitelists: {e}")
 
                 # Process inbox
                 self._process_inbox()

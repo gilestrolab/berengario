@@ -17,17 +17,20 @@ from src.email.message_tracker import MessageTracker
 @pytest.fixture
 def test_tracker():
     """Create a test message tracker with in-memory SQLite."""
-    # Override settings to use in-memory SQLite
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import StaticPool
+
+    test_engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
     with (
-        patch("src.email.db_manager.settings") as mock_settings,
+        patch.object(DatabaseManager, "_create_engine", return_value=test_engine),
+        patch("src.email.db_manager.settings"),
         patch("src.email.message_tracker.db_manager") as mock_db_manager,
     ):
-
-        mock_settings.db_type = "sqlite"
-        mock_settings.sqlite_db_path = ":memory:"
-        mock_settings.debug = False
-        mock_settings.get_database_url.return_value = "sqlite:///:memory:"
-
         # Create fresh database manager for this test
         fresh_db_manager = DatabaseManager()
         fresh_db_manager.init_db()

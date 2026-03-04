@@ -14,10 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from src.api.auth.otp_manager import OTPManager
 from src.config import settings
-from src.platform.db_manager import TenantDBManager
-from src.platform.encryption import DatabaseKeyManager
-from src.platform.provisioning import TenantProvisioner
-from src.platform.storage import create_storage_backend
+from src.platform.bootstrap import bootstrap_platform
 from src.platform_admin.routes.auth import AdminSessionManager, create_admin_auth_router
 from src.platform_admin.routes.health import create_health_router
 from src.platform_admin.routes.tenants import create_tenants_router
@@ -28,16 +25,11 @@ logger = logging.getLogger(__name__)
 # Initialize platform-level dependencies
 # ---------------------------------------------------------------------------
 
-db_manager = TenantDBManager()
-db_manager.init_platform_db()
-
-storage = create_storage_backend()
-
-key_manager = None
-if settings.master_encryption_key:
-    key_manager = DatabaseKeyManager(settings.master_encryption_key)
-
-provisioner = TenantProvisioner(db_manager, storage, key_manager)
+infra = bootstrap_platform(include_provisioner=True)
+db_manager = infra.db_manager
+storage = infra.storage
+key_manager = infra.key_manager
+provisioner = infra.provisioner
 
 # Auth components
 otp_manager = OTPManager()
@@ -49,12 +41,6 @@ try:
     from src.email.email_sender import EmailSender
 
     email_sender = EmailSender(
-        smtp_server=settings.smtp_server,
-        smtp_port=settings.smtp_port,
-        smtp_user=settings.smtp_user,
-        smtp_password=settings.smtp_password,
-        use_tls=settings.smtp_use_tls,
-        from_address=settings.email_target_address,
         from_name=f"{settings.instance_name} Platform Admin",
     )
 except Exception as e:

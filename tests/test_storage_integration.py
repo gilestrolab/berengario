@@ -4,7 +4,7 @@ Tests for StorageBackend and encryption integration into active code paths.
 Verifies that:
 - EmailProcessor._archive_file() routes to StorageBackend or local filesystem
 - MT email processing passes storage_backend and tenant_slug through
-- EmailService._create_mt_processor() uses create_storage_backend() factory
+- EmailService._create_processor() uses create_storage_backend() factory
 - Admin upload uses StorageBackend in MT mode
 - TenantProvisioner creates encryption keys when key_manager is provided
 """
@@ -36,26 +36,20 @@ def processor():
         email_client=MagicMock(),
         parser=MagicMock(),
         attachment_handler=MagicMock(),
-        doc_processor=MagicMock(),
-        kb_manager=MagicMock(),
         message_tracker=MagicMock(),
         email_sender=MagicMock(),
-        query_handler=MagicMock(),
     )
 
 
 @pytest.fixture
 def processor_with_storage(mock_storage_backend):
-    """Create an EmailProcessor with storage_backend set (MT mode)."""
+    """Create an EmailProcessor with storage_backend set."""
     return EmailProcessor(
         email_client=MagicMock(),
         parser=MagicMock(),
         attachment_handler=MagicMock(),
-        doc_processor=MagicMock(),
-        kb_manager=MagicMock(),
         message_tracker=MagicMock(),
         email_sender=MagicMock(),
-        query_handler=MagicMock(),
         storage_backend=mock_storage_backend,
     )
 
@@ -191,7 +185,12 @@ class TestProcessForKbWithStorage:
 
         mock_router = MagicMock()
         mock_router.resolve_sender.return_value = [
-            {"tenant_slug": "acme", "tenant_id": "t-1", "role": "teacher"}
+            {
+                "tenant_slug": "acme",
+                "tenant_id": "t-1",
+                "role": "teacher",
+                "tenant_name": "Acme",
+            }
         ]
         mock_router.check_permission.return_value = True
         mock_router.get_components.return_value = mock_components
@@ -216,8 +215,8 @@ class TestProcessForKbWithStorage:
 
         mock_mail = MagicMock()
 
-        # Act — _process_mt determines action internally from parser
-        proc._process_mt(mock_email, mock_mail)
+        # Act — _process determines action internally from parser
+        proc._process(mock_email, mock_mail)
 
         # Assert
         assert call_args.get("storage_backend") is proc.storage_backend
@@ -225,35 +224,33 @@ class TestProcessForKbWithStorage:
 
 
 # ============================================================================
-# Tests: EmailService._create_mt_processor()
+# Tests: EmailService._create_processor()
 # ============================================================================
 
 
 class TestEmailServiceStorageInit:
     """Tests for EmailService MT processor creation."""
 
-    def test_create_mt_processor_uses_factory(self):
-        """_create_mt_processor() should use create_storage_backend(), not hardcoded Local."""
-        # Lazy imports in _create_mt_processor require patching at source modules
+    def test_create_processor_uses_factory(self):
+        """_create_processor() should pass storage from bootstrap to EmailProcessor."""
+        mock_storage = MagicMock()
+        mock_infra = MagicMock()
+        mock_infra.storage = mock_storage
+        mock_infra.db_manager = MagicMock()
+
         with (
+            patch("src.platform.bootstrap.bootstrap_platform", return_value=mock_infra),
             patch("src.email.tenant_email_router.TenantEmailRouter"),
             patch("src.platform.component_factory.TenantComponentFactory"),
-            patch("src.platform.db_manager.TenantDBManager"),
-            patch("src.platform.storage.create_storage_backend") as mock_create,
             patch("src.email.email_service.EmailProcessor") as mock_processor_cls,
         ):
-            mock_storage = MagicMock()
-            mock_create.return_value = mock_storage
             mock_processor_cls.return_value = MagicMock()
 
             from src.email.email_service import EmailService
 
-            EmailService._create_mt_processor()
+            EmailService._create_processor()
 
-            # Verify factory function was called (not LocalStorageBackend directly)
-            mock_create.assert_called_once()
-
-            # Verify EmailProcessor was called with storage_backend
+            # Verify EmailProcessor was called with storage_backend from infra
             mock_processor_cls.assert_called_once()
             call_kwargs = mock_processor_cls.call_args[1]
             assert call_kwargs.get("storage_backend") is mock_storage
@@ -287,8 +284,6 @@ class TestAdminUploadStorage:
         mock_resolver.resolve.return_value = mock_components
 
         router = create_admin_router(
-            whitelist_manager=MagicMock(),
-            whitelist_validators={},
             audit_logger=MagicMock(),
             kb_manager=mock_kb,
             document_manager=MagicMock(),
@@ -416,11 +411,8 @@ class TestProcessorStorageAttribute:
             email_client=MagicMock(),
             parser=MagicMock(),
             attachment_handler=MagicMock(),
-            doc_processor=MagicMock(),
-            kb_manager=MagicMock(),
             message_tracker=MagicMock(),
             email_sender=MagicMock(),
-            query_handler=MagicMock(),
             storage_backend=mock_storage_backend,
         )
         assert proc.storage_backend is mock_storage_backend
@@ -431,10 +423,7 @@ class TestProcessorStorageAttribute:
             email_client=MagicMock(),
             parser=MagicMock(),
             attachment_handler=MagicMock(),
-            doc_processor=MagicMock(),
-            kb_manager=MagicMock(),
             message_tracker=MagicMock(),
             email_sender=MagicMock(),
-            query_handler=MagicMock(),
         )
         assert proc.storage_backend is None
