@@ -1124,6 +1124,7 @@ class AdminPanel {
                 </div>
             </div>
 
+            ${data.reranking ? `
             <div class="model-card">
                 <h4>Reranking</h4>
                 <div class="model-detail">
@@ -1148,6 +1149,7 @@ class AdminPanel {
                     <span class="model-detail-value">${data.reranking.top_n}</span>
                 </div>
             </div>
+            ` : ''}
         `;
     }
 
