@@ -14,7 +14,7 @@ from fastapi import (
     Request,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -546,6 +546,15 @@ def get_example_questions(request: Request):
         raise HTTPException(
             status_code=500, detail=f"Error loading example questions: {str(e)}"
         )
+
+
+@app.get("/.well-known/apple-developer-merchantid-domain-association")
+def apple_developer_merchantid():
+    """Serve Apple Pay domain verification file for Paddle."""
+    path = static_dir / ".well-known" / "apple-developer-merchantid-domain-association"
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(str(path))
 
 
 @app.get("/health")
