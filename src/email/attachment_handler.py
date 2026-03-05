@@ -18,60 +18,27 @@ from typing import List, Optional
 from imap_tools import MailMessage
 
 from src.config import settings
+from src.document_processing.document_processor import (
+    SUPPORTED_EXTENSIONS as _DOC_SUPPORTED,
+)
 
 logger = logging.getLogger(__name__)
 
 
-# Supported document types
-SUPPORTED_EXTENSIONS = {
-    # Documents
-    ".pdf",
-    ".doc",
-    ".docx",
-    ".txt",
-    ".md",
-    ".rtf",
-    ".odt",
-    # Spreadsheets
-    ".xls",
-    ".xlsx",
-    ".csv",
-    ".ods",
-    # Presentations
-    ".ppt",
-    ".pptx",
-    ".odp",
-    # Other
-    ".html",
-    ".htm",
-    ".xml",
-    ".json",
-}
+# Attachment handler accepts the same extensions the document processor can
+# actually parse, so unsupported files are rejected at the gate.
+SUPPORTED_EXTENSIONS = _DOC_SUPPORTED
 
-# MIME types that are allowed
+# MIME types corresponding to the supported extensions
 SUPPORTED_MIME_TYPES = {
     # Documents
     "application/pdf",
-    "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "text/plain",
-    "text/markdown",
-    "application/rtf",
-    "application/vnd.oasis.opendocument.text",
     # Spreadsheets
     "application/vnd.ms-excel",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "text/csv",
-    "application/vnd.oasis.opendocument.spreadsheet",
-    # Presentations
-    "application/vnd.ms-powerpoint",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "application/vnd.oasis.opendocument.presentation",
-    # Other
-    "text/html",
-    "application/xml",
-    "text/xml",
-    "application/json",
 }
 
 

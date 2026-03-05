@@ -1,13 +1,13 @@
 """
 Document processor for parsing and chunking various document formats.
 
-Supports: PDF, DOCX, TXT, CSV, XLS, XLSX, and other text-based formats.
+Supports: PDF, DOCX, TXT, CSV, XLS, XLSX.
 """
 
 import hashlib
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 import pandas as pd
 from docx import Document as DocxDocument
@@ -19,6 +19,10 @@ from pypdf import PdfReader
 from src.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Canonical set of file extensions that the document processor can handle.
+# All other modules should reference this constant instead of defining their own.
+SUPPORTED_EXTENSIONS: Set[str] = {".pdf", ".docx", ".txt", ".csv", ".xls", ".xlsx"}
 
 # Lazy import to avoid circular dependencies and API key errors during initialization
 _enhancement_processor = None
@@ -417,11 +421,10 @@ class DocumentProcessor:
         elif suffix in (".xls", ".xlsx"):
             return self.extract_text_from_excel(file_path)
         else:
-            # Try to read as text file
-            try:
-                return self.extract_text_from_txt(file_path)
-            except Exception:
-                raise ValueError(f"Unsupported file format: {suffix}")
+            raise ValueError(
+                f"Unsupported file format: {suffix}. "
+                f"Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
+            )
 
     def process_document(
         self,
@@ -690,10 +693,9 @@ class DocumentProcessor:
         logger.info(f"Processing directory: {directory_path}")
 
         all_nodes = []
-        supported_extensions = {".pdf", ".docx", ".txt", ".csv", ".xls", ".xlsx"}
 
         for file_path in directory_path.rglob("*"):
-            if file_path.is_file() and file_path.suffix.lower() in supported_extensions:
+            if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_EXTENSIONS:
                 try:
                     nodes = self.process_document(file_path, source_type=source_type)
                     all_nodes.extend(nodes)

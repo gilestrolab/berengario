@@ -24,14 +24,10 @@ class DocumentManager:
     - Bulk operations
     """
 
-    # Supported file types
-    SUPPORTED_TYPES = {
-        ".pdf": "PDF",
-        ".docx": "DOCX",
-        ".doc": "DOC",
-        ".txt": "TXT",
-        ".csv": "CSV",
-    }
+    # Supported file types — derived from the canonical set in document_processor
+    from src.document_processing.document_processor import SUPPORTED_EXTENSIONS as _SE
+
+    SUPPORTED_TYPES = {ext: ext.lstrip(".").upper() for ext in _SE}
 
     # Maximum file sizes (in bytes)
     MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB per file

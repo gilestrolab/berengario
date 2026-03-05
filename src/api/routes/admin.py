@@ -409,13 +409,14 @@ def create_admin_router(
         """
         try:
             # Validate file type
-            allowed_extensions = {".pdf", ".docx", ".doc", ".txt", ".csv"}
+            from src.document_processing.document_processor import SUPPORTED_EXTENSIONS
+
             file_ext = Path(file.filename).suffix.lower()
 
-            if file_ext not in allowed_extensions:
+            if file_ext not in SUPPORTED_EXTENSIONS:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Unsupported file type: {file_ext}. Allowed: {', '.join(allowed_extensions)}",
+                    detail=f"Unsupported file type: {file_ext}. Allowed: {', '.join(sorted(SUPPORTED_EXTENSIONS))}",
                 )
 
             # Create temp directory if it doesn't exist

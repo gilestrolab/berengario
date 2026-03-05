@@ -162,11 +162,12 @@ def reingest_documents():
             raise typer.Exit(1)
 
         # Find all supported files
-        supported_extensions = {".pdf", ".docx", ".txt", ".csv"}
+        from src.document_processing.document_processor import SUPPORTED_EXTENSIONS
+
         files = [
             f
             for f in documents_path.rglob("*")
-            if f.is_file() and f.suffix.lower() in supported_extensions
+            if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS
         ]
 
         if not files:

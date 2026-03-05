@@ -133,22 +133,17 @@ class TestDocumentProcessor:
 
     def test_extract_text_unsupported_format(self, processor, temp_dir):
         """
-        Test that unsupported file format falls back to text extraction.
-
-        For unknown file extensions, the processor tries to read as text.
-        This is a reasonable fallback for plain text files with unusual extensions.
+        Test that unsupported file format raises ValueError.
 
         Args:
             processor: DocumentProcessor fixture.
             temp_dir: Temporary directory fixture.
         """
         test_file = temp_dir / "test.xyz"
-        test_content = "Some text content in unusual format"
-        test_file.write_text(test_content)
+        test_file.write_text("Some text content in unusual format")
 
-        # Should successfully extract as text (fallback behavior)
-        result = processor.extract_text(test_file)
-        assert test_content in result
+        with pytest.raises(ValueError, match="Unsupported file format"):
+            processor.extract_text(test_file)
 
     def test_process_document_success(self, processor, temp_dir):
         """

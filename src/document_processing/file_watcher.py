@@ -13,7 +13,7 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 from src.config import settings
-from src.document_processing.document_processor import DocumentProcessor
+from src.document_processing.document_processor import SUPPORTED_EXTENSIONS, DocumentProcessor
 from src.document_processing.kb_manager import KnowledgeBaseManager
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class DocumentEventHandler(FileSystemEventHandler):
         super().__init__()
         self.document_processor = document_processor
         self.kb_manager = kb_manager
-        self.supported_extensions = {".pdf", ".docx", ".txt", ".csv"}
+        self.supported_extensions = SUPPORTED_EXTENSIONS
 
     def _is_supported_file(self, path: Path) -> bool:
         """
