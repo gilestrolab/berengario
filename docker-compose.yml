@@ -113,12 +113,12 @@ services:
       - berengario-network
 
   # Berengario Web Interface (depends on MariaDB)
-  berengario-web:
+  berengario-app:
     build:
       context: .
       dockerfile: Dockerfile
       target: production  # Use production image (minimal size)
-    container_name: berengario-web
+    container_name: berengario-app
     restart: unless-stopped
     command: python run_web_service.py
 
