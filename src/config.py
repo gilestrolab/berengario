@@ -8,7 +8,7 @@ from environment variables. Supports multiple instances with different configura
 from pathlib import Path
 from typing import List, Optional
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -296,18 +296,22 @@ class Settings(BaseSettings):
     )
 
     # Platform Database (shared across all tenants, only used in multi-tenant mode)
-    platform_db_host: str = Field(
-        default="localhost", description="Platform database host"
+    # Host/port/user/password default to their db_* counterparts when not set.
+    platform_db_host: Optional[str] = Field(
+        default=None, description="Platform database host (defaults to db_host)"
     )
-    platform_db_port: int = Field(default=3306, description="Platform database port")
+    platform_db_port: Optional[int] = Field(
+        default=None, description="Platform database port (defaults to db_port)"
+    )
     platform_db_name: str = Field(
         default="berengario_platform", description="Platform database name"
     )
-    platform_db_user: str = Field(
-        default="berengario", description="Platform database username"
+    platform_db_user: Optional[str] = Field(
+        default=None, description="Platform database username (defaults to db_user)"
     )
-    platform_db_password: str = Field(
-        default="", description="Platform database password"
+    platform_db_password: Optional[str] = Field(
+        default=None,
+        description="Platform database password (defaults to db_password)",
     )
 
     # Object Storage (S3-compatible, for multi-tenant file storage)
@@ -362,6 +366,19 @@ class Settings(BaseSettings):
         "DO NOT enable in production! When enabled, any login attempt will succeed "
         "without requiring email verification.",
     )
+
+    @model_validator(mode="after")
+    def _platform_db_defaults(self) -> "Settings":
+        """Default platform_db_* to db_* values when not explicitly set."""
+        if self.platform_db_host is None:
+            self.platform_db_host = self.db_host
+        if self.platform_db_port is None:
+            self.platform_db_port = self.db_port
+        if self.platform_db_user is None:
+            self.platform_db_user = self.db_user
+        if self.platform_db_password is None:
+            self.platform_db_password = self.db_password
+        return self
 
     @field_validator("documents_path", "chroma_db_path", mode="before")
     @classmethod
