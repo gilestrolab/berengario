@@ -415,16 +415,10 @@ class S3StorageBackend(StorageBackend):
                         delete_request = {
                             "Objects": [{"Key": obj["Key"]} for obj in objects]
                         }
-                        self.client.delete_objects(
-                            Bucket=bucket, Delete=delete_request
-                        )
-                logger.info(
-                    f"Deleted tenant data from S3: s3://{bucket}/{s3_prefix}"
-                )
+                        self.client.delete_objects(Bucket=bucket, Delete=delete_request)
+                logger.info(f"Deleted tenant data from S3: s3://{bucket}/{s3_prefix}")
             except Exception as e:
-                logger.error(
-                    f"Error deleting S3 tenant data for {tenant_slug}: {e}"
-                )
+                logger.error(f"Error deleting S3 tenant data for {tenant_slug}: {e}")
                 raise
         else:
             # Per-tenant bucket: delete all objects then delete the bucket
@@ -436,15 +430,11 @@ class S3StorageBackend(StorageBackend):
                         delete_request = {
                             "Objects": [{"Key": obj["Key"]} for obj in objects]
                         }
-                        self.client.delete_objects(
-                            Bucket=bucket, Delete=delete_request
-                        )
+                        self.client.delete_objects(Bucket=bucket, Delete=delete_request)
                 self.client.delete_bucket(Bucket=bucket)
                 logger.info(f"Deleted S3 bucket for tenant: {bucket}")
             except Exception as e:
-                logger.error(
-                    f"Error deleting S3 tenant data for {bucket}: {e}"
-                )
+                logger.error(f"Error deleting S3 tenant data for {bucket}: {e}")
                 raise
 
     def ensure_tenant_storage(self, tenant_slug: str) -> None:

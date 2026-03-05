@@ -1519,8 +1519,7 @@ def create_admin_router(
                     "active": settings.reranking_enabled
                     and bool(settings.cohere_api_key),
                     "model": settings.reranking_model,
-                    "top_n": settings.reranking_top_n
-                    or settings.top_k_retrieval,
+                    "top_n": settings.reranking_top_n or settings.top_k_retrieval,
                     "provider": "Cohere",
                 },
             }

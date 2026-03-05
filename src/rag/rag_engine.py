@@ -334,9 +334,7 @@ class RAGEngine:
                 tool_result_data = result.get(
                     "result", result.get("error", "Unknown error")
                 )
-                tool_response_content = json.dumps(
-                    tool_result_data, default=str
-                )
+                tool_response_content = json.dumps(tool_result_data, default=str)
                 messages.append(
                     {
                         "role": "tool",

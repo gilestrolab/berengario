@@ -421,9 +421,7 @@ class TestS3StorageBackendSingleBucket:
 
         storage.ensure_tenant_storage("acme")
 
-        mock_client.create_bucket.assert_called_once_with(
-            Bucket="berengario-storage"
-        )
+        mock_client.create_bucket.assert_called_once_with(Bucket="berengario-storage")
 
     def test_delete_tenant_data_only_deletes_tenant_prefix(self, s3_setup):
         """Test that deleting tenant data only removes objects under tenant prefix."""

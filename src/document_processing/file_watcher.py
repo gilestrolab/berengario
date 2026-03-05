@@ -13,7 +13,10 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 from src.config import settings
-from src.document_processing.document_processor import SUPPORTED_EXTENSIONS, DocumentProcessor
+from src.document_processing.document_processor import (
+    SUPPORTED_EXTENSIONS,
+    DocumentProcessor,
+)
 from src.document_processing.kb_manager import KnowledgeBaseManager
 
 logger = logging.getLogger(__name__)

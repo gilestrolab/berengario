@@ -69,7 +69,6 @@ class TenantBackupImporter:
         """
         with zipfile.ZipFile(zip_path, "r") as zf:
             tenant_slugs = set()
-            has_single_tenant_content = False
 
             for info in zf.infolist():
                 name = info.filename
@@ -83,13 +82,6 @@ class TenantBackupImporter:
                     parts = rel.split("/", 3)  # ["tenants", slug, rest...]
                     if len(parts) >= 3 and parts[1]:
                         tenant_slugs.add(parts[1])
-
-                # Check for single-tenant layout
-                for doc_dir in DOCUMENT_DIRS:
-                    if rel.startswith(doc_dir + "/"):
-                        has_single_tenant_content = True
-                if rel.startswith("chroma_db/"):
-                    has_single_tenant_content = True
 
             if tenant_slugs:
                 # Prefer multi-tenant layout when tenants exist.
