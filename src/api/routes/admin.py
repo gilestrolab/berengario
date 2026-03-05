@@ -1514,6 +1514,15 @@ def create_admin_router(
                     "top_k_retrieval": settings.top_k_retrieval,
                     "similarity_threshold": settings.similarity_threshold,
                 },
+                "reranking": {
+                    "enabled": settings.reranking_enabled,
+                    "active": settings.reranking_enabled
+                    and bool(settings.cohere_api_key),
+                    "model": settings.reranking_model,
+                    "top_n": settings.reranking_top_n
+                    or settings.top_k_retrieval,
+                    "provider": "Cohere",
+                },
             }
 
         except Exception as e:

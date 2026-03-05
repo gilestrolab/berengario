@@ -1123,6 +1123,31 @@ class AdminPanel {
                     <span class="model-detail-value">${data.rag.similarity_threshold}</span>
                 </div>
             </div>
+
+            <div class="model-card">
+                <h4>Reranking</h4>
+                <div class="model-detail">
+                    <span class="model-detail-label">Status:</span>
+                    <span class="model-detail-value">${data.reranking.active
+                        ? '<span style="color: #4CAF50;">Active</span>'
+                        : data.reranking.enabled
+                            ? '<span style="color: #FF9800;">Enabled (no API key)</span>'
+                            : '<span style="color: #999;">Disabled</span>'
+                    }</span>
+                </div>
+                <div class="model-detail">
+                    <span class="model-detail-label">Provider:</span>
+                    <span class="model-detail-value">${this.escapeHtml(data.reranking.provider)}</span>
+                </div>
+                <div class="model-detail">
+                    <span class="model-detail-label">Model:</span>
+                    <span class="model-detail-value">${this.escapeHtml(data.reranking.model)}</span>
+                </div>
+                <div class="model-detail">
+                    <span class="model-detail-label">Top N:</span>
+                    <span class="model-detail-value">${data.reranking.top_n}</span>
+                </div>
+            </div>
         `;
     }
 
