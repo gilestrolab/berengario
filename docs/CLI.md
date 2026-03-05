@@ -29,14 +29,14 @@ The CLI is included with Berengario and runs inside the Docker container:
 
 ```bash
 # Access the CLI inside the container
-docker exec berengario-web python -m src.cli.main [COMMAND]
+docker exec berengario-app python -m src.cli.main [COMMAND]
 ```
 
 For convenience, you can create an alias:
 
 ```bash
 # Add to your ~/.bashrc or ~/.zshrc
-alias berengario="docker exec berengario-web python -m src.cli.main"
+alias berengario="docker exec berengario-app python -m src.cli.main"
 
 # Then use it directly
 berengario kb list
@@ -440,7 +440,7 @@ For easier access, create a shell alias:
 
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
-alias berengario="docker exec berengario-web python -m src.cli.main"
+alias berengario="docker exec berengario-app python -m src.cli.main"
 
 # Reload shell
 source ~/.bashrc  # or source ~/.zshrc
@@ -460,15 +460,15 @@ The CLI can be used in scripts and automation:
 # Daily backup and cleanup script
 
 # Create backup
-docker exec berengario-web python -m src.cli.main backup create
+docker exec berengario-app python -m src.cli.main backup create
 
 # Clean up old backups (keep last 7, delete older than 30 days)
-docker exec berengario-web python -m src.cli.main backup cleanup \
+docker exec berengario-app python -m src.cli.main backup cleanup \
   --keep 7 --days 30 --force
 
 # Check statistics
-docker exec berengario-web python -m src.cli.main kb stats
-docker exec berengario-web python -m src.cli.main db stats
+docker exec berengario-app python -m src.cli.main kb stats
+docker exec berengario-app python -m src.cli.main db stats
 ```
 
 ## Migration from Scripts
@@ -534,7 +534,7 @@ The CLI uses standard exit codes:
 
 **Solution:** Make sure you're running commands inside the Docker container:
 ```bash
-docker exec berengario-web python -m src.cli.main --help
+docker exec berengario-app python -m src.cli.main --help
 ```
 
 ### Permission denied
@@ -549,7 +549,7 @@ docker exec berengario-web python -m src.cli.main --help
 
 **Solution:** Ensure dependencies are installed:
 ```bash
-docker exec berengario-web pip install typer rich
+docker exec berengario-app pip install typer rich
 ```
 
 ## Future Enhancements

@@ -19,7 +19,7 @@ Utility scripts for managing the Berengario system.
 ```
 
 **How it works**:
-1. Stops berengario-web and berengario-email containers
+1. Stops berengario-app and berengario-email containers
 2. Runs `reingest_documents.py` in a temporary container
 3. Restarts the containers
 
@@ -33,7 +33,7 @@ Utility scripts for managing the Berengario system.
 
 If needed to run manually in Docker:
 ```bash
-docker-compose run --rm berengario-web python /app/scripts/reingest_documents.py
+docker-compose run --rm berengario-app python /app/scripts/reingest_documents.py
 ```
 
 ---
@@ -48,7 +48,7 @@ docker-compose run --rm berengario-web python /app/scripts/reingest_documents.py
 
 **Usage**:
 ```bash
-docker exec berengario-web python /app/scripts/init_conversation_db.py
+docker exec berengario-app python /app/scripts/init_conversation_db.py
 ```
 
 ---

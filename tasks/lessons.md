@@ -43,7 +43,7 @@
 
 ### Docker container selection matters for test sends
 - **Problem**: `docker-compose run --rm` containers can't resolve SMTP hostnames (DNS issue). `berengario-email` production image doesn't have volume-mounted source code.
-- **Fix**: Use `docker exec berengario-web` for ad-hoc Python scripts — it has volume mounts AND proper DNS.
+- **Fix**: Use `docker exec berengario-app` for ad-hoc Python scripts — it has volume mounts AND proper DNS.
 
 ### Welcome emails should be warm and human, not bullet-point lists
 - **Lesson**: First draft was dry bullet points. Users want narrative tone explaining what the system is and how to use it naturally. Use friendly role labels (member/contributor/administrator instead of querier/teacher/admin).

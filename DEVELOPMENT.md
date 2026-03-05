@@ -7,7 +7,7 @@ This document describes the development environment setup for Berengario contrib
 Berengario uses a streamlined setup with **4 containers**:
 
 ### Production Containers (3)
-- **berengario-web**: Web interface (production image, ~900MB)
+- **berengario-app**: Web interface (production image, ~900MB)
 - **berengario-email**: Email service (production image, ~900MB)
 - **berengario-db**: MariaDB database (shared by all services)
 
@@ -82,7 +82,7 @@ docker build --target production -t berengario:prod .
 
 ## Container Names
 
-- `berengario-web` - Production web interface
+- `berengario-app` - Production web interface
 - `berengario-email` - Production email service
 - `berengario-dev` - Development container (testing/linting)
 - `berengario-db` - MariaDB database (shared)

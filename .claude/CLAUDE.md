@@ -78,7 +78,7 @@ Users can have one role, both roles, or neither. Roles are managed via TenantUse
 Berengario uses a streamlined container setup with 3 production containers + 1 optional dev container:
 
 - **Production Containers** (3 - start automatically):
-  - `berengario-web`: Web interface (production image)
+  - `berengario-app`: Web interface (production image)
   - `berengario-email`: Email service (production image)
   - `berengario-db`: MariaDB database (shared by all services)
 
@@ -141,36 +141,36 @@ Berengario includes a unified CLI for administration:
 
 ```bash
 # Basic usage
-docker exec berengario-web berengario-cli [COMMAND] [OPTIONS]
+docker exec berengario-app berengario-cli [COMMAND] [OPTIONS]
 
 # Get help
-docker exec berengario-web berengario-cli help
-docker exec berengario-web berengario-cli --help
+docker exec berengario-app berengario-cli help
+docker exec berengario-app berengario-cli --help
 
 # Knowledge base operations
-docker exec berengario-web berengario-cli kb list       # List documents
-docker exec berengario-web berengario-cli kb stats      # Show statistics
-docker exec berengario-web berengario-cli kb reingest   # Reingest all documents
+docker exec berengario-app berengario-cli kb list       # List documents
+docker exec berengario-app berengario-cli kb stats      # Show statistics
+docker exec berengario-app berengario-cli kb reingest   # Reingest all documents
 
 # Database operations
-docker exec berengario-web berengario-cli db init       # Initialize database
-docker exec berengario-web berengario-cli db test       # Test connection
-docker exec berengario-web berengario-cli db info       # Show DB info
-docker exec berengario-web berengario-cli db stats      # Show statistics
+docker exec berengario-app berengario-cli db init       # Initialize database
+docker exec berengario-app berengario-cli db test       # Test connection
+docker exec berengario-app berengario-cli db info       # Show DB info
+docker exec berengario-app berengario-cli db stats      # Show statistics
 
 # Backup operations
-docker exec berengario-web berengario-cli backup create  # Create backup
-docker exec berengario-web berengario-cli backup list    # List backups
-docker exec berengario-web berengario-cli backup cleanup # Clean old backups
+docker exec berengario-app berengario-cli backup create  # Create backup
+docker exec berengario-app berengario-cli backup list    # List backups
+docker exec berengario-app berengario-cli backup cleanup # Clean old backups
 
 # System information
-docker exec berengario-web berengario-cli version        # Show version
-docker exec berengario-web berengario-cli info           # Show configuration
+docker exec berengario-app berengario-cli version        # Show version
+docker exec berengario-app berengario-cli info           # Show configuration
 ```
 
 **Tip:** Create an alias for easier access:
 ```bash
-alias berengario="docker exec berengario-web berengario-cli"
+alias berengario="docker exec berengario-app berengario-cli"
 # Then use: berengario kb list, berengario db stats, etc.
 ```
 
@@ -208,7 +208,7 @@ docker-compose run --rm berengario-dev pytest tests/ -v -k "email"
 - The dev container includes pytest and all testing tools
 - Container name: `berengario-dev`
 
-**Note:** Production containers (`berengario-web`, `berengario-email`) do not include testing tools. Always use `berengario-dev` for running tests.
+**Note:** Production containers (`berengario-app`, `berengario-email`) do not include testing tools. Always use `berengario-dev` for running tests.
 
 ### Code Quality & Pre-commit Hook
 
@@ -260,7 +260,7 @@ docker-compose up -d
 docker-compose --profile dev up -d
 
 # View logs for specific services
-docker-compose logs -f berengario-web
+docker-compose logs -f berengario-app
 docker-compose logs -f berengario-email
 
 # Stop production services
@@ -290,27 +290,27 @@ docker build -t berengario:dev --target dev .
 
 ```bash
 # Access Python REPL in containers
-docker exec -it berengario-web python      # Production web
+docker exec -it berengario-app python      # Production web
 docker exec -it berengario-email python    # Production email
 docker-compose run --rm berengario-dev python  # Development (on-demand)
 
 # Access bash shell in containers
-docker exec -it berengario-web bash
+docker exec -it berengario-app bash
 docker exec -it berengario-email bash
 docker-compose run --rm berengario-dev bash  # Development (on-demand)
 
 # Check container logs with timestamps
-docker-compose logs -f --timestamps berengario-web
+docker-compose logs -f --timestamps berengario-app
 docker-compose logs -f --timestamps berengario-email
 
 # Inspect container environment variables
-docker exec berengario-web env | grep -E "(DB_|EMAIL_|IMAP_|SMTP_)"
+docker exec berengario-app env | grep -E "(DB_|EMAIL_|IMAP_|SMTP_)"
 
 # Check database connection
-docker exec berengario-web berengario-cli db test
+docker exec berengario-app berengario-cli db test
 
 # View knowledge base contents
-docker exec berengario-web berengario-cli kb list
+docker exec berengario-app berengario-cli kb list
 ```
 
 ## Important Implementation Details
@@ -689,7 +689,7 @@ The EmailClient supports both SSL (port 993) and STARTTLS (port 143). Set `IMAP_
 ### Database Issues
 
 **Problem**: "Table doesn't exist" errors
-**Solution**: Initialize database: `docker exec berengario-web berengario-cli db init`
+**Solution**: Initialize database: `docker exec berengario-app berengario-cli db init`
 
 **Problem**: Connection errors with MariaDB
 **Solution**: Check `docker-compose logs mariadb` and ensure healthcheck passes before services start
@@ -740,4 +740,4 @@ RAG tools follow similar organization:
 - ✅ Phase 4: Web frontend with chat interface, OTP authentication, admin panel
 - ✅ Phase 5: Docker deployment and CI/CD
 
-**Test Coverage**: Run `docker exec berengario-web pytest tests/ -v` to verify current test status
+**Test Coverage**: Run `docker exec berengario-app pytest tests/ -v` to verify current test status

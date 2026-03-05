@@ -75,7 +75,7 @@ cp .env.example .env
 docker-compose up -d
 
 # View logs
-docker-compose logs -f berengario-web
+docker-compose logs -f berengario-app
 ```
 
 Docker images are automatically built and published to GitHub Container Registry:
@@ -142,42 +142,42 @@ Berengario includes a unified CLI for administration and management (Docker-only
 
 ```bash
 # Basic usage
-docker exec berengario-web berengario-cli [COMMAND] [OPTIONS]
+docker exec berengario-app berengario-cli [COMMAND] [OPTIONS]
 
 # Get help
-docker exec berengario-web berengario-cli help
-docker exec berengario-web berengario-cli --help
+docker exec berengario-app berengario-cli help
+docker exec berengario-app berengario-cli --help
 
 # Knowledge Base operations
-docker exec berengario-web berengario-cli kb list              # List all documents in the KB
-docker exec berengario-web berengario-cli kb stats             # Show KB statistics
-docker exec berengario-web berengario-cli kb reingest          # Reingest all documents
-docker exec berengario-web berengario-cli kb delete <hash>     # Delete a specific document
-docker exec berengario-web berengario-cli kb clear             # Clear entire KB (confirmation required)
-docker exec berengario-web berengario-cli kb regenerate-descriptions  # Regenerate document descriptions via LLM
-docker exec berengario-web berengario-cli kb query "<text>"   # Query the knowledge base directly
+docker exec berengario-app berengario-cli kb list              # List all documents in the KB
+docker exec berengario-app berengario-cli kb stats             # Show KB statistics
+docker exec berengario-app berengario-cli kb reingest          # Reingest all documents
+docker exec berengario-app berengario-cli kb delete <hash>     # Delete a specific document
+docker exec berengario-app berengario-cli kb clear             # Clear entire KB (confirmation required)
+docker exec berengario-app berengario-cli kb regenerate-descriptions  # Regenerate document descriptions via LLM
+docker exec berengario-app berengario-cli kb query "<text>"   # Query the knowledge base directly
 
 # Database operations
-docker exec berengario-web berengario-cli db init              # Initialize database tables
-docker exec berengario-web berengario-cli db test              # Test database connection
-docker exec berengario-web berengario-cli db info              # Show database configuration
-docker exec berengario-web berengario-cli db stats             # Show processing statistics
-docker exec berengario-web berengario-cli db cleanup           # Clean up old database records
+docker exec berengario-app berengario-cli db init              # Initialize database tables
+docker exec berengario-app berengario-cli db test              # Test database connection
+docker exec berengario-app berengario-cli db info              # Show database configuration
+docker exec berengario-app berengario-cli db stats             # Show processing statistics
+docker exec berengario-app berengario-cli db cleanup           # Clean up old database records
 
 # Backup operations
-docker exec berengario-web berengario-cli backup create        # Create a new backup
-docker exec berengario-web berengario-cli backup list          # List available backups
-docker exec berengario-web berengario-cli backup delete <file> # Delete a specific backup
-docker exec berengario-web berengario-cli backup cleanup       # Clean up old backups
+docker exec berengario-app berengario-cli backup create        # Create a new backup
+docker exec berengario-app berengario-cli backup list          # List available backups
+docker exec berengario-app berengario-cli backup delete <file> # Delete a specific backup
+docker exec berengario-app berengario-cli backup cleanup       # Clean up old backups
 
 # System information
-docker exec berengario-web berengario-cli version              # Show version and instance info
-docker exec berengario-web berengario-cli info                 # Show detailed configuration
+docker exec berengario-app berengario-cli version              # Show version and instance info
+docker exec berengario-app berengario-cli info                 # Show detailed configuration
 ```
 
 **Tip:** For easier access, you can create a shell alias:
 ```bash
-alias berengario="docker exec berengario-web berengario-cli"
+alias berengario="docker exec berengario-app berengario-cli"
 # Then use: berengario kb list, berengario db stats, etc.
 ```
 
