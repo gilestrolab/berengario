@@ -170,7 +170,7 @@ class TenantProvisioner:
             )
 
         db_name = f"berengario_tenant_{slug.replace('-', '_')}"
-        email_address = email_address or f"{slug}@{settings.platform_domain}"
+        email_address = email_address or settings.email_target_address
         storage_path = f"tenants/{slug}"
 
         logger.info(f"Provisioning tenant: slug={slug}, name={name}")
@@ -180,15 +180,6 @@ class TenantProvisioner:
             existing = session.query(Tenant).filter(Tenant.slug == slug).first()
             if existing:
                 raise ValueError(f"Tenant with slug '{slug}' already exists")
-
-            # Check email uniqueness
-            existing_email = (
-                session.query(Tenant)
-                .filter(Tenant.email_address == email_address)
-                .first()
-            )
-            if existing_email:
-                raise ValueError(f"Tenant with email '{email_address}' already exists")
 
             # Step 1: Create tenant record with invite code
             invite_code = Tenant.generate_invite_code()

@@ -176,7 +176,6 @@ def create_tenant_admin_router(
                     )
 
                 tenant.slug = body.slug
-                tenant.email_address = f"{body.slug}@{settings.platform_domain}"
                 updated_fields.append("slug")
 
             if updated_fields:

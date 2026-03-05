@@ -285,7 +285,7 @@ class EmailProcessor:
                         email_sender=self.email_sender,
                         instance_name=ctx.instance_name,
                         organization=ctx.organization,
-                        from_address=ctx.email_address or settings.email_target_address,
+                        from_address=settings.email_target_address,
                         from_name=ctx.email_display_name or ctx.instance_name,
                         is_admin=is_admin_user,
                     )
@@ -302,7 +302,7 @@ class EmailProcessor:
                         organization=ctx.organization,
                         storage_backend=self.storage_backend,
                         tenant_slug=ctx.tenant_slug,
-                        from_address=ctx.email_address or settings.email_target_address,
+                        from_address=settings.email_target_address,
                         from_name=ctx.email_display_name or ctx.instance_name,
                     )
 

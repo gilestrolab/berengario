@@ -331,8 +331,11 @@ class RAGEngine:
                         f"Tool {call['name']} already sent email - will skip automatic reply"
                     )
 
+                tool_result_data = result.get(
+                    "result", result.get("error", "Unknown error")
+                )
                 tool_response_content = json.dumps(
-                    result.get("result", result.get("error", "Unknown error"))
+                    tool_result_data, default=str
                 )
                 messages.append(
                     {

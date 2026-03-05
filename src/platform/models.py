@@ -99,7 +99,7 @@ class Tenant(PlatformBase):
     )
 
     # Email config
-    email_address = Column(String(255), unique=True, nullable=False)
+    email_address = Column(String(255), nullable=False)
     email_display_name = Column(String(255), nullable=True)
 
     # RAG config (per-tenant overrides, all nullable to fall back to defaults)
