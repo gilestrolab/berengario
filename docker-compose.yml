@@ -13,9 +13,10 @@ services:
 
     volumes:
       - berengario-db-data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
 
-    ports:
-      - "3307:3306"  # Use 3307 to avoid conflicts with local MySQL
+    expose:
+      - "3306"
 
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
@@ -137,8 +138,8 @@ services:
       - ./data/backups:/app/data/backups  # Mount backups for persistence
       - ./data/tenants:/app/data/tenants  # Multi-tenancy: per-tenant data
 
-    ports:
-      - "8090:8000"  # Web interface port (host:container)
+    expose:
+      - "8000"
 
     depends_on:
       mariadb:
@@ -162,6 +163,7 @@ services:
 
     networks:
       - berengario-network
+      - intranet
 
   # Platform Admin (multi-tenant management panel)
   # Only starts when explicitly requested with: docker-compose --profile multitenant up
@@ -184,8 +186,8 @@ services:
       - ./data/tenants:/app/data/tenants
       - ./data/logs:/app/data/logs
 
-    ports:
-      - "8091:8000"
+    expose:
+      - "8000"
 
     depends_on:
       mariadb:
@@ -200,11 +202,13 @@ services:
 
     networks:
       - berengario-network
+      - intranet
 
-  # MinIO Object Storage (S3-compatible, for multi-tenant file storage)
-  # Only starts when explicitly requested with: docker-compose --profile multitenant up
+  # MinIO Object Storage (S3-compatible, for local multi-tenant file storage)
+  # Only starts when explicitly requested with: docker-compose --profile minio up
+  # Not needed when using external S3-compatible storage (e.g., Garage, AWS S3)
   minio:
-    profiles: ["multitenant"]
+    profiles: ["minio"]
     image: minio/minio:latest
     container_name: berengario-minio
     restart: unless-stopped
@@ -234,6 +238,8 @@ services:
 networks:
   berengario-network:
     driver: bridge
+  intranet:
+    external: true
 
 volumes:
   berengario-db-data:
