@@ -334,3 +334,132 @@ def restore_backup(
         raise
     except Exception as e:
         handle_error(e, "restoring backup")
+
+
+@app.command("import-tenant")
+def import_tenant(
+    source: str = typer.Argument(..., help="Path to backup ZIP file to import"),
+    slug: str = typer.Option(
+        ..., "--slug", "-s", help="Tenant slug (URL-safe identifier)"
+    ),
+    name: str = typer.Option(..., "--name", "-n", help="Tenant display name"),
+    admin_email: str = typer.Option(
+        ..., "--admin-email", "-e", help="Admin user email address"
+    ),
+    description: str = typer.Option(
+        None, "--description", "-d", help="Tenant description"
+    ),
+    organization: str = typer.Option(
+        None, "--organization", "-o", help="Organization name"
+    ),
+    skip_chromadb: bool = typer.Option(
+        False, "--skip-chromadb", help="Skip importing ChromaDB embeddings"
+    ),
+    skip_conversations: bool = typer.Option(
+        False, "--skip-conversations", help="Skip migrating conversations"
+    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
+):
+    """
+    Import a single-tenant backup as a new multi-tenant tenant.
+
+    Creates a new tenant and imports documents, ChromaDB embeddings,
+    and optionally conversations from a backup ZIP file.
+    """
+    try:
+        print_header("Import Tenant from Backup")
+
+        # Resolve source path
+        zip_path = Path(source)
+        if not zip_path.is_file():
+            print_error(f"File not found: {source}")
+            raise typer.Exit(1)
+
+        # Lazy imports to avoid loading platform modules at CLI startup
+        from src.platform.backup_import import TenantBackupImporter
+        from src.platform.db_manager import TenantDBManager
+        from src.platform.provisioning import TenantProvisioner
+        from src.platform.storage import create_storage_backend
+
+        storage = create_storage_backend()
+        db_manager = TenantDBManager()
+        provisioner = TenantProvisioner(db_manager, storage)
+        importer = TenantBackupImporter(provisioner, storage, db_manager)
+
+        # Validate backup first
+        print_info(f"Validating: {zip_path.name}")
+        validation = importer.validate_backup(zip_path)
+
+        if not validation["valid"]:
+            print_error("Backup validation failed:")
+            for err in validation["errors"]:
+                console.print(f"  [red]✗[/red] {err}")
+            raise typer.Exit(1)
+
+        # Show summary
+        console.print()
+        print_key_value("File", zip_path.name)
+        print_key_value("Size", format_bytes(validation["total_size"]))
+        if validation.get("source_slug"):
+            print_key_value("Source Tenant", validation["source_slug"])
+        print_key_value("Documents", str(validation["document_count"]))
+        print_key_value("ChromaDB", "Yes" if validation["has_chromadb"] else "No")
+        print_key_value("Config", "Yes" if validation["has_config"] else "No")
+        console.print()
+        print_key_value("Target Slug", slug)
+        print_key_value("Tenant Name", name)
+        print_key_value("Admin Email", admin_email)
+
+        if validation["warnings"]:
+            for warn in validation["warnings"]:
+                print_warning(warn)
+
+        # Confirm import
+        if not force:
+            console.print()
+            print_warning(
+                "This will create a new tenant and import all data from the backup."
+            )
+            if not confirm_destructive("import", f"backup as tenant '{slug}'"):
+                return
+
+        # Run import
+        with create_progress() as progress:
+            task = progress.add_task("Importing tenant...", total=None)
+
+            result = importer.import_tenant(
+                zip_path=zip_path,
+                slug=slug,
+                name=name,
+                admin_email=admin_email,
+                description=description,
+                organization=organization,
+                skip_chromadb=skip_chromadb,
+                skip_conversations=skip_conversations,
+            )
+
+            progress.update(task, completed=True)
+
+        console.print()
+
+        if result["success"]:
+            print_success("Tenant imported successfully")
+            print_key_value("Slug", result["slug"])
+            print_key_value("Documents Uploaded", str(result["documents_uploaded"]))
+            print_key_value(
+                "ChromaDB Imported", "Yes" if result["chromadb_imported"] else "No"
+            )
+            if result["conversations_migrated"]:
+                print_key_value("Conversations", str(result["conversations_migrated"]))
+            if result["config_applied"]:
+                print_key_value("Config Applied", "Yes")
+        else:
+            print_error("Import failed:")
+            for err in result["errors"]:
+                console.print(f"  [red]✗[/red] {err}")
+            raise typer.Exit(1)
+
+    except typer.Exit:
+        raise
+    except Exception as e:
+        handle_error(e, "importing tenant")
