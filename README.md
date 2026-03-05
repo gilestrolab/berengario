@@ -6,9 +6,9 @@ Berengario is a flexible infrastructure that combines document processing, vecto
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://github.com/gilestrolab/berengar.io/workflows/CI/badge.svg)](https://github.com/gilestrolab/berengar.io/actions/workflows/ci.yml)
-[![Docker Build](https://github.com/gilestrolab/berengar.io/workflows/Docker%20Build/badge.svg)](https://github.com/gilestrolab/berengar.io/actions/workflows/docker.yml)
-[![codecov](https://codecov.io/gh/gilestrolab/berengar.io/branch/master/graph/badge.svg)](https://codecov.io/gh/gilestrolab/berengar.io)
+[![CI](https://github.com/gilestrolab/berengario/actions/workflows/ci.yml/badge.svg)](https://github.com/gilestrolab/berengario/actions/workflows/ci.yml)
+[![Docker Build](https://github.com/gilestrolab/berengario/actions/workflows/docker.yml/badge.svg)](https://github.com/gilestrolab/berengario/actions/workflows/docker.yml)
+[![codecov](https://codecov.io/gh/gilestrolab/berengario/branch/master/graph/badge.svg)](https://codecov.io/gh/gilestrolab/berengario)
 
 ## Features
 
@@ -64,8 +64,8 @@ Berengario is a flexible infrastructure that combines document processing, vecto
 
 ```bash
 # Clone the repository
-git clone https://github.com/gilestrolab/berengar.io.git
-cd berengar.io
+git clone https://github.com/gilestrolab/berengario.git
+cd berengario
 
 # Copy and configure environment
 cp .env.example .env
@@ -82,15 +82,15 @@ Docker images are automatically built and published to GitHub Container Registry
 
 ```bash
 # Pull latest image
-docker pull ghcr.io/gilestrolab/berengar.io:latest
+docker pull ghcr.io/gilestrolab/berengario:latest
 ```
 
 #### Option 2: Local Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/gilestrolab/berengar.io.git
-cd berengar.io
+git clone https://github.com/gilestrolab/berengario.git
+cd berengario
 
 # Create virtual environment
 python -m venv .venv
@@ -220,6 +220,7 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 3. **RAG Engine** (`src/rag/`)
    - LlamaIndex query engine with customizable prompts
    - Query optimization (expansion, rewriting, context-aware enhancement)
+   - Cohere reranking for improved retrieval precision
    - Function calling / tool system (calendar, export, web search, database, team management)
    - Source citation
 
@@ -317,6 +318,15 @@ See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for detailed setup instructions.
 | `QUERY_OPTIMIZATION_TEMPERATURE` | Temperature (lower = more consistent) | `0.3` |
 | `QUERY_OPTIMIZATION_TIMEOUT` | API timeout in seconds | `10` |
 
+### Reranking Settings
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `RERANKING_ENABLED` | Enable Cohere reranking after retrieval | `false` |
+| `COHERE_API_KEY` | Cohere API key for reranking | None |
+| `RERANKING_MODEL` | Cohere reranking model | `rerank-v3.5` |
+| `RERANKING_TOP_N` | Number of results after reranking | Same as `TOP_K_RETRIEVAL` |
+
 ### Email Settings
 
 | Variable | Description | Default |
@@ -371,7 +381,7 @@ See [`.env.example`](.env.example) for complete configuration options including 
 ### Project Structure
 
 ```
-berengar.io/
+berengario/
 ├── .github/
 │   └── workflows/                        # CI/CD pipelines
 │       ├── ci.yml                        # Testing and linting
@@ -774,7 +784,7 @@ Builds and publishes Docker images:
 - **On Push to Main**: Builds multi-platform images (amd64, arm64)
 - **On Tags**: Publishes versioned releases to GitHub Container Registry
 - **Image Testing**: Validates container startup and imports
-- **Registry**: `ghcr.io/gilestrolab/berengar.io`
+- **Registry**: `ghcr.io/gilestrolab/berengario`
 
 Available tags:
 - `latest` - Latest stable build from main branch
@@ -861,8 +871,8 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 ## Support
 
 - [Documentation](docs/)
-- [Issue Tracker](https://github.com/gilestrolab/berengar.io/issues)
-- [Discussions](https://github.com/gilestrolab/berengar.io/discussions)
+- [Issue Tracker](https://github.com/gilestrolab/berengario/issues)
+- [Discussions](https://github.com/gilestrolab/berengario/discussions)
 
 ## Credits
 

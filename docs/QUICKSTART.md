@@ -4,8 +4,8 @@
 
 ```bash
 # Clone repository
-git clone https://github.com/gilestrolab/berengar.io.git
-cd Berengario
+git clone https://github.com/gilestrolab/berengario.git
+cd berengario
 
 # Setup Python environment
 python -m venv .venv

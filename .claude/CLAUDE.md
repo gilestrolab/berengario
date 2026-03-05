@@ -274,7 +274,7 @@ docker-compose build
 docker-compose up -d
 
 # Pull latest published image from GitHub Container Registry
-docker pull ghcr.io/gilestrolab/berengar.io:latest
+docker pull ghcr.io/gilestrolab/berengario:latest
 ```
 
 **Building specific targets manually:**
@@ -639,7 +639,7 @@ Runs on push/PR to main/develop:
 
 ### Docker Build (`docker.yml`)
 - Builds multi-platform images (amd64, arm64)
-- Publishes to `ghcr.io/gilestrolab/berengar.io`
+- Publishes to `ghcr.io/gilestrolab/berengario`
 - Tags: `latest`, `v1.2.3`, `main-abc123`
 
 ### Release (`release.yml`)

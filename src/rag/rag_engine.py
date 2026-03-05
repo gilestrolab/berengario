@@ -143,7 +143,7 @@ class RAGEngine:
             max_tokens=4096,
             is_chat_model=True,
             default_headers={
-                "HTTP-Referer": "https://github.com/gilestrolab/berengar.io",
+                "HTTP-Referer": "https://github.com/gilestrolab/berengario",
             },
             # Additional model parameters to override in API calls
             additional_kwargs={
@@ -235,7 +235,7 @@ class RAGEngine:
                 tools=[{"type": "function", "function": tool} for tool in self.tools],
                 tool_choice="auto",
                 extra_headers={
-                    "HTTP-Referer": "https://github.com/gilestrolab/berengar.io"
+                    "HTTP-Referer": "https://github.com/gilestrolab/berengario"
                 },
             )
 
@@ -348,7 +348,7 @@ class RAGEngine:
                 model=self.llm_model,
                 messages=messages,
                 extra_headers={
-                    "HTTP-Referer": "https://github.com/gilestrolab/berengar.io"
+                    "HTTP-Referer": "https://github.com/gilestrolab/berengario"
                 },
             )
 

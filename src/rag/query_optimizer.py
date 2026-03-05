@@ -179,7 +179,7 @@ Optimized query:"""
                 max_tokens=self.max_tokens,
                 temperature=self.temperature,
                 extra_headers={
-                    "HTTP-Referer": "https://github.com/gilestrolab/berengar.io"
+                    "HTTP-Referer": "https://github.com/gilestrolab/berengario"
                 },
             )
 

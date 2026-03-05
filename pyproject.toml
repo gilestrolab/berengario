@@ -90,9 +90,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/gilestrolab/berengar.io"
-Repository = "https://github.com/gilestrolab/berengar.io.git"
-Issues = "https://github.com/gilestrolab/berengar.io/issues"
+Homepage = "https://github.com/gilestrolab/berengario"
+Repository = "https://github.com/gilestrolab/berengario.git"
+Issues = "https://github.com/gilestrolab/berengario/issues"
 
 [project.optional-dependencies]
 dev = [
