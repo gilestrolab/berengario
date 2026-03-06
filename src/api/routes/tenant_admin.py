@@ -123,10 +123,9 @@ def create_tenant_admin_router(
         body: TenantSettingsRequest,
         admin_session=Depends(require_admin),
     ):
-        """Update tenant settings (join policy, description, organization, slug)."""
+        """Update tenant settings (join policy, description, organization)."""
 
         from src.platform.models import Tenant
-        from src.platform.provisioning import TenantProvisioner
 
         with platform_db_manager.get_platform_session() as db_session:
             tenant = (
@@ -150,33 +149,6 @@ def create_tenant_admin_router(
             if body.organization is not None:
                 tenant.organization = body.organization
                 updated_fields.append("organization")
-
-            if body.slug is not None and body.slug != tenant.slug:
-                # Validate slug format
-                if not TenantProvisioner.validate_slug(body.slug):
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Invalid slug. Must be 2-63 chars, lowercase "
-                        "alphanumeric with optional hyphens.",
-                    )
-
-                # Check uniqueness
-                existing = (
-                    db_session.query(Tenant)
-                    .filter(
-                        Tenant.slug == body.slug,
-                        Tenant.id != admin_session.tenant_id,
-                    )
-                    .first()
-                )
-                if existing:
-                    raise HTTPException(
-                        status_code=409,
-                        detail=f"Slug '{body.slug}' is already in use.",
-                    )
-
-                tenant.slug = body.slug
-                updated_fields.append("slug")
 
             if updated_fields:
                 tenant.updated_at = datetime.utcnow()

@@ -26,7 +26,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.mysql import JSON
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import declarative_base, relationship, validates
 
 # Separate Base for platform models (different database than tenant models)
 PlatformBase = declarative_base()
@@ -202,6 +202,25 @@ class Tenant(PlatformBase):
             Random invite code string.
         """
         return "".join(random.choices(Tenant._INVITE_ALPHABET, k=length))
+
+    @validates("slug")
+    def _immutable_slug(self, key, value):
+        """Prevent slug changes after initial creation.
+
+        The slug is used as the S3 key prefix, ChromaDB cache path, and
+        tenant database name seed — changing it would orphan all data.
+        """
+        from sqlalchemy import inspect as sa_inspect
+
+        state = sa_inspect(self)
+        if not state.pending and not state.transient:
+            existing = state.attrs.slug.loaded_value
+            if existing is not None and value != existing:
+                raise ValueError(
+                    f"Tenant slug is immutable once created "
+                    f"(current='{existing}', attempted='{value}')"
+                )
+        return value
 
     def __repr__(self) -> str:
         """String representation."""
