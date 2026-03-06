@@ -278,6 +278,29 @@ class EmailProcessor:
                 is_admin_user = role == "admin"
 
                 if is_query:
+                    # Check billing query limit before processing
+                    try:
+                        self._check_email_query_limit(
+                            router, tenant_slug, components
+                        )
+                    except ValueError as limit_err:
+                        logger.warning(
+                            "Query limit exceeded for tenant %s: %s",
+                            tenant_slug,
+                            limit_err,
+                        )
+                        self._send_limit_exceeded_email(
+                            email, str(limit_err), self.email_sender
+                        )
+                        result = ProcessingResult(
+                            message_id=email.message_id,
+                            success=False,
+                            error=str(limit_err),
+                            action="query_limit_exceeded",
+                        )
+                        failures += 1
+                        continue
+
                     result = self._process_query_with(
                         email=email,
                         query_handler=components.query_handler,
@@ -1036,6 +1059,58 @@ The following material has been successfully processed:
             logger.error(
                 f"Failed to send KB acknowledgment to {email.sender.email}: {e}"
             )
+
+    def _check_email_query_limit(self, router, tenant_slug, components):
+        """Check billing query limit for email queries.
+
+        Raises ValueError if limit exceeded.
+        Non-billing errors are logged and silently ignored (don't block queries).
+        """
+        try:
+            from src.billing.plans import check_query_limit
+            from src.billing.router import _count_queries_this_month
+            from src.platform.models import PlanTier, Tenant
+
+            db_manager = router._db_manager
+            with db_manager.get_platform_session() as db:
+                tenant = (
+                    db.query(Tenant)
+                    .filter(Tenant.slug == tenant_slug)
+                    .first()
+                )
+                if not tenant or not isinstance(tenant.plan, PlanTier):
+                    return
+                queries = _count_queries_this_month(db_manager, tenant)
+                check_query_limit(
+                    tenant.plan, tenant.subscription_status, queries
+                )
+        except ValueError:
+            raise  # Re-raise limit exceeded errors
+        except Exception as e:
+            logger.debug("Billing check skipped for %s: %s", tenant_slug, e)
+
+    def _send_limit_exceeded_email(self, email, message, email_sender):
+        """Send a reply informing the user their query limit was exceeded."""
+        try:
+            subject = f"Re: {email.subject}"
+            body_text = (
+                f"Thank you for your message.\n\n{message}\n\n"
+                "Please visit your admin panel to manage your subscription."
+            )
+            body_html = (
+                f"<p>Thank you for your message.</p>"
+                f"<p>{message}</p>"
+                f"<p>Please visit your admin panel to manage your subscription.</p>"
+            )
+            email_sender.send_reply(
+                to_address=email.sender.email,
+                subject=subject,
+                body_text=body_text,
+                body_html=body_html,
+                in_reply_to=email.message_id,
+            )
+        except Exception as e:
+            logger.error("Failed to send limit exceeded email: %s", e)
 
     def _send_rejection_email(
         self,

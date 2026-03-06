@@ -8,13 +8,15 @@ across all platform components (database, storage, encryption, email).
 import logging
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from src.config import settings
 from src.platform.db_manager import TenantDBManager
 from src.platform.encryption import DatabaseKeyManager
 from src.platform.models import (
+    PlanTier,
+    SubscriptionStatus,
     Tenant,
     TenantStatus,
     TenantUser,
@@ -181,8 +183,11 @@ class TenantProvisioner:
             if existing:
                 raise ValueError(f"Tenant with slug '{slug}' already exists")
 
-            # Step 1: Create tenant record with invite code
+            # Step 1: Create tenant record with invite code and trial
             invite_code = Tenant.generate_invite_code()
+            trial_ends = datetime.utcnow() + timedelta(
+                days=settings.trial_duration_days
+            )
             tenant = Tenant(
                 slug=slug,
                 name=name,
@@ -193,6 +198,9 @@ class TenantProvisioner:
                 email_display_name=f"{name} AI Assistant",
                 custom_prompt=custom_prompt,
                 llm_model=llm_model,
+                plan=PlanTier.DEPARTMENT,
+                subscription_status=SubscriptionStatus.TRIALING,
+                trial_ends_at=trial_ends,
                 invite_code=invite_code,
                 db_name=db_name,
                 storage_path=storage_path,

@@ -341,6 +341,16 @@ app.include_router(admin_router)
 app.include_router(analytics_router)
 app.include_router(team_router)
 
+# Billing router (always available — uses platform DB for subscription management)
+from src.billing.router import create_billing_router  # noqa: E402
+
+billing_router = create_billing_router(
+    platform_db_manager=platform_db_manager,
+    require_admin=require_admin,
+    require_auth=require_auth,
+)
+app.include_router(billing_router)
+
 # Multi-tenant-only routers (onboarding, tenant admin)
 if settings.multi_tenant:
     from src.api.routes.onboarding import create_onboarding_router

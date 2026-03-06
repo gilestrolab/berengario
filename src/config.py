@@ -336,6 +336,33 @@ class Settings(BaseSettings):
         description="Prefix for per-tenant S3 buckets (ignored if s3_bucket_name is set)",
     )
 
+    # Paddle Billing
+    paddle_api_key: str = Field(
+        default="", description="Paddle API key for server-side API calls"
+    )
+    paddle_environment: str = Field(
+        default="sandbox",
+        description="Paddle environment: 'sandbox' or 'production'",
+    )
+    paddle_client_token: str = Field(
+        default="", description="Paddle client-side token for Paddle.js"
+    )
+    paddle_webhook_secret: str = Field(
+        default="", description="Paddle webhook signature verification secret"
+    )
+    paddle_price_id_lite: str = Field(
+        default="", description="Paddle price ID for Lite plan"
+    )
+    paddle_price_id_team: str = Field(
+        default="", description="Paddle price ID for Team plan"
+    )
+    paddle_price_id_department: str = Field(
+        default="", description="Paddle price ID for Department plan"
+    )
+    trial_duration_days: int = Field(
+        default=90, description="Trial duration in days for new tenants"
+    )
+
     # Platform Admin
     platform_admin_emails: str = Field(
         default="",

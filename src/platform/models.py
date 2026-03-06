@@ -25,10 +25,29 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import declarative_base, relationship
 
 # Separate Base for platform models (different database than tenant models)
 PlatformBase = declarative_base()
+
+
+class PlanTier(enum.Enum):
+    """Subscription plan tiers."""
+
+    FREE = "free"            # Expired trial / cancelled — no queries
+    LITE = "lite"            # 500 queries/month, 2 GB storage
+    TEAM = "team"            # 2,000 queries/month, 10 GB storage
+    DEPARTMENT = "department"  # 10,000 queries/month, 50 GB storage
+
+
+class SubscriptionStatus(enum.Enum):
+    """Subscription lifecycle states."""
+
+    TRIALING = "trialing"
+    ACTIVE = "active"
+    PAST_DUE = "past_due"
+    CANCELLED = "cancelled"
 
 
 class TenantStatus(enum.Enum):
@@ -113,6 +132,26 @@ class Tenant(PlatformBase):
     # LLM config
     llm_model = Column(String(255), nullable=True)
 
+    # Plan & subscription
+    plan = Column(
+        Enum(PlanTier),
+        nullable=False,
+        default=PlanTier.DEPARTMENT,
+        server_default="department",
+    )
+    subscription_status = Column(
+        Enum(SubscriptionStatus),
+        nullable=False,
+        default=SubscriptionStatus.TRIALING,
+        server_default="trialing",
+    )
+    trial_ends_at = Column(DateTime, nullable=True)
+
+    # Paddle billing integration
+    paddle_customer_id = Column(String(255), nullable=True, index=True)
+    paddle_subscription_id = Column(String(255), nullable=True, index=True)
+    paddle_subscription_scheduled_change = Column(JSON, nullable=True)
+
     # Invite / join settings
     invite_code = Column(String(12), unique=True, nullable=True, index=True)
     join_approval_required = Column(Boolean, default=False, nullable=False)
@@ -144,6 +183,8 @@ class Tenant(PlatformBase):
         Index("idx_tenant_status", "status"),
         Index("idx_tenant_email", "email_address"),
         Index("idx_tenant_invite_code", "invite_code"),
+        Index("idx_tenant_paddle_customer", "paddle_customer_id"),
+        Index("idx_tenant_paddle_subscription", "paddle_subscription_id"),
     )
 
     # Characters excluding ambiguous ones: O/0, I/1/L
@@ -194,6 +235,17 @@ class Tenant(PlatformBase):
             "top_k_retrieval": self.top_k_retrieval,
             "similarity_threshold": self.similarity_threshold,
             "llm_model": self.llm_model,
+            "plan": (
+                self.plan.value if isinstance(self.plan, PlanTier) else self.plan
+            ),
+            "subscription_status": (
+                self.subscription_status.value
+                if isinstance(self.subscription_status, SubscriptionStatus)
+                else self.subscription_status
+            ),
+            "trial_ends_at": (
+                self.trial_ends_at.isoformat() if self.trial_ends_at else None
+            ),
             "invite_code": self.invite_code,
             "join_approval_required": self.join_approval_required,
             "db_name": self.db_name,

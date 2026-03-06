@@ -93,6 +93,10 @@ def create_query_router(
 
         user_identifier = get_session_email(session)
 
+        # Check billing limits (query quota) if tenant is resolved
+        if component_resolver and session.tenant_slug:
+            _check_billing_query_limit(session, component_resolver)
+
         # Determine thread_id: use existing conversation or create new
         thread_id = None
         channel = ChannelType.WEBCHAT
@@ -321,3 +325,38 @@ def create_query_router(
         )
 
     return router
+
+
+def _check_billing_query_limit(session, component_resolver):
+    """Check if the tenant has exceeded their monthly query limit.
+
+    Raises HTTPException 429 if the limit is exceeded.
+    """
+    try:
+        from src.billing.plans import check_query_limit
+        from src.billing.router import _count_queries_this_month
+        from src.platform.models import Tenant
+
+        components = component_resolver.resolve(session)
+        db_manager = component_resolver.component_factory.db_manager
+
+        with db_manager.get_platform_session() as db:
+            tenant = (
+                db.query(Tenant)
+                .filter(Tenant.slug == session.tenant_slug)
+                .first()
+            )
+            if not tenant:
+                return
+
+            queries_this_month = _count_queries_this_month(db_manager, tenant)
+            check_query_limit(
+                tenant.plan, tenant.subscription_status, queries_this_month
+            )
+    except ValueError as e:
+        raise HTTPException(status_code=429, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Don't block queries if billing check fails
+        logger.warning("Billing check failed (allowing query): %s", e)

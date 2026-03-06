@@ -12,7 +12,7 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from typing import Generator, Optional
 
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Engine, create_engine, inspect, text
 from sqlalchemy.orm import Session, make_transient, sessionmaker
 
 from src.config import settings
@@ -109,10 +109,78 @@ class TenantDBManager:
 
         Creates tables for Tenant, TenantUser, TenantEncryptionKey.
         Safe to call multiple times (idempotent).
+        Also runs migrations for new columns on existing tables.
         """
         logger.info("Creating platform database tables...")
         PlatformBase.metadata.create_all(bind=self.platform_engine)
+        self._migrate_billing_columns()
         logger.info("Platform database tables created successfully")
+
+    def _migrate_billing_columns(self) -> None:
+        """Add billing columns to tenants table if they don't exist.
+
+        This handles upgrading existing databases that were created before
+        billing fields were added to the Tenant model.
+        """
+        inspector = inspect(self.platform_engine)
+        if "tenants" not in inspector.get_table_names():
+            return
+
+        existing_columns = {col["name"] for col in inspector.get_columns("tenants")}
+        migrations = []
+
+        if "plan" not in existing_columns:
+            migrations.append(
+                "ALTER TABLE tenants ADD COLUMN plan "
+                "ENUM('free','lite','team','department') "
+                "NOT NULL DEFAULT 'department'"
+            )
+        if "subscription_status" not in existing_columns:
+            migrations.append(
+                "ALTER TABLE tenants ADD COLUMN subscription_status "
+                "ENUM('trialing','active','past_due','cancelled') "
+                "NOT NULL DEFAULT 'trialing'"
+            )
+        if "trial_ends_at" not in existing_columns:
+            migrations.append(
+                "ALTER TABLE tenants ADD COLUMN trial_ends_at DATETIME NULL"
+            )
+        if "paddle_customer_id" not in existing_columns:
+            migrations.append(
+                "ALTER TABLE tenants ADD COLUMN paddle_customer_id "
+                "VARCHAR(255) NULL"
+            )
+            migrations.append(
+                "CREATE INDEX idx_tenant_paddle_customer "
+                "ON tenants (paddle_customer_id)"
+            )
+        if "paddle_subscription_id" not in existing_columns:
+            migrations.append(
+                "ALTER TABLE tenants ADD COLUMN paddle_subscription_id "
+                "VARCHAR(255) NULL"
+            )
+            migrations.append(
+                "CREATE INDEX idx_tenant_paddle_subscription "
+                "ON tenants (paddle_subscription_id)"
+            )
+        if "paddle_subscription_scheduled_change" not in existing_columns:
+            migrations.append(
+                "ALTER TABLE tenants ADD COLUMN "
+                "paddle_subscription_scheduled_change JSON NULL"
+            )
+
+        if migrations:
+            logger.info("Running billing column migrations on tenants table...")
+            with self.platform_engine.connect() as conn:
+                for sql in migrations:
+                    try:
+                        conn.execute(text(sql))
+                    except Exception as e:
+                        # Ignore if column/index already exists (race condition)
+                        if "Duplicate" not in str(e):
+                            logger.warning("Migration warning: %s", e)
+                conn.commit()
+            logger.info("Billing column migrations complete")
 
     def init_tenant_db(self, db_name: str) -> None:
         """
