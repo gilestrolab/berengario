@@ -132,14 +132,14 @@ class TenantDBManager:
         if "plan" not in existing_columns:
             migrations.append(
                 "ALTER TABLE tenants ADD COLUMN plan "
-                "ENUM('free','lite','team','department') "
-                "NOT NULL DEFAULT 'department'"
+                "ENUM('FREE','LITE','TEAM','DEPARTMENT') "
+                "NOT NULL DEFAULT 'DEPARTMENT'"
             )
         if "subscription_status" not in existing_columns:
             migrations.append(
                 "ALTER TABLE tenants ADD COLUMN subscription_status "
-                "ENUM('trialing','active','past_due','cancelled') "
-                "NOT NULL DEFAULT 'trialing'"
+                "ENUM('TRIALING','ACTIVE','PAST_DUE','CANCELLED') "
+                "NOT NULL DEFAULT 'TRIALING'"
             )
         if "trial_ends_at" not in existing_columns:
             migrations.append(
@@ -180,6 +180,25 @@ class TenantDBManager:
                             logger.warning("Migration warning: %s", e)
                 conn.commit()
             logger.info("Billing column migrations complete")
+
+        # Fix enum case: early migration used lowercase values but SQLAlchemy
+        # expects uppercase enum names.  This ALTER is idempotent.
+        if "plan" in existing_columns:
+            fixup_sqls = [
+                "ALTER TABLE tenants MODIFY COLUMN plan "
+                "ENUM('FREE','LITE','TEAM','DEPARTMENT') "
+                "NOT NULL DEFAULT 'DEPARTMENT'",
+                "ALTER TABLE tenants MODIFY COLUMN subscription_status "
+                "ENUM('TRIALING','ACTIVE','PAST_DUE','CANCELLED') "
+                "NOT NULL DEFAULT 'TRIALING'",
+            ]
+            with self.platform_engine.connect() as conn:
+                for sql in fixup_sqls:
+                    try:
+                        conn.execute(text(sql))
+                    except Exception as e:
+                        logger.debug("Enum fixup skipped: %s", e)
+                conn.commit()
 
     def init_tenant_db(self, db_name: str) -> None:
         """

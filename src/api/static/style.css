@@ -1632,6 +1632,44 @@ body {
 }
 
 /* ====================================
+   PLAN BANNER (trial/expired)
+   ==================================== */
+
+.plan-banner {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.plan-banner.banner-warning {
+    background: #FEF3CD;
+    color: #856404;
+    border-bottom: 1px solid #FFE69C;
+}
+
+.plan-banner.banner-danger {
+    background: #F8D7DA;
+    color: #842029;
+    border-bottom: 1px solid #F5C2C7;
+}
+
+.plan-banner.banner-info {
+    background: #D1ECF1;
+    color: #0C5460;
+    border-bottom: 1px solid #BEE5EB;
+}
+
+.plan-banner a {
+    color: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+/* ====================================
    APP FOOTER
    ==================================== */
 

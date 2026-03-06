@@ -50,6 +50,7 @@ services:
       - ./data/kb:/app/data/kb  # Mount KB structure (documents, emails, archive)
       - ./data/documents:/app/data/documents  # Legacy mount (can be removed after migration)
       - ./data/chroma_db:/app/data/chroma_db
+      - ./data/cache:/app/data/cache  # S3 tenants: local ChromaDB cache
       - ./data/logs:/app/data/logs
       - ./data/config:/app/data/config
       - ./data/temp_attachments:/app/data/temp_attachments
@@ -83,6 +84,7 @@ services:
       - ./data/kb:/app/data/kb  # Mount KB structure (documents, emails, archive)
       - ./data/documents:/app/data/documents  # Legacy mount (can be removed after migration)
       - ./data/chroma_db:/app/data/chroma_db
+      - ./data/cache:/app/data/cache  # S3 tenants: local ChromaDB cache
       - ./data/logs:/app/data/logs
       - ./data/config:/app/data/config
       - ./data/temp_attachments:/app/data/temp_attachments
@@ -132,6 +134,7 @@ services:
       - ./data/kb:/app/data/kb  # Mount KB structure (documents, emails, archive)
       - ./data/documents:/app/data/documents  # Legacy mount (can be removed after migration)
       - ./data/chroma_db:/app/data/chroma_db
+      - ./data/cache:/app/data/cache  # S3 tenants: local ChromaDB cache
       - ./data/logs:/app/data/logs
       - ./data/config:/app/data/config
       - ./data/temp_attachments:/app/data/temp_attachments

@@ -582,6 +582,10 @@ def create_admin_router(
         Raises:
             HTTPException: If URL is invalid or crawling fails
         """
+        # Check storage limit before crawling (MT mode)
+        if component_resolver and session.tenant_slug:
+            _check_billing_storage_limit(session, component_resolver, 0)
+
         try:
             logger.info(
                 f"Admin {session.email} initiated crawl: {request.url} (depth={request.crawl_depth})"

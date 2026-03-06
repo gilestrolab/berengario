@@ -40,6 +40,11 @@ class ChatApp {
         // Load instance configuration
         await this.loadConfig();
 
+        // Check trial/plan status banner (MT mode only)
+        if (this.config && this.config.multi_tenant) {
+            this.loadPlanBanner();
+        }
+
         // Load KB stats
         await this.loadStats();
 
@@ -93,6 +98,44 @@ class ChatApp {
             }
         } catch (error) {
             console.error('Error loading config:', error);
+        }
+    }
+
+    async loadPlanBanner() {
+        try {
+            const response = await fetch('/api/billing/plan-info', { credentials: 'include' });
+            if (!response.ok) return;
+            const info = await response.json();
+
+            const banner = document.getElementById('plan-banner');
+            if (!banner) return;
+
+            const status = info.subscription_status;
+            const plan = info.plan;
+
+            if (status === 'trialing' && info.trial_ends_at) {
+                const daysLeft = Math.ceil((new Date(info.trial_ends_at) - new Date()) / (1000 * 60 * 60 * 24));
+
+                if (daysLeft <= 0) {
+                    banner.className = 'plan-banner banner-danger';
+                    banner.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Your free trial has expired. <a href="/admin">Upgrade now</a> to continue using the service.';
+                    banner.style.display = 'flex';
+                } else if (daysLeft <= 14) {
+                    banner.className = 'plan-banner banner-warning';
+                    banner.innerHTML = `<i class="fas fa-clock"></i> Your free trial ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}. <a href="/admin">Choose a plan</a> to keep access.`;
+                    banner.style.display = 'flex';
+                }
+            } else if (plan === 'free' && status === 'cancelled') {
+                banner.className = 'plan-banner banner-danger';
+                banner.innerHTML = '<i class="fas fa-exclamation-triangle"></i> You are on the Free plan with no active subscription. <a href="/admin">Upgrade</a> to send queries.';
+                banner.style.display = 'flex';
+            } else if (status === 'past_due') {
+                banner.className = 'plan-banner banner-warning';
+                banner.innerHTML = '<i class="fas fa-exclamation-circle"></i> Your payment is past due. Please <a href="/admin">update your payment method</a> to avoid service interruption.';
+                banner.style.display = 'flex';
+            }
+        } catch (error) {
+            // Billing not configured — silently ignore
         }
     }
 

@@ -34,6 +34,9 @@ class EmailService:
         max_failures: Maximum failures before extended backoff
     """
 
+    # Check trial expiry once per day (in seconds)
+    TRIAL_CHECK_INTERVAL = 86400
+
     def __init__(
         self,
         processor: Optional[EmailProcessor] = None,
@@ -54,6 +57,7 @@ class EmailService:
         self.running = False
         self.failure_count = 0
         self.max_failures = 5
+        self._last_trial_check = 0.0
 
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -162,6 +166,110 @@ class EmailService:
 
             return False
 
+    def _check_trial_expiry(self):
+        """Send warning emails to tenant admins whose trials are expiring soon.
+
+        Runs at most once per TRIAL_CHECK_INTERVAL. Checks for trials expiring
+        within 14 days and sends a single notification email to each admin.
+        """
+        now = time.time()
+        if now - self._last_trial_check < self.TRIAL_CHECK_INTERVAL:
+            return
+        self._last_trial_check = now
+
+        if not settings.multi_tenant:
+            return
+
+        try:
+            from datetime import timedelta
+
+            from src.platform.models import (
+                SubscriptionStatus,
+                Tenant,
+                TenantUser,
+                TenantUserRole,
+            )
+
+            router = getattr(self.processor, "tenant_email_router", None)
+            if not router:
+                return
+            db_manager = router._db_manager
+
+            with db_manager.get_platform_session() as db:
+                now_dt = datetime.utcnow()
+                warning_cutoff = now_dt + timedelta(days=14)
+
+                expiring_tenants = (
+                    db.query(Tenant)
+                    .filter(
+                        Tenant.subscription_status == SubscriptionStatus.TRIALING,
+                        Tenant.trial_ends_at.isnot(None),
+                        Tenant.trial_ends_at <= warning_cutoff,
+                        Tenant.trial_ends_at > now_dt,
+                    )
+                    .all()
+                )
+
+                for tenant in expiring_tenants:
+                    days_left = max(0, (tenant.trial_ends_at - now_dt).days)
+
+                    # Find admin emails for this tenant
+                    admins = (
+                        db.query(TenantUser)
+                        .filter(
+                            TenantUser.tenant_id == tenant.id,
+                            TenantUser.role == TenantUserRole.ADMIN,
+                        )
+                        .all()
+                    )
+
+                    for admin in admins:
+                        try:
+                            from src.email.email_sender import EmailSender
+
+                            sender = EmailSender()
+                            subject = (
+                                f"Your {tenant.name} trial expires in {days_left} day"
+                                f"{'s' if days_left != 1 else ''}"
+                            )
+                            body_text = (
+                                f"Hi,\n\n"
+                                f"Your free trial for {tenant.name} on Berengario "
+                                f"expires in {days_left} day{'s' if days_left != 1 else ''}.\n\n"
+                                f"To continue using the service without interruption, "
+                                f"please visit the admin panel and choose a plan.\n\n"
+                                f"Best regards,\nThe Berengario Team"
+                            )
+                            body_html = (
+                                f"<p>Hi,</p>"
+                                f"<p>Your free trial for <strong>{tenant.name}</strong> on Berengario "
+                                f"expires in <strong>{days_left} day{'s' if days_left != 1 else ''}</strong>.</p>"
+                                f"<p>To continue using the service without interruption, "
+                                f"please visit the admin panel and choose a plan.</p>"
+                                f"<p>Best regards,<br>The Berengario Team</p>"
+                            )
+                            sender.send_reply(
+                                to_address=admin.email,
+                                subject=subject,
+                                body_text=body_text,
+                                body_html=body_html,
+                            )
+                            logger.info(
+                                "Sent trial expiry warning to %s for tenant %s (%d days left)",
+                                admin.email,
+                                tenant.slug,
+                                days_left,
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                "Failed to send trial expiry email to %s: %s",
+                                admin.email,
+                                e,
+                            )
+
+        except Exception as e:
+            logger.warning("Trial expiry check failed: %s", e)
+
     def start(self):
         """
         Start the email service daemon.
@@ -214,6 +322,9 @@ class EmailService:
 
                 # Process inbox
                 self._process_inbox()
+
+                # Periodic trial expiry check (once per day)
+                self._check_trial_expiry()
 
             except KeyboardInterrupt:
                 logger.info("Received keyboard interrupt, shutting down...")

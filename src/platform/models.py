@@ -137,13 +137,13 @@ class Tenant(PlatformBase):
         Enum(PlanTier),
         nullable=False,
         default=PlanTier.DEPARTMENT,
-        server_default="department",
+        server_default="DEPARTMENT",
     )
     subscription_status = Column(
         Enum(SubscriptionStatus),
         nullable=False,
         default=SubscriptionStatus.TRIALING,
-        server_default="trialing",
+        server_default="TRIALING",
     )
     trial_ends_at = Column(DateTime, nullable=True)
 
