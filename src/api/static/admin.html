@@ -2208,6 +2208,195 @@
                 font-size: 1.1rem;
             }
         }
+
+        /* ---- Billing Tab ---- */
+        .billing-section {
+            max-width: 900px;
+        }
+
+        .billing-badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .billing-badge-trial {
+            background: #FFF3E0;
+            color: #E65100;
+        }
+        .billing-badge-active {
+            background: #E8F5E9;
+            color: #2E7D32;
+        }
+        .billing-badge-warning {
+            background: #FFF8E1;
+            color: #F57F17;
+        }
+        .billing-badge-cancelled {
+            background: #FFEBEE;
+            color: #C62828;
+        }
+        .billing-badge-popular {
+            background: var(--primary, #7A5C3E);
+            color: white;
+        }
+
+        .billing-notice {
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+        }
+        .billing-notice-warning {
+            background: #FFF8E1;
+            border-left: 3px solid #F57F17;
+            color: #5D4037;
+        }
+
+        .billing-usage-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .billing-usage-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            color: var(--text-secondary, #8C8279);
+            margin-bottom: 0.4rem;
+        }
+
+        .billing-bar {
+            height: 8px;
+            background: var(--bg-secondary, #F7F2EA);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .billing-bar-fill {
+            height: 100%;
+            background: var(--primary, #7A5C3E);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        .billing-bar-fill.billing-bar-warning {
+            background: #F57F17;
+        }
+        .billing-bar-fill.billing-bar-danger {
+            background: var(--danger, #A3423A);
+        }
+
+        .billing-plans-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        .billing-plan-card {
+            border: 1px solid var(--border, #D5C9B8);
+            border-radius: 4px;
+            padding: 1.5rem;
+            background: white;
+            display: flex;
+            flex-direction: column;
+        }
+        .billing-plan-card-active {
+            border-color: var(--primary, #7A5C3E);
+            box-shadow: 0 0 0 1px var(--primary, #7A5C3E);
+        }
+
+        .billing-plan-header {
+            margin-bottom: 0.75rem;
+        }
+        .billing-plan-header h4 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.1rem;
+            color: var(--text-primary, #2E2E2E);
+        }
+
+        .billing-plan-price {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary, #2E2E2E);
+            margin-bottom: 1rem;
+        }
+
+        .billing-plan-features {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 1.5rem 0;
+            flex: 1;
+        }
+        .billing-plan-features li {
+            padding: 0.3rem 0;
+            font-size: 0.875rem;
+            color: var(--text-secondary, #8C8279);
+        }
+        .billing-plan-features li::before {
+            content: "\2713 ";
+            color: var(--success, #5B8C7A);
+            font-weight: bold;
+        }
+
+        .billing-btn {
+            display: inline-block;
+            padding: 0.6rem 1.2rem;
+            border: 1px solid var(--border, #D5C9B8);
+            border-radius: 4px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            text-align: center;
+            background: white;
+            color: var(--text-primary, #2E2E2E);
+        }
+        .billing-btn:hover {
+            background: var(--bg-secondary, #F7F2EA);
+        }
+        .billing-btn-upgrade {
+            background: var(--primary, #7A5C3E);
+            color: white;
+            border-color: var(--primary, #7A5C3E);
+        }
+        .billing-btn-upgrade:hover {
+            opacity: 0.9;
+            background: var(--primary, #7A5C3E);
+        }
+        .billing-btn-current {
+            background: var(--bg-secondary, #F7F2EA);
+            color: var(--text-secondary, #8C8279);
+            cursor: default;
+        }
+        .billing-btn-current:hover {
+            background: var(--bg-secondary, #F7F2EA);
+        }
+        .billing-btn-manage {
+            background: white;
+        }
+        .billing-btn-danger {
+            color: var(--danger, #A3423A);
+            border-color: var(--danger, #A3423A);
+        }
+        .billing-btn-danger:hover {
+            background: #FFEBEE;
+        }
+
+        .billing-management {
+            display: flex;
+            gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .billing-plans-grid {
+                grid-template-columns: 1fr;
+            }
+            .billing-usage-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -2226,6 +2415,7 @@
             <button class="tab" data-tab="webcrawl">Web Crawling</button>
             <button class="tab" data-tab="backups">Backups</button>
             <button class="tab" data-tab="settings">Settings</button>
+            <button class="tab" data-tab="billing" id="billing-tab-btn">Billing</button>
         </div>
 
         <!-- Team Tab (MT mode only) -->
@@ -2739,6 +2929,33 @@
                 </div>
             </div>
         </div>
+        <!-- Billing Tab -->
+        <div id="billing-tab" class="tab-content">
+            <div class="billing-section">
+                <!-- Current Plan & Usage -->
+                <div class="settings-card">
+                    <h3>Plan & Usage</h3>
+                    <p style="margin-bottom: 1rem; color: var(--text-secondary, #8C8279); font-size: 0.875rem;">
+                        Your current plan, subscription status, and resource usage.
+                    </p>
+                    <div id="billing-plan-info">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+
+                <!-- Plan Comparison -->
+                <div class="settings-card" style="margin-top: 2rem;">
+                    <h3>Choose a Plan</h3>
+                    <p style="margin-bottom: 1rem; color: var(--text-secondary, #8C8279); font-size: 0.875rem;">
+                        All plans include unlimited users, email &amp; web interface, setup, maintenance, and backups.
+                        Prices shown at checkout in your local currency.
+                    </p>
+                    <div id="billing-plan-cards">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Notification -->
@@ -2765,9 +2982,11 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="/static/admin.js?v=20260305"></script>
+    <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+    <script src="/static/admin.js?v=20260306"></script>
     <script src="/static/admin-usage.js?v=20260305"></script>
     <script src="/static/admin-kb-health.js?v=20260303-1"></script>
     <script src="/static/admin-feedback.js?v=20260305"></script>
+    <script src="/static/admin-billing.js?v=20260306"></script>
 </body>
 </html>

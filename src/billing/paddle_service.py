@@ -133,8 +133,6 @@ async def cancel_subscription(
             json={"effective_from": effective_from},
         )
         if resp.status_code not in (200, 201):
-            logger.error(
-                "Paddle cancel failed for %s: %s", subscription_id, resp.text
-            )
+            logger.error("Paddle cancel failed for %s: %s", subscription_id, resp.text)
             return False
         return True

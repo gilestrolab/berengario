@@ -21,9 +21,7 @@ def _find_tenant(db: Session, event_data: dict[str, Any]) -> Tenant | None:
     sub_id = event_data.get("id")
     if sub_id:
         tenant = (
-            db.query(Tenant)
-            .filter(Tenant.paddle_subscription_id == sub_id)
-            .first()
+            db.query(Tenant).filter(Tenant.paddle_subscription_id == sub_id).first()
         )
         if tenant:
             return tenant

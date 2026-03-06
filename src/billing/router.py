@@ -87,15 +87,11 @@ def create_billing_router(platform_db_manager, require_admin, require_auth):
                     content={"detail": "No active subscription found"},
                 )
 
-            urls = await get_subscription_management_urls(
-                tenant.paddle_subscription_id
-            )
+            urls = await get_subscription_management_urls(tenant.paddle_subscription_id)
             if not urls:
                 return JSONResponse(
                     status_code=502,
-                    content={
-                        "detail": "Could not fetch management URLs from Paddle"
-                    },
+                    content={"detail": "Could not fetch management URLs from Paddle"},
                 )
 
             return urls
@@ -151,9 +147,7 @@ def create_billing_router(platform_db_manager, require_admin, require_auth):
                 if not success:
                     return JSONResponse(
                         status_code=502,
-                        content={
-                            "detail": "Failed to cancel subscription with Paddle"
-                        },
+                        content={"detail": "Failed to cancel subscription with Paddle"},
                     )
                 return {
                     "detail": "Subscription will be cancelled at the end "
@@ -188,9 +182,7 @@ def create_billing_router(platform_db_manager, require_admin, require_auth):
             storage_limit_mb = get_storage_limit_mb(plan, status)
 
             # Count queries this month from tenant DB
-            queries_this_month = _count_queries_this_month(
-                platform_db_manager, tenant
-            )
+            queries_this_month = _count_queries_this_month(platform_db_manager, tenant)
 
             # Calculate storage used
             storage_used_mb = _get_storage_used_mb(platform_db_manager, tenant)
@@ -201,9 +193,7 @@ def create_billing_router(platform_db_manager, require_admin, require_auth):
                 "subscription_status": status.value,
                 "is_trialing": status == SubscriptionStatus.TRIALING,
                 "trial_ends_at": (
-                    tenant.trial_ends_at.isoformat()
-                    if tenant.trial_ends_at
-                    else None
+                    tenant.trial_ends_at.isoformat() if tenant.trial_ends_at else None
                 ),
                 "queries_this_month": queries_this_month,
                 "query_limit": query_limit,
@@ -249,17 +239,12 @@ def _get_storage_used_mb(platform_db_manager, tenant) -> float:
         with platform_db_manager.get_tenant_session(tenant) as db:
             from sqlalchemy import func
 
-            total_bytes = (
-                db.query(func.sum(DocumentDescription.file_size))
-                .scalar()
-            )
+            total_bytes = db.query(func.sum(DocumentDescription.file_size)).scalar()
             if total_bytes is None:
                 return 0.0
             return total_bytes / (1024 * 1024)
     except Exception as e:
-        logger.error(
-            "Failed to get storage for tenant %s: %s", tenant.slug, e
-        )
+        logger.error("Failed to get storage for tenant %s: %s", tenant.slug, e)
         return 0.0
 
 

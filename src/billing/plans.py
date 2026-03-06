@@ -13,8 +13,8 @@ PLAN_QUERY_LIMITS: dict[PlanTier, int] = {
 # Storage limits in MB per plan (0 = no new uploads)
 PLAN_STORAGE_LIMITS_MB: dict[PlanTier, int] = {
     PlanTier.FREE: 0,
-    PlanTier.LITE: 2 * 1024,       # 2 GB
-    PlanTier.TEAM: 10 * 1024,      # 10 GB
+    PlanTier.LITE: 2 * 1024,  # 2 GB
+    PlanTier.TEAM: 10 * 1024,  # 10 GB
     PlanTier.DEPARTMENT: 50 * 1024,  # 50 GB
 }
 
@@ -29,8 +29,8 @@ PLAN_DISPLAY_NAMES: dict[PlanTier, str] = {
 # Actual prices (incl. currency localisation) come from Paddle PricePreview.
 PLAN_FALLBACK_PRICES: dict[PlanTier, int | None] = {
     PlanTier.FREE: None,
-    PlanTier.LITE: 240,        # GBP/year
-    PlanTier.TEAM: 588,        # GBP/year
+    PlanTier.LITE: 240,  # GBP/year
+    PlanTier.TEAM: 588,  # GBP/year
     PlanTier.DEPARTMENT: 1788,  # GBP/year
 }
 

@@ -35,9 +35,9 @@ PlatformBase = declarative_base()
 class PlanTier(enum.Enum):
     """Subscription plan tiers."""
 
-    FREE = "free"            # Expired trial / cancelled — no queries
-    LITE = "lite"            # 500 queries/month, 2 GB storage
-    TEAM = "team"            # 2,000 queries/month, 10 GB storage
+    FREE = "free"  # Expired trial / cancelled — no queries
+    LITE = "lite"  # 500 queries/month, 2 GB storage
+    TEAM = "team"  # 2,000 queries/month, 10 GB storage
     DEPARTMENT = "department"  # 10,000 queries/month, 50 GB storage
 
 
@@ -235,9 +235,7 @@ class Tenant(PlatformBase):
             "top_k_retrieval": self.top_k_retrieval,
             "similarity_threshold": self.similarity_threshold,
             "llm_model": self.llm_model,
-            "plan": (
-                self.plan.value if isinstance(self.plan, PlanTier) else self.plan
-            ),
+            "plan": (self.plan.value if isinstance(self.plan, PlanTier) else self.plan),
             "subscription_status": (
                 self.subscription_status.value
                 if isinstance(self.subscription_status, SubscriptionStatus)

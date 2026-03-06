@@ -147,8 +147,7 @@ class TenantDBManager:
             )
         if "paddle_customer_id" not in existing_columns:
             migrations.append(
-                "ALTER TABLE tenants ADD COLUMN paddle_customer_id "
-                "VARCHAR(255) NULL"
+                "ALTER TABLE tenants ADD COLUMN paddle_customer_id " "VARCHAR(255) NULL"
             )
             migrations.append(
                 "CREATE INDEX idx_tenant_paddle_customer "

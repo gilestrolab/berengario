@@ -109,14 +109,11 @@ class TestStorageLimits:
 
     def test_active_lite(self):
         assert (
-            get_storage_limit_mb(PlanTier.LITE, SubscriptionStatus.ACTIVE)
-            == 2 * 1024
+            get_storage_limit_mb(PlanTier.LITE, SubscriptionStatus.ACTIVE) == 2 * 1024
         )
 
     def test_cancelled_free(self):
-        assert (
-            get_storage_limit_mb(PlanTier.FREE, SubscriptionStatus.CANCELLED) == 0
-        )
+        assert get_storage_limit_mb(PlanTier.FREE, SubscriptionStatus.CANCELLED) == 0
 
 
 class TestCheckQueryLimit:
@@ -155,15 +152,11 @@ class TestCheckStorageLimit:
 
     def test_would_exceed_raises(self):
         with pytest.raises(ValueError, match="2 GB"):
-            check_storage_limit(
-                PlanTier.LITE, SubscriptionStatus.ACTIVE, 2000.0, 100.0
-            )
+            check_storage_limit(PlanTier.LITE, SubscriptionStatus.ACTIVE, 2000.0, 100.0)
 
     def test_free_always_raises(self):
         with pytest.raises(ValueError, match="trial has ended"):
-            check_storage_limit(
-                PlanTier.FREE, SubscriptionStatus.CANCELLED, 0.0, 1.0
-            )
+            check_storage_limit(PlanTier.FREE, SubscriptionStatus.CANCELLED, 0.0, 1.0)
 
     def test_trialing_has_department_limit(self):
         # 50 GB limit when trialing

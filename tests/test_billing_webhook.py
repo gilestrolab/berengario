@@ -1,10 +1,10 @@
 """Tests for Paddle webhook handler."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from src.billing.webhook_handler import (
     dispatch_event,
@@ -27,8 +27,8 @@ def db_session():
     """Create an in-memory SQLite database with platform tables."""
     engine = create_engine("sqlite:///:memory:")
     PlatformBase.metadata.create_all(bind=engine)
-    SessionLocal = sessionmaker(bind=engine)
-    session = SessionLocal()
+    session_factory = sessionmaker(bind=engine)
+    session = session_factory()
     yield session
     session.close()
     engine.dispose()
@@ -169,7 +169,9 @@ class TestDispatchEvent:
         tenant.paddle_subscription_id = "sub_abc123"
         db_session.commit()
 
-        result = dispatch_event(db_session, "subscription.past_due", {"id": "sub_abc123"})
+        result = dispatch_event(
+            db_session, "subscription.past_due", {"id": "sub_abc123"}
+        )
         assert result is True
 
     def test_ignores_unknown_event(self, db_session):

@@ -419,6 +419,10 @@ def create_admin_router(
                     detail=f"Unsupported file type: {file_ext}. Allowed: {', '.join(sorted(SUPPORTED_EXTENSIONS))}",
                 )
 
+            # Check billing storage limit before accepting upload
+            if component_resolver and session.tenant_slug:
+                _check_billing_storage_limit(session, component_resolver, file.size)
+
             # Create temp directory if it doesn't exist
             temp_dir = Path(settings.email_temp_dir)
             temp_dir.mkdir(parents=True, exist_ok=True)
@@ -1599,3 +1603,36 @@ def create_admin_router(
             )
 
     return router
+
+
+def _check_billing_storage_limit(session, component_resolver, file_size):
+    """Check if uploading a file would exceed the tenant's storage limit.
+
+    Raises HTTPException 429 if the limit is exceeded.
+    """
+    try:
+        from src.billing.plans import check_storage_limit
+        from src.billing.router import _get_storage_used_mb
+        from src.platform.models import Tenant
+
+        db_manager = component_resolver.component_factory.db_manager
+
+        with db_manager.get_platform_session() as db:
+            tenant = db.query(Tenant).filter(Tenant.slug == session.tenant_slug).first()
+            if not tenant:
+                return
+
+            storage_used_mb = _get_storage_used_mb(db_manager, tenant)
+            new_file_mb = (file_size or 0) / (1024 * 1024)
+            check_storage_limit(
+                tenant.plan,
+                tenant.subscription_status,
+                storage_used_mb,
+                new_file_mb,
+            )
+    except ValueError as e:
+        raise HTTPException(status_code=429, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning("Storage billing check failed (allowing upload): %s", e)

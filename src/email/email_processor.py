@@ -280,9 +280,7 @@ class EmailProcessor:
                 if is_query:
                     # Check billing query limit before processing
                     try:
-                        self._check_email_query_limit(
-                            router, tenant_slug, components
-                        )
+                        self._check_email_query_limit(router, tenant_slug, components)
                     except ValueError as limit_err:
                         logger.warning(
                             "Query limit exceeded for tenant %s: %s",
@@ -1073,17 +1071,11 @@ The following material has been successfully processed:
 
             db_manager = router._db_manager
             with db_manager.get_platform_session() as db:
-                tenant = (
-                    db.query(Tenant)
-                    .filter(Tenant.slug == tenant_slug)
-                    .first()
-                )
+                tenant = db.query(Tenant).filter(Tenant.slug == tenant_slug).first()
                 if not tenant or not isinstance(tenant.plan, PlanTier):
                     return
                 queries = _count_queries_this_month(db_manager, tenant)
-                check_query_limit(
-                    tenant.plan, tenant.subscription_status, queries
-                )
+                check_query_limit(tenant.plan, tenant.subscription_status, queries)
         except ValueError:
             raise  # Re-raise limit exceeded errors
         except Exception as e:

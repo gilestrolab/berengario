@@ -337,15 +337,10 @@ def _check_billing_query_limit(session, component_resolver):
         from src.billing.router import _count_queries_this_month
         from src.platform.models import Tenant
 
-        components = component_resolver.resolve(session)
         db_manager = component_resolver.component_factory.db_manager
 
         with db_manager.get_platform_session() as db:
-            tenant = (
-                db.query(Tenant)
-                .filter(Tenant.slug == session.tenant_slug)
-                .first()
-            )
+            tenant = db.query(Tenant).filter(Tenant.slug == session.tenant_slug).first()
             if not tenant:
                 return
 
