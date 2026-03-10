@@ -86,7 +86,7 @@
      * Fetch localised prices from Paddle PricePreview.
      */
     AdminPanel.prototype.fetchPaddlePrices = async function () {
-        if (!billingConfig || billingConfig.environment === 'sandbox') return;
+        if (!billingConfig) return;
         const priceIds = [
             billingConfig.price_id_lite,
             billingConfig.price_id_team,
