@@ -11,6 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 </head>
 <body>
 
@@ -246,8 +247,8 @@
         <div class="pricing-grid">
             <div class="pricing-card">
                 <div class="pricing-tier">Lite</div>
-                <div class="pricing-price">&pound;240<span>/yr</span></div>
-                <div class="pricing-period">&pound;20 / month, billed annually</div>
+                <div class="pricing-price" id="price-lite">&pound;240<span>/yr</span></div>
+                <div class="pricing-period" id="price-lite-monthly">&pound;20 / month, billed annually</div>
                 <ul class="pricing-features">
                     <li>500 queries / month</li>
                     <li>2 GB documents</li>
@@ -260,8 +261,8 @@
             <div class="pricing-card pricing-featured">
                 <div class="pricing-badge">Most popular</div>
                 <div class="pricing-tier">Team</div>
-                <div class="pricing-price">&pound;588<span>/yr</span></div>
-                <div class="pricing-period">&pound;49 / month, billed annually</div>
+                <div class="pricing-price" id="price-team">&pound;588<span>/yr</span></div>
+                <div class="pricing-period" id="price-team-monthly">&pound;49 / month, billed annually</div>
                 <ul class="pricing-features">
                     <li>2,000 queries / month</li>
                     <li>10 GB documents</li>
@@ -273,8 +274,8 @@
             </div>
             <div class="pricing-card">
                 <div class="pricing-tier">Department</div>
-                <div class="pricing-price">&pound;1,788<span>/yr</span></div>
-                <div class="pricing-period">&pound;149 / month, billed annually</div>
+                <div class="pricing-price" id="price-department">&pound;1,788<span>/yr</span></div>
+                <div class="pricing-period" id="price-department-monthly">&pound;149 / month, billed annually</div>
                 <ul class="pricing-features">
                     <li>10,000 queries / month</li>
                     <li>50 GB documents</li>
@@ -371,6 +372,68 @@ window.addEventListener('scroll', () => {
 
 // Initialize Lucide icons
 lucide.createIcons();
+
+// Paddle pricing — fetch localized prices, fallback to GBP already in HTML
+(function() {
+    const PADDLE_CLIENT_TOKEN = 'test_5f3beb948ca30338b61bea483cd';
+    const PADDLE_ENVIRONMENT = 'sandbox';
+    const PRICE_ID_LITE = 'pri_01khpd9vdksfytk28fnqkyb674';
+    const PRICE_ID_TEAM = 'pri_01kkbpqzyqwe2a5cpp3580ybk7';
+    const PRICE_ID_DEPARTMENT = 'pri_01kkbpsek9aax7xsv7q3as22nm';
+
+    const PLAN_MAP = {
+        [PRICE_ID_LITE]: 'lite',
+        [PRICE_ID_TEAM]: 'team',
+        [PRICE_ID_DEPARTMENT]: 'department',
+    };
+
+    if (typeof Paddle === 'undefined') { console.warn('Paddle.js not loaded'); return; }
+    try {
+        if (PADDLE_ENVIRONMENT === 'sandbox') {
+            Paddle.Environment.set('sandbox');
+        }
+        Paddle.Initialize({ token: PADDLE_CLIENT_TOKEN });
+        console.log('Paddle initialized, fetching prices...');
+
+        Paddle.PricePreview({
+            items: [
+                { priceId: PRICE_ID_LITE, quantity: 1 },
+                { priceId: PRICE_ID_TEAM, quantity: 1 },
+                { priceId: PRICE_ID_DEPARTMENT, quantity: 1 },
+            ],
+        }).then(function(result) {
+            console.log('Paddle PricePreview result:', result);
+            var currency = result.data.currencyCode;
+            var items = result.data.details.lineItems;
+
+            function formatPrice(amount, curr) {
+                return new Intl.NumberFormat(undefined, {
+                    style: 'currency', currency: curr,
+                    minimumFractionDigits: 0, maximumFractionDigits: 0,
+                }).format(parseInt(amount) / 100);
+            }
+
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i];
+                var plan = PLAN_MAP[item.price.id];
+                if (!plan) continue;
+
+                var totalCents = parseInt(item.totals.total);
+                var yearly = formatPrice(totalCents, currency);
+                var monthly = formatPrice(Math.round(totalCents / 12), currency);
+
+                var priceEl = document.getElementById('price-' + plan);
+                var monthlyEl = document.getElementById('price-' + plan + '-monthly');
+                if (priceEl) priceEl.innerHTML = yearly + '<span>/yr</span>';
+                if (monthlyEl) monthlyEl.textContent = monthly + ' / month, billed annually';
+            }
+        }).catch(function(e) {
+            console.error('Paddle PricePreview failed, using fallback prices:', e);
+        });
+    } catch (e) {
+        console.error('Paddle init failed:', e);
+    }
+})();
 </script>
 
 </body>
