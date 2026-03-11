@@ -353,84 +353,79 @@ class RAGEngine:
         logger.info(f"Processing query: {query_text[:100]}...")
 
         try:
-            # Check for function calls and generate attachments
-            function_result = self._check_for_function_calls(
-                query_text, conversation_history
-            )
-            attachments = function_result.get("attachments", [])
+            # Step 1: ALWAYS run RAG retrieval first — this is the primary response path
+            if top_k:
+                self.query_engine.retriever.similarity_top_k = top_k
 
-            # If tools were called, use the tool response instead of RAG query
-            if function_result.get("has_tool_calls"):
-                response_text = function_result.get(
-                    "tool_response", "Tool executed successfully."
+            full_query = query_text
+            if conversation_history:
+                full_query = (
+                    f"{conversation_history}\n\nCurrent query: {query_text}"
                 )
-                sources = []
-                logger.info("Using tool response instead of RAG query")
-            else:
-                # Update top_k if provided
-                if top_k:
-                    self.query_engine.retriever.similarity_top_k = top_k
+                logger.debug("Added conversation history to RAG query")
 
-                # Build query with conversation history if available
-                full_query = query_text
-                if conversation_history:
-                    full_query = (
-                        f"{conversation_history}\n\nCurrent query: {query_text}"
+            response = self.query_engine.query(full_query)
+            response_text = str(response)
+
+            # Extract source information
+            sources = []
+            if hasattr(response, "source_nodes"):
+                all_sources = []
+                for node in response.source_nodes:
+                    source_info = {
+                        "filename": node.metadata.get("filename", "Unknown"),
+                        "score": node.score,
+                        "text_preview": (
+                            node.text[:200] + "..."
+                            if len(node.text) > 200
+                            else node.text
+                        ),
+                        "source_type": node.metadata.get("source_type", "Unknown"),
+                        "sender": node.metadata.get("sender"),
+                        "subject": node.metadata.get("subject"),
+                        "date": node.metadata.get("date"),
+                    }
+                    all_sources.append(source_info)
+
+                # Deduplicate sources by filename/subject, keeping highest score
+                logger.info(
+                    f"Before deduplication: {len(all_sources)} source nodes"
+                )
+                seen = {}
+                for source in all_sources:
+                    if source.get("subject") and source.get("sender"):
+                        key = (source["subject"], source["sender"])
+                    else:
+                        key = source["filename"]
+                    if key not in seen or source["score"] > seen[key]["score"]:
+                        seen[key] = source
+
+                sources = sorted(
+                    seen.values(), key=lambda x: x["score"], reverse=True
+                )
+                logger.info(
+                    f"After deduplication: {len(sources)} unique sources from {len(seen)} unique keys"
+                )
+
+            # Step 2: Check for tool calls (calendar, exports) — attachments only
+            # The RAG response text and sources are ALWAYS the primary answer.
+            # Tools can only ADD attachments (calendar files, exports) alongside.
+            attachments = []
+            skip_email_reply = False
+            if self.enable_function_calling and self.tools:
+                function_result = self._check_for_function_calls(
+                    query_text, conversation_history
+                )
+                if function_result.get("has_tool_calls"):
+                    attachments = function_result.get("attachments", [])
+                    skip_email_reply = function_result.get(
+                        "skip_email_reply", False
                     )
-                    logger.debug("Added conversation history to RAG query")
-
-                # Execute query
-                response = self.query_engine.query(full_query)
-                response_text = str(response)
-
-                # Extract source information
-                sources = []
-                if hasattr(response, "source_nodes"):
-                    # Build all sources first
-                    all_sources = []
-                    for node in response.source_nodes:
-                        source_info = {
-                            "filename": node.metadata.get("filename", "Unknown"),
-                            "score": node.score,
-                            "text_preview": (
-                                node.text[:200] + "..."
-                                if len(node.text) > 200
-                                else node.text
-                            ),
-                            "source_type": node.metadata.get("source_type", "Unknown"),
-                            # Additional metadata for emails
-                            "sender": node.metadata.get("sender"),
-                            "subject": node.metadata.get("subject"),
-                            "date": node.metadata.get("date"),
-                        }
-                        all_sources.append(source_info)
-
-                    # Deduplicate sources by filename/subject, keeping highest score
-                    # Use filename for files, subject for emails
-                    logger.info(
-                        f"Before deduplication: {len(all_sources)} source nodes"
-                    )
-                    seen = {}
-                    for source in all_sources:
-                        # Create unique key based on source type
-                        if source.get("subject") and source.get("sender"):
-                            # Email source - use subject+sender as key
-                            key = (source["subject"], source["sender"])
-                        else:
-                            # File source - use filename as key
-                            key = source["filename"]
-
-                        # Keep only the highest scoring source for each unique document
-                        if key not in seen or source["score"] > seen[key]["score"]:
-                            seen[key] = source
-
-                    # Convert back to list, sorted by score (highest first)
-                    sources = sorted(
-                        seen.values(), key=lambda x: x["score"], reverse=True
-                    )
-                    logger.info(
-                        f"After deduplication: {len(sources)} unique sources from {len(seen)} unique keys"
-                    )
+                    if attachments:
+                        logger.info(
+                            f"Tool produced {len(attachments)} attachment(s) — "
+                            "appending to RAG response"
+                        )
 
             result = {
                 "response": response_text,
@@ -441,7 +436,7 @@ class RAGEngine:
                     "num_sources": len(sources),
                     "num_attachments": len(attachments),
                     "query_length": len(query_text),
-                    "skip_email_reply": function_result.get("skip_email_reply", False),
+                    "skip_email_reply": skip_email_reply,
                 },
             }
 

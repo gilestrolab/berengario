@@ -481,7 +481,11 @@ class EmailProcessor:
                             delete=False,
                             dir=str(temp_dir),
                         )
-                        temp_file.write(body_text)
+                        # Clean URLs/mailto links for better KB chunking
+                        from src.email.email_parser import EmailParser
+
+                        clean_body = EmailParser.clean_text_for_kb(body_text)
+                        temp_file.write(clean_body)
                         temp_file.close()
 
                         # Check if email body content already exists in KB

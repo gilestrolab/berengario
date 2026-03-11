@@ -287,6 +287,39 @@ class EmailParser:
             logger.error(f"Error converting HTML to text: {e}")
             return ""
 
+    @staticmethod
+    def clean_text_for_kb(text: str) -> str:
+        """
+        Clean email text for knowledge base ingestion.
+
+        Strips inline URLs and mailto links that add no semantic value
+        for RAG retrieval but bloat chunk sizes and create bad split points.
+        Preserves the human-readable link text (e.g., "Report and Support").
+
+        Handles both:
+        - Angle-bracket URLs from plain text emails: <https://...>, <mailto:...>
+        - Markdown mailto links from HTML conversion: [text](mailto:...)
+
+        Args:
+            text: Email body text.
+
+        Returns:
+            Cleaned text with URLs removed.
+        """
+        if not text:
+            return text
+        # Remove angle-bracket URLs: <https://example.com/path>
+        text = re.sub(r"<https?://[^>]+>", "", text)
+        # Remove angle-bracket mailto: <mailto:user@example.com>
+        text = re.sub(r"<mailto:[^>]+>", "", text)
+        # Remove markdown mailto links: [text](mailto:email)
+        text = re.sub(r"\[([^\]]+)\]\(mailto:[^)]+\)", r"\1", text)
+        # Collapse multiple spaces left by URL removal
+        text = re.sub(r"  +", " ", text)
+        # Clean up lines that are just whitespace
+        text = re.sub(r"\n +\n", "\n\n", text)
+        return text
+
     def strip_signature(self, text: str) -> str:
         """
         Remove email signature from body text.

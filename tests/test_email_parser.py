@@ -312,6 +312,32 @@ class TestEmailParser:
         assert "example.com" in text
         assert "our site" in text
 
+    def test_clean_text_for_kb_strips_urls(self):
+        """Test that clean_text_for_kb strips angle-bracket URLs and mailto links."""
+        from src.email.email_parser import EmailParser
+
+        text = (
+            "Report via Report and Support<https://report-and-support.imperial.ac.uk/> form.\n"
+            "Contact Dan Davis<mailto:dols.hod@imperial.ac.uk>, our Head of Department.\n"
+            "Also [Bob](mailto:bob@example.com) is available.\n"
+            "Visit https://example.com for more."
+        )
+        cleaned = EmailParser.clean_text_for_kb(text)
+
+        # Angle-bracket URLs removed
+        assert "<https://" not in cleaned
+        assert "<mailto:" not in cleaned
+        # Markdown mailto removed
+        assert "(mailto:" not in cleaned
+        # Display text preserved
+        assert "Report and Support" in cleaned
+        assert "Dan Davis" in cleaned
+        assert "Bob" in cleaned
+        # Bare URLs (no angle brackets) are preserved
+        assert "https://example.com" in cleaned
+        # No excessive whitespace
+        assert "  " not in cleaned
+
     def test_html_to_text_empty(self, parser):
         """Test HTML to text with empty input."""
         text = parser.html_to_text("")
