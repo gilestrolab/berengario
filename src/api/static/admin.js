@@ -1598,10 +1598,13 @@ class AdminPanel {
                 created_at: r.created_at,
             }));
 
-            // Pending first, then members sorted by email
+            // Pending first, then members sorted by role (admin > teacher > query) then email
+            const roleOrder = { admin: 0, teacher: 1, query: 2 };
+            const byRoleThenEmail = (a, b) =>
+                (roleOrder[a.role] ?? 99) - (roleOrder[b.role] ?? 99) || a.email.localeCompare(b.email);
             this.teamMembers = [
                 ...pending.sort((a, b) => a.email.localeCompare(b.email)),
-                ...normalized.sort((a, b) => a.email.localeCompare(b.email)),
+                ...normalized.sort(byRoleThenEmail),
             ];
             this.teamPage = 1;
             this.renderTeamMembers();
@@ -1680,7 +1683,6 @@ class AdminPanel {
                 <div class="team-member-row">
                     <div class="team-member-info">
                         <span class="team-member-email">${this.escapeHtml(m.email)}</span>
-                        <span class="role-badge role-${m.role}">${m.role}</span>
                     </div>
                     <div class="team-member-actions">
                         <select class="team-select role-select" data-user-id="${m.id}">
