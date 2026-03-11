@@ -244,18 +244,17 @@ class RAGEngine:
             # Check if there are tool calls
             if not hasattr(message, "tool_calls") or not message.tool_calls:
                 # No tools called, but check if this is an administrative query
-                # (team management, clarification requests, etc.)
-                # If so, use the LLM's response directly without RAG retrieval
+                # about user/team management. Only bypass RAG when the user's
+                # query itself contains admin keywords — never based on the
+                # LLM's speculative response content, which can false-positive
+                # on hedging words like "clarification" or "ambiguous".
                 if message.content:
                     query_lower = query_text.lower()
-                    response_lower = message.content.lower()
 
-                    # Check if query is about user/team management
                     admin_query_keywords = [
-                        "team",
                         "team member",
-                        "add to",
-                        "remove from",
+                        "add to team",
+                        "remove from team",
                         "list of users",
                         "grant access",
                         "revoke access",
@@ -264,24 +263,12 @@ class RAGEngine:
                         keyword in query_lower for keyword in admin_query_keywords
                     )
 
-                    # Check if response suggests administrative action or clarification
-                    admin_response_keywords = [
-                        "confirmation required",
-                        "please specify",
-                        "which team",
-                        "clarification",
-                        "ambiguous",
-                    ]
-                    is_admin_response = any(
-                        keyword in response_lower for keyword in admin_response_keywords
-                    )
-
-                    if is_admin_query or is_admin_response:
+                    if is_admin_query:
                         logger.info(
-                            "Administrative query/response detected - using direct LLM response without sources"
+                            "Administrative query detected - using direct LLM response without sources"
                         )
                         return {
-                            "has_tool_calls": True,  # Treat as tool-related (no sources)
+                            "has_tool_calls": True,
                             "tool_response": message.content,
                             "attachments": [],
                         }

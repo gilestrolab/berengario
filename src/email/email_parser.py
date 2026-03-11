@@ -272,6 +272,13 @@ class EmailParser:
 
         try:
             text = self.html_converter.handle(html)
+            # Simplify mailto: markdown links to plain email addresses
+            # [user@example.com](mailto:user@example.com) → user@example.com
+            text = re.sub(
+                r"\[([^\]]+)\]\(mailto:[^)]+\)",
+                r"\1",
+                text,
+            )
             # Clean up excessive newlines
             text = re.sub(r"\n{3,}", "\n\n", text)
             return text.strip()

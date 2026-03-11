@@ -294,6 +294,24 @@ class TestEmailParser:
         assert "this link" in text
         assert "example.com" in text
 
+    def test_html_to_text_mailto_links_simplified(self, parser):
+        """Test that mailto: links are simplified to plain email addresses."""
+        html = (
+            '<p>From: <a href="mailto:alice@example.com">alice@example.com</a></p>'
+            '<p>Contact <a href="mailto:bob@example.com">Bob Smith</a> or '
+            'visit <a href="https://example.com">our site</a></p>'
+        )
+        text = parser.html_to_text(html)
+
+        # mailto links should be simplified (no markdown syntax)
+        assert "[alice@example.com]" not in text
+        assert "alice@example.com" in text
+        assert "Bob Smith" in text
+        assert "(mailto:" not in text
+        # HTTP links should be preserved as markdown
+        assert "example.com" in text
+        assert "our site" in text
+
     def test_html_to_text_empty(self, parser):
         """Test HTML to text with empty input."""
         text = parser.html_to_text("")
