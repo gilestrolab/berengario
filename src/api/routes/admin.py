@@ -1509,6 +1509,7 @@ def create_admin_router(
                 },
                 "llm": {
                     "model": settings.openrouter_model,
+                    "fallback_model": settings.openrouter_fallback_model,
                     "api_base": settings.openrouter_api_base,
                     "provider": (
                         "Naga.ac"

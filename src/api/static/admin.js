@@ -1094,6 +1094,12 @@ class AdminPanel {
                     <span class="model-detail-label">Model:</span>
                     <span class="model-detail-value">${this.escapeHtml(data.llm.model)}</span>
                 </div>
+                ${data.llm.fallback_model ? `
+                <div class="model-detail">
+                    <span class="model-detail-label">Fallback Model:</span>
+                    <span class="model-detail-value">${this.escapeHtml(data.llm.fallback_model)}</span>
+                </div>
+                ` : ''}
                 <div class="model-detail">
                     <span class="model-detail-label">Provider:</span>
                     <span class="model-detail-value">${this.escapeHtml(data.llm.provider)}</span>
