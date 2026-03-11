@@ -15,13 +15,22 @@ from src.api.auth.session_manager import Session, SessionManager
 from src.api.routes.auth import create_auth_router
 
 
-def _make_settings(multi_tenant=True, disable_otp=True):
+def _make_settings(
+    multi_tenant=True,
+    disable_otp=True,
+    email_target_address="ask@testbot.example.com",
+    email_teach_address=None,
+    platform_domain=None,
+):
     """Create mock settings."""
     s = MagicMock()
     s.multi_tenant = multi_tenant
     s.disable_otp_for_dev = disable_otp
     s.instance_name = "TestBot"
     s.organization = "TestOrg"
+    s.email_target_address = email_target_address
+    s.email_teach_address = email_teach_address
+    s.platform_domain = platform_domain
     return s
 
 
@@ -82,6 +91,91 @@ def _create_test_app(settings_override=None, platform_db=None):
     )
     app.include_router(router)
     return app, session_manager
+
+
+class TestOTPBotEmailBlocking:
+    """Tests that OTP requests are blocked for bot/platform email addresses."""
+
+    def test_blocks_bot_target_address(self):
+        """OTP request for the bot's own email address is rejected."""
+        settings = _make_settings(email_target_address="ask@berengar.io")
+        app, _ = _create_test_app(settings_override=settings)
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/auth/request-otp",
+            json={"email": "ask@berengar.io"},
+        )
+        data = response.json()
+        assert data["success"] is False
+        assert "cannot be used for login" in data["message"]
+
+    def test_blocks_bot_teach_address(self):
+        """OTP request for the teach address is rejected."""
+        settings = _make_settings(
+            email_target_address="ask@berengar.io",
+            email_teach_address="teach@berengar.io",
+        )
+        app, _ = _create_test_app(settings_override=settings)
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/auth/request-otp",
+            json={"email": "teach@berengar.io"},
+        )
+        data = response.json()
+        assert data["success"] is False
+        assert "cannot be used for login" in data["message"]
+
+    def test_blocks_any_platform_domain_email(self):
+        """OTP request for any @platform_domain email is rejected."""
+        settings = _make_settings(
+            email_target_address="ask@berengar.io",
+            platform_domain="berengar.io",
+        )
+        app, _ = _create_test_app(settings_override=settings)
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/auth/request-otp",
+            json={"email": "anything@berengar.io"},
+        )
+        data = response.json()
+        assert data["success"] is False
+        assert "cannot be used for login" in data["message"]
+
+    def test_blocks_case_insensitive(self):
+        """Bot email blocking is case-insensitive."""
+        settings = _make_settings(
+            email_target_address="Ask@Berengar.IO",
+            platform_domain="Berengar.IO",
+        )
+        app, _ = _create_test_app(settings_override=settings)
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/auth/request-otp",
+            json={"email": "ASK@BERENGAR.IO"},
+        )
+        data = response.json()
+        assert data["success"] is False
+
+    def test_allows_normal_email_with_platform_domain_set(self):
+        """Normal user emails are still allowed when platform_domain is set."""
+        settings = _make_settings(
+            email_target_address="ask@berengar.io",
+            platform_domain="berengar.io",
+        )
+        platform_db = _make_platform_db(tenant_users=[])
+        app, _ = _create_test_app(settings_override=settings, platform_db=platform_db)
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/auth/request-otp",
+            json={"email": "user@example.com"},
+        )
+        data = response.json()
+        assert data["success"] is True
 
 
 class TestMTRequestOTP:

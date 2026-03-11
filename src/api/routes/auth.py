@@ -96,6 +96,25 @@ def create_auth_router(
         """
         email = request.email.lower()
 
+        # Block OTP requests for the bot's own email addresses to prevent
+        # email loops (OTP → bot inbox → processing → reply → ...)
+        bot_addresses = {settings.email_target_address.lower()}
+        if settings.email_teach_address:
+            bot_addresses.add(settings.email_teach_address.lower())
+        platform_domain = getattr(settings, "platform_domain", None)
+
+        if email in bot_addresses or (
+            platform_domain and email.endswith(f"@{platform_domain.lower()}")
+        ):
+            logger.warning(
+                f"OTP request blocked for bot/platform email: {email}"
+            )
+            return AuthResponse(
+                success=False,
+                message="This email address cannot be used for login. "
+                "Please use your personal or work email address.",
+            )
+
         if settings.multi_tenant:
             # MT mode: allow any email (unknown users enter onboarding flow)
             pass
