@@ -23,14 +23,24 @@ from src.config import settings
 from src.email.db_manager import db_manager
 from src.email.message_tracker import MessageTracker
 
-# Initialize message tracker instance
-message_tracker = MessageTracker()
-
 # Setup logging
 logger = logging.getLogger(__name__)
 
 # Create Typer app for DB commands
 app = typer.Typer(help="Database operations")
+
+
+def _get_db_session_manager(ctx: typer.Context):
+    """Get tenant-aware DB session manager, or default db_manager.
+
+    In MT mode, the ConversationManager's db_manager points to the
+    tenant-specific database (via TenantDBSessionAdapter).
+    """
+    obj = ctx.ensure_object(dict)
+    components = obj.get("components")
+    if components:
+        return components.conversation_manager.db_manager
+    return db_manager
 
 
 @app.command("init")
@@ -122,6 +132,7 @@ def show_info():
 
 @app.command("stats")
 def show_stats(
+    ctx: typer.Context,
     days: int = typer.Option(
         7, "--days", "-d", help="Number of days to show stats for"
     ),
@@ -132,6 +143,8 @@ def show_stats(
     Displays message processing statistics, conversation counts, and more.
     """
     try:
+        tenant_db = _get_db_session_manager(ctx)
+        message_tracker = MessageTracker()
         print_header("Database Statistics")
 
         # Get processing stats
@@ -155,7 +168,7 @@ def show_stats(
 
         # Get daily stats
         cutoff_date = datetime.now() - timedelta(days=days)
-        with db_manager.get_session() as session:
+        with tenant_db.get_session() as session:
             from src.email.db_models import ProcessingStats
 
             recent_stats = (
@@ -187,7 +200,7 @@ def show_stats(
         console.print()
         console.print("  [bold cyan]Conversations:[/bold cyan]")
 
-        with db_manager.get_session() as session:
+        with tenant_db.get_session() as session:
             from src.email.db_models import Conversation, ConversationMessage
 
             total_conversations = session.query(Conversation).count()
@@ -218,6 +231,7 @@ def show_stats(
 
 @app.command("cleanup")
 def cleanup_records(
+    ctx: typer.Context,
     days: int = typer.Option(
         90, "--days", "-d", help="Delete records older than N days"
     ),
@@ -230,6 +244,7 @@ def cleanup_records(
     unbounded database growth. Daily aggregate statistics are kept.
     """
     try:
+        message_tracker = MessageTracker()
         print_header("Database Cleanup")
 
         print_info(f"Will delete message records older than {days} days")

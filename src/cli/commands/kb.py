@@ -27,9 +27,6 @@ from src.config import settings
 from src.document_processing.document_processor import DocumentProcessor
 from src.document_processing.kb_manager import KnowledgeBaseManager
 
-# Initialize KB manager instance
-kb_manager = KnowledgeBaseManager()
-
 # Setup logging
 logger = logging.getLogger(__name__)
 
@@ -37,14 +34,51 @@ logger = logging.getLogger(__name__)
 app = typer.Typer(help="Knowledge Base operations")
 
 
+def _get_kb_manager(ctx: typer.Context) -> KnowledgeBaseManager:
+    """Get tenant-aware KnowledgeBaseManager from context, or default."""
+    obj = ctx.ensure_object(dict)
+    components = obj.get("components")
+    if components:
+        return components.kb_manager
+    return KnowledgeBaseManager()
+
+
+def _get_doc_processor(ctx: typer.Context) -> DocumentProcessor:
+    """Get tenant-aware DocumentProcessor from context, or default."""
+    obj = ctx.ensure_object(dict)
+    components = obj.get("components")
+    if components:
+        return components.doc_processor
+    return DocumentProcessor()
+
+
+def _get_documents_path(ctx: typer.Context):
+    """Get tenant-aware documents path from context, or default."""
+    obj = ctx.ensure_object(dict)
+    components = obj.get("components")
+    if components:
+        return components.context.documents_path
+    return settings.documents_path
+
+
+def _get_chroma_db_path(ctx: typer.Context):
+    """Get tenant-aware ChromaDB path from context, or default."""
+    obj = ctx.ensure_object(dict)
+    components = obj.get("components")
+    if components:
+        return components.context.chroma_db_path
+    return settings.chroma_db_path
+
+
 @app.command("list")
-def list_documents():
+def list_documents(ctx: typer.Context):
     """
     List all documents in the knowledge base.
 
     Displays a table with filename, hash, chunks, source type, and file type.
     """
     try:
+        kb_manager = _get_kb_manager(ctx)
         print_header("Knowledge Base Documents")
 
         # Get documents from KB
@@ -81,13 +115,14 @@ def list_documents():
 
 
 @app.command("stats")
-def show_stats():
+def show_stats(ctx: typer.Context):
     """
     Show knowledge base statistics.
 
     Displays total documents, chunks, and other metadata.
     """
     try:
+        kb_manager = _get_kb_manager(ctx)
         print_header("Knowledge Base Statistics")
 
         # Get documents
@@ -127,7 +162,7 @@ def show_stats():
             print_key_value(f"  {ftype}", str(count), key_width=15)
 
         # KB storage info
-        kb_path = settings.chroma_db_path
+        kb_path = _get_chroma_db_path(ctx)
         if kb_path.exists():
             # Calculate directory size
             total_size = sum(
@@ -144,7 +179,7 @@ def show_stats():
 
 
 @app.command("reingest")
-def reingest_documents():
+def reingest_documents(ctx: typer.Context):
     """
     Reingest all documents from data/documents/ directory.
 
@@ -152,10 +187,11 @@ def reingest_documents():
     Shows progress with a progress bar.
     """
     try:
+        kb_manager = _get_kb_manager(ctx)
         print_header("Reingesting Documents")
 
         # Get documents directory
-        documents_path = settings.documents_path
+        documents_path = _get_documents_path(ctx)
 
         if not documents_path.exists():
             print_error(f"Documents directory not found: {documents_path}")
@@ -178,7 +214,7 @@ def reingest_documents():
         console.print()
 
         # Initialize processor
-        processor = DocumentProcessor()
+        processor = _get_doc_processor(ctx)
 
         # Process files with progress bar
         success_count = 0
@@ -227,6 +263,7 @@ def reingest_documents():
 
 @app.command("delete")
 def delete_document(
+    ctx: typer.Context,
     hash: str = typer.Argument(..., help="File hash (SHA-256) of document to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
 ):
@@ -236,6 +273,7 @@ def delete_document(
     Use 'kb list' to find document hashes.
     """
     try:
+        kb_manager = _get_kb_manager(ctx)
         # Get document info first
         documents = kb_manager.get_unique_documents()
         doc = next(
@@ -265,6 +303,7 @@ def delete_document(
 
 @app.command("clear")
 def clear_knowledge_base(
+    ctx: typer.Context,
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
 ):
     """
@@ -273,6 +312,7 @@ def clear_knowledge_base(
     WARNING: This will delete ALL documents and cannot be undone!
     """
     try:
+        kb_manager = _get_kb_manager(ctx)
         # Get current stats
         documents = kb_manager.get_unique_documents()
         doc_count = len(documents)
@@ -300,6 +340,7 @@ def clear_knowledge_base(
 
 @app.command("regenerate-descriptions")
 def regenerate_descriptions(
+    ctx: typer.Context,
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
 ):
     """
@@ -310,6 +351,7 @@ def regenerate_descriptions(
     try:
         from src.document_processing.description_generator import DescriptionGenerator
 
+        kb_manager = _get_kb_manager(ctx)
         print_header("Regenerate Document Descriptions")
 
         # Get all unique documents
@@ -332,8 +374,15 @@ def regenerate_descriptions(
             ):
                 return
 
-        # Initialize description generator
-        desc_gen = DescriptionGenerator()
+        # Initialize description generator (tenant-aware)
+        obj = ctx.ensure_object(dict)
+        components = obj.get("components")
+        if components:
+            desc_gen = DescriptionGenerator(
+                db_manager=components.conversation_manager.db_manager
+            )
+        else:
+            desc_gen = DescriptionGenerator()
 
         # Regenerate descriptions
         success_count = 0
@@ -400,6 +449,7 @@ def regenerate_descriptions(
 
 @app.command("query")
 def query_kb(
+    ctx: typer.Context,
     query: str = typer.Argument(..., help="Question to ask the knowledge base"),
     show_sources: bool = typer.Option(
         True, "--sources/--no-sources", help="Show source documents"
@@ -419,8 +469,13 @@ def query_kb(
         console.print(f"[bold]Question:[/bold] {query}")
         console.print()
 
-        # Create query handler
-        handler = QueryHandler()
+        # Create query handler (tenant-aware)
+        obj = ctx.ensure_object(dict)
+        components = obj.get("components")
+        if components:
+            handler = components.query_handler
+        else:
+            handler = QueryHandler()
 
         # Process query
         with console.status("[bold cyan]Searching knowledge base...", spinner="dots"):

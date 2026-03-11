@@ -6,6 +6,7 @@ Provides unified command-line access to knowledge base, database, and backup ope
 
 import logging
 import sys
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -39,10 +40,17 @@ console = Console()
 
 @app.callback()
 def main(
+    ctx: typer.Context,
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="Enable verbose output"
     ),
     debug: bool = typer.Option(False, "--debug", help="Enable debug logging"),
+    tenant: Optional[str] = typer.Option(
+        None,
+        "--tenant",
+        "-t",
+        help="Tenant slug for multi-tenant operations (e.g., 'dolsgpt')",
+    ),
 ):
     """
     Berengario CLI - Command-line administration tool.
@@ -50,10 +58,10 @@ def main(
     Use COMMAND --help for detailed help on each command group.
 
     Examples:
-        berengario kb list              # List all documents
-        berengario kb reingest          # Reingest all documents
-        berengario db init              # Initialize database
-        berengario backup create        # Create backup
+        berengario kb list                          # List all documents (ST mode)
+        berengario --tenant dolsgpt kb list          # List tenant documents (MT mode)
+        berengario db init                           # Initialize database
+        berengario backup create                     # Create backup
     """
     # Configure logging based on flags
     if debug:
@@ -62,6 +70,30 @@ def main(
     elif verbose:
         logging.getLogger().setLevel(logging.INFO)
         logger.info("Verbose logging enabled")
+
+    # Initialize context object for passing data to subcommands
+    ctx.ensure_object(dict)
+
+    if tenant:
+        from src.platform.bootstrap import bootstrap_platform
+        from src.platform.component_factory import TenantComponentFactory
+
+        try:
+            infra = bootstrap_platform()
+            factory = TenantComponentFactory(
+                storage_backend=infra.storage,
+                db_manager=infra.db_manager,
+            )
+            components = factory.get_components_for_slug(tenant)
+            ctx.obj["components"] = components
+            ctx.obj["tenant"] = tenant
+            logger.info(f"Tenant context initialized: {tenant}")
+        except ValueError as e:
+            print_error(f"Tenant error: {e}")
+            raise typer.Exit(1)
+        except Exception as e:
+            print_error(f"Failed to initialize tenant '{tenant}': {e}")
+            raise typer.Exit(1)
 
 
 @app.command("version")
