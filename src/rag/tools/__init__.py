@@ -22,7 +22,6 @@ from .context import (
 from .database_tools import query_analytics, query_conversation_history
 from .export_tools import create_json_file, create_text_file, export_to_csv
 from .rag_tools import rag_search
-from .team_tools import add_team_member, remove_team_member
 from .tool_executor import ToolExecutor
 from .web_search_tools import web_search
 
@@ -37,7 +36,6 @@ __all__ = [
     "export_to_csv",
     "create_text_file",
     "create_json_file",
-    "add_team_member",
     "clear_tool_context",
     "get_conversation_manager",
     "get_kb_manager",
@@ -49,7 +47,6 @@ __all__ = [
     "query_analytics",
     "query_conversation_history",
     "rag_search",
-    "remove_team_member",
     "set_tool_context",
     "validate_admin_access",
     "web_search",

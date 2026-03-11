@@ -243,36 +243,7 @@ class RAGEngine:
 
             # Check if there are tool calls
             if not hasattr(message, "tool_calls") or not message.tool_calls:
-                # No tools called, but check if this is an administrative query
-                # about user/team management. Only bypass RAG when the user's
-                # query itself contains admin keywords — never based on the
-                # LLM's speculative response content, which can false-positive
-                # on hedging words like "clarification" or "ambiguous".
-                if message.content:
-                    query_lower = query_text.lower()
-
-                    admin_query_keywords = [
-                        "team member",
-                        "add to team",
-                        "remove from team",
-                        "list of users",
-                        "grant access",
-                        "revoke access",
-                    ]
-                    is_admin_query = any(
-                        keyword in query_lower for keyword in admin_query_keywords
-                    )
-
-                    if is_admin_query:
-                        logger.info(
-                            "Administrative query detected - using direct LLM response without sources"
-                        )
-                        return {
-                            "has_tool_calls": True,
-                            "tool_response": message.content,
-                            "attachments": [],
-                        }
-
+                # No tools were called — proceed to normal RAG retrieval
                 return {
                     "has_tool_calls": False,
                     "tool_response": None,
