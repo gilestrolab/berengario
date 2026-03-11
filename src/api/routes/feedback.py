@@ -141,11 +141,24 @@ def create_feedback_router(
             if not token or message_id is None:
                 raise HTTPException(status_code=400, detail="Missing required fields")
 
-            decoded_message_id = decode_feedback_token(token)
+            decoded_message_id, tenant_slug = decode_feedback_token(token)
             if decoded_message_id != message_id:
                 raise HTTPException(status_code=400, detail="Invalid feedback token")
 
-            with conversation_manager.db_manager.get_session() as db_session:
+            # Resolve the correct conversation manager for the tenant
+            cm = conversation_manager
+            if tenant_slug and component_resolver:
+                try:
+                    components = component_resolver._factory.get_components_for_slug(
+                        tenant_slug
+                    )
+                    cm = components.conversation_manager
+                except Exception as e:
+                    logger.warning(
+                        f"Could not resolve tenant '{tenant_slug}' for feedback: {e}"
+                    )
+
+            with cm.db_manager.get_session() as db_session:
                 _upsert_feedback(db_session, message_id, is_positive, comment)
 
             return FeedbackResponse(

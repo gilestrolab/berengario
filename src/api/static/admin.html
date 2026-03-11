@@ -2142,7 +2142,8 @@
         }
 
         .settings-form .form-group input,
-        .settings-form .form-group textarea {
+        .settings-form .form-group textarea,
+        .settings-form .form-group select {
             width: 100%;
             box-sizing: border-box;
             padding: 0.5rem 0.65rem;
@@ -2155,7 +2156,8 @@
         }
 
         .settings-form .form-group input:focus,
-        .settings-form .form-group textarea:focus {
+        .settings-form .form-group textarea:focus,
+        .settings-form .form-group select:focus {
             outline: none;
             border-color: var(--primary-color, #7A5C3E);
             box-shadow: 0 0 0 2px rgba(122, 92, 62, 0.12);
@@ -2447,6 +2449,15 @@
                         <label for="team-desc-input">Description</label>
                         <textarea id="team-desc-input" rows="2"
                             placeholder="Describe what this team's knowledge base is about..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="team-email-format">Email Response Format</label>
+                        <select id="team-email-format">
+                            <option value="">Default (from server config)</option>
+                            <option value="html">HTML (styled)</option>
+                            <option value="markdown">Markdown</option>
+                            <option value="text">Plain Text</option>
+                        </select>
                     </div>
                     <button class="save-btn" id="save-team-settings-btn">
                         <i class="fas fa-save"></i> Save Settings

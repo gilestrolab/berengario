@@ -237,6 +237,7 @@ class TenantSettingsRequest(BaseModel):
     join_approval_required: Optional[bool] = None
     description: Optional[str] = None
     organization: Optional[str] = None
+    email_response_format: Optional[str] = None
 
 
 class JoinRequestActionResponse(BaseModel):

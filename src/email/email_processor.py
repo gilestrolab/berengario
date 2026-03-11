@@ -309,6 +309,8 @@ class EmailProcessor:
                         from_address=settings.email_target_address,
                         from_name=ctx.email_display_name or ctx.instance_name,
                         is_admin=is_admin_user,
+                        email_response_format=ctx.email_response_format,
+                        tenant_slug=ctx.tenant_slug,
                     )
                 else:
                     result = self._process_for_kb_with(
@@ -820,6 +822,8 @@ class EmailProcessor:
         from_address: str,
         from_name: str,
         is_admin: bool = False,
+        email_response_format: Optional[str] = None,
+        tenant_slug: Optional[str] = None,
     ) -> ProcessingResult:
         """
         Process email as a query with tenant-specific components.
@@ -941,6 +945,8 @@ class EmailProcessor:
                 original_subject=email.subject,
                 message_id=reply_message_id,
                 organization=organization,
+                response_format=email_response_format,
+                tenant_slug=tenant_slug,
             )
 
             # Check if tool already sent an email (e.g., confirmation email)
@@ -1189,7 +1195,6 @@ The following material has been successfully processed:
             from_name: Override sender display name (for MT mode)
         """
         inst_name = instance_name or settings.instance_name
-        org = organization or settings.organization
 
         try:
             subject = f"Re: {email.subject}"

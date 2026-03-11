@@ -53,9 +53,15 @@ class FeedbackPage {
 
     decodeToken() {
         try {
-            // Decode base64 token to get message_id
+            // Decode base64 token to get optional tenant slug and message_id
+            // Token format: base64("slug:message_id") or base64("message_id")
             const decoded = atob(this.token.replace(/_/g, '/').replace(/-/g, '+'));
-            this.messageId = parseInt(decoded);
+            if (decoded.includes(':')) {
+                const lastColon = decoded.lastIndexOf(':');
+                this.messageId = parseInt(decoded.substring(lastColon + 1));
+            } else {
+                this.messageId = parseInt(decoded);
+            }
         } catch (error) {
             console.error('Failed to decode token:', error);
             this.showError('Invalid feedback link. Please use the link from your email.');

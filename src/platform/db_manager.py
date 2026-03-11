@@ -168,6 +168,12 @@ class TenantDBManager:
                 "paddle_subscription_scheduled_change JSON NULL"
             )
 
+        if "email_response_format" not in existing_columns:
+            migrations.append(
+                "ALTER TABLE tenants ADD COLUMN email_response_format "
+                "VARCHAR(16) NULL"
+            )
+
         if migrations:
             logger.info("Running billing column migrations on tenants table...")
             with self.platform_engine.connect() as conn:

@@ -89,6 +89,7 @@ class TenantContext:
     # Prompt and footer (text, not file paths)
     custom_prompt: Optional[str]
     email_footer: Optional[str]
+    email_response_format: str
 
     # Feature flags
     query_optimization_enabled: bool
@@ -161,6 +162,7 @@ class TenantContext:
             email_display_name=settings.email_display_name,
             custom_prompt=custom_prompt,
             email_footer=email_footer,
+            email_response_format=settings.email_response_format,
             query_optimization_enabled=settings.query_optimization_enabled,
             query_optimization_model=settings.query_optimization_model,
             doc_enhancement_enabled=settings.doc_enhancement_enabled,
@@ -246,6 +248,8 @@ class TenantContext:
             email_display_name=tenant.email_display_name or tenant.name,
             custom_prompt=tenant.custom_prompt,
             email_footer=tenant.email_footer,
+            email_response_format=tenant.email_response_format
+            or settings.email_response_format,
             query_optimization_enabled=settings.query_optimization_enabled,
             query_optimization_model=settings.query_optimization_model,
             doc_enhancement_enabled=settings.doc_enhancement_enabled,

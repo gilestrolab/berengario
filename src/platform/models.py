@@ -124,6 +124,7 @@ class Tenant(PlatformBase):
     # RAG config (per-tenant overrides, all nullable to fall back to defaults)
     custom_prompt = Column(Text, nullable=True)
     email_footer = Column(Text, nullable=True)
+    email_response_format = Column(String(16), nullable=True)
     chunk_size = Column(Integer, default=1024)
     chunk_overlap = Column(Integer, default=200)
     top_k_retrieval = Column(Integer, default=5)
@@ -253,6 +254,7 @@ class Tenant(PlatformBase):
             "chunk_overlap": self.chunk_overlap,
             "top_k_retrieval": self.top_k_retrieval,
             "similarity_threshold": self.similarity_threshold,
+            "email_response_format": self.email_response_format,
             "llm_model": self.llm_model,
             "plan": (self.plan.value if isinstance(self.plan, PlanTier) else self.plan),
             "subscription_status": (

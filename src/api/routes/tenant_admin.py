@@ -150,6 +150,17 @@ def create_tenant_admin_router(
                 tenant.organization = body.organization
                 updated_fields.append("organization")
 
+            if body.email_response_format is not None:
+                valid_formats = {"html", "markdown", "text", ""}
+                fmt = body.email_response_format.strip().lower()
+                if fmt not in valid_formats:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Invalid email_response_format: must be html, markdown, text, or empty",
+                    )
+                tenant.email_response_format = fmt if fmt else None
+                updated_fields.append("email_response_format")
+
             if updated_fields:
                 tenant.updated_at = datetime.utcnow()
 

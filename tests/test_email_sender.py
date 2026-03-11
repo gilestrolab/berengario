@@ -502,6 +502,63 @@ class TestFormatResponseEmail:
         assert 'class="sources"' in html
         assert "<h3>Sources:</h3>" in html
 
+    @patch("src.email.email_sender.settings")
+    def test_response_format_param_overrides_settings(self, mock_settings):
+        """Test that response_format parameter overrides global settings."""
+        mock_settings.email_response_format = "html"
+        mock_settings.email_custom_footer_file = None
+
+        response_text = "This is the answer."
+        sources = [{"filename": "doc.pdf", "score": 0.9}]
+
+        # Global says html, but we pass text explicitly
+        _, plain, html = format_response_email(
+            response_text,
+            sources,
+            "TestBot",
+            "Question",
+            response_format="text",
+        )
+
+        # Should use text format (plain text with <pre>), not html
+        assert "<pre>" in html
+        assert "<style>" not in html
+
+    @patch("src.email.email_sender.settings")
+    def test_response_format_param_markdown(self, mock_settings):
+        """Test response_format parameter with markdown value."""
+        mock_settings.email_response_format = "html"
+        mock_settings.email_custom_footer_file = None
+
+        _, plain, html = format_response_email(
+            "Answer.",
+            [{"filename": "doc.pdf", "score": 0.9}],
+            "TestBot",
+            "Question",
+            response_format="markdown",
+        )
+
+        assert "## Sources" in plain
+        assert "<pre>" in html
+
+    @patch("src.email.email_sender.settings")
+    def test_response_format_none_uses_settings(self, mock_settings):
+        """Test that response_format=None falls back to settings."""
+        mock_settings.email_response_format = "text"
+        mock_settings.email_custom_footer_file = None
+
+        _, plain, html = format_response_email(
+            "Answer.",
+            [{"filename": "doc.pdf", "score": 0.9}],
+            "TestBot",
+            "Question",
+            response_format=None,
+        )
+
+        # Should use text format from settings
+        assert "<pre>" in html
+        assert "<style>" not in html
+
 
 class TestLoadCustomFooter:
     """Test suite for load_custom_footer function."""

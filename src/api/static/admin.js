@@ -1978,9 +1978,12 @@ class AdminPanel {
             const slugInput = document.getElementById('team-slug-input');
             const preview = document.getElementById('slug-email-preview');
 
+            const emailFormatSelect = document.getElementById('team-email-format');
+
             if (nameInput) nameInput.value = data.name || '';
             if (orgInput) orgInput.value = data.organization || '';
             if (descInput) descInput.value = data.description || '';
+            if (emailFormatSelect) emailFormatSelect.value = data.email_response_format || '';
             if (slugInput) {
                 slugInput.value = data.slug || '';
                 slugInput.readOnly = true;
@@ -1997,10 +2000,12 @@ class AdminPanel {
     async saveTeamSettings() {
         const orgInput = document.getElementById('team-org-input');
         const descInput = document.getElementById('team-desc-input');
+        const emailFormatSelect = document.getElementById('team-email-format');
 
         const body = {};
         if (orgInput) body.organization = orgInput.value.trim();
         if (descInput) body.description = descInput.value.trim();
+        if (emailFormatSelect) body.email_response_format = emailFormatSelect.value;
 
         try {
             const resp = await fetch('/api/admin/tenant/settings', {

@@ -21,41 +21,48 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 
-def generate_feedback_token(message_id: int) -> str:
+def generate_feedback_token(message_id: int, tenant_slug: Optional[str] = None) -> str:
     """
-    Generate a URL-safe token from a message ID.
+    Generate a URL-safe token from a message ID and optional tenant slug.
 
     Args:
         message_id: Database ID of the conversation message
+        tenant_slug: Tenant slug for multi-tenant mode (optional)
 
     Returns:
         Base64-encoded token for use in feedback URLs
     """
-    # Convert message_id to string and encode to base64
-    token = base64.urlsafe_b64encode(str(message_id).encode()).decode()
+    payload = f"{tenant_slug}:{message_id}" if tenant_slug else str(message_id)
+    token = base64.urlsafe_b64encode(payload.encode()).decode()
     return token
 
 
-def decode_feedback_token(token: str) -> Optional[int]:
+def decode_feedback_token(token: str) -> tuple[Optional[int], Optional[str]]:
     """
-    Decode a feedback token to get the message ID.
+    Decode a feedback token to get the message ID and optional tenant slug.
 
     Args:
         token: Base64-encoded token
 
     Returns:
-        Message ID as integer, or None if invalid
+        Tuple of (message_id, tenant_slug). tenant_slug is None for
+        legacy single-tenant tokens.
     """
     try:
         decoded = base64.urlsafe_b64decode(token.encode()).decode()
-        return int(decoded)
+        if ":" in decoded:
+            slug, mid = decoded.rsplit(":", 1)
+            return int(mid), slug
+        return int(decoded), None
     except (ValueError, Exception) as e:
         logger.warning(f"Failed to decode feedback token: {e}")
-        return None
+        return None, None
 
 
 def generate_feedback_urls(
-    message_id: int, base_url: Optional[str] = None
+    message_id: int,
+    base_url: Optional[str] = None,
+    tenant_slug: Optional[str] = None,
 ) -> Dict[str, str]:
     """
     Generate feedback URLs for thumbs up/down.
@@ -63,6 +70,7 @@ def generate_feedback_urls(
     Args:
         message_id: Database ID of the conversation message
         base_url: Base URL for the web interface (defaults to settings)
+        tenant_slug: Tenant slug for multi-tenant mode (optional)
 
     Returns:
         Dictionary with 'positive' and 'negative' URLs
@@ -71,7 +79,7 @@ def generate_feedback_urls(
     if not base_url:
         base_url = settings.web_base_url
 
-    token = generate_feedback_token(message_id)
+    token = generate_feedback_token(message_id, tenant_slug=tenant_slug)
 
     return {
         "positive": f"{base_url}/feedback?token={token}&rating=positive",
@@ -84,6 +92,7 @@ def load_custom_footer(
     message_id: Optional[int] = None,
     custom_footer_file=None,
     organization: Optional[str] = None,
+    tenant_slug: Optional[str] = None,
 ) -> tuple[str, str]:
     """
     Load custom footer or use default, optionally with feedback links.
@@ -103,7 +112,7 @@ def load_custom_footer(
     feedback_html = ""
 
     if message_id:
-        feedback_urls = generate_feedback_urls(message_id)
+        feedback_urls = generate_feedback_urls(message_id, tenant_slug=tenant_slug)
         feedback_plain = f"\n\nWas this response helpful?\nYes: {feedback_urls['positive']}\nNo: {feedback_urls['negative']}"
 
         feedback_html = f"""
@@ -397,6 +406,8 @@ def format_response_email(
     original_subject: str,
     message_id: Optional[int] = None,
     organization: Optional[str] = None,
+    response_format: Optional[str] = None,
+    tenant_slug: Optional[str] = None,
 ) -> tuple[str, str, str]:
     """
     Format RAG response into email-friendly text and HTML.
@@ -413,6 +424,8 @@ def format_response_email(
         original_subject: Original email subject
         message_id: Optional database message ID for feedback links
         organization: Organization name for footer signature.
+        response_format: Email format override (html/markdown/text).
+        tenant_slug: Tenant slug for multi-tenant feedback tokens.
 
     Returns:
         Tuple of (subject, plain_text_body, html_body).
@@ -425,11 +438,14 @@ def format_response_email(
 
     # Load custom footer with optional feedback links
     plain_footer, html_footer = load_custom_footer(
-        instance_name, message_id, organization=organization
+        instance_name,
+        message_id,
+        organization=organization,
+        tenant_slug=tenant_slug,
     )
 
-    # Get email format from settings
-    email_format = settings.email_response_format.lower()
+    # Get email format: explicit parameter > global settings
+    email_format = (response_format or settings.email_response_format).lower()
 
     # Format based on selected format
     if email_format == "text":

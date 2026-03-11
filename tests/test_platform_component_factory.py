@@ -40,6 +40,7 @@ def _make_context(slug: str = "test", tmp_path: Path = Path("/tmp")) -> TenantCo
         organization=f"{slug} org",
         custom_prompt=None,
         email_footer=None,
+        email_response_format="html",
         query_optimization_enabled=False,
         query_optimization_model=None,
         doc_enhancement_enabled=False,
