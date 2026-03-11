@@ -325,6 +325,7 @@ class EmailProcessor:
                         tenant_slug=ctx.tenant_slug,
                         from_address=settings.email_target_address,
                         from_name=ctx.email_display_name or ctx.instance_name,
+                        conversation_manager=components.conversation_manager,
                     )
 
                 if result.success:
@@ -427,6 +428,7 @@ class EmailProcessor:
         tenant_slug: Optional[str] = None,
         from_address: Optional[str] = None,
         from_name: Optional[str] = None,
+        conversation_manager=None,
     ) -> ProcessingResult:
         """
         Process email for KB ingestion with tenant-specific components.
@@ -564,6 +566,15 @@ class EmailProcessor:
                             f"Successfully added email body to KB: {chunks_created} chunks created"
                         )
 
+                        # Generate document description
+                        self._generate_description(
+                            file_path=descriptive_filename,
+                            filename=descriptive_filename,
+                            nodes=nodes,
+                            file_type="txt",
+                            conversation_manager=conversation_manager,
+                        )
+
                         # Persist email body to kb/emails/ for future reingestion
                         self._archive_file(
                             source_path=Path(temp_file.name),
@@ -685,6 +696,22 @@ class EmailProcessor:
                         processed_files.append(attachment)
                         logger.info(
                             f"Added {attachment.filename} to KB: {len(nodes)} chunks"
+                        )
+
+                        # Generate document description
+                        file_ext = Path(attachment.filename).suffix.lstrip(".")
+                        file_size = (
+                            attachment.filepath.stat().st_size
+                            if attachment.filepath.exists()
+                            else None
+                        )
+                        self._generate_description(
+                            file_path=attachment.filename,
+                            filename=attachment.filename,
+                            nodes=nodes,
+                            file_size=file_size,
+                            file_type=file_ext,
+                            conversation_manager=conversation_manager,
                         )
 
                         # Persist attachment to kb/documents/ for future reingestion
@@ -968,6 +995,39 @@ class EmailProcessor:
                 action="query",
             )
 
+    def _generate_description(
+        self,
+        file_path: str,
+        filename: str,
+        nodes,
+        file_size: Optional[int] = None,
+        file_type: Optional[str] = None,
+        conversation_manager=None,
+    ):
+        """Generate and save a document description for the admin panel."""
+        try:
+            from src.document_processing.description_generator import (
+                DescriptionGenerator,
+            )
+
+            # Use tenant-scoped DB if available
+            tenant_db = None
+            if conversation_manager:
+                tenant_db = getattr(conversation_manager, "db_manager", None)
+
+            desc_gen = DescriptionGenerator(db_manager=tenant_db)
+            desc_gen.generate_and_save(
+                file_path=file_path,
+                filename=filename,
+                chunks=nodes,
+                file_size=file_size,
+                file_type=file_type,
+            )
+            logger.info(f"Generated description for: {filename}")
+        except Exception as e:
+            # Don't fail ingestion if description generation fails
+            logger.error(f"Error generating description for {filename}: {e}")
+
     def _send_kb_acknowledgment(
         self,
         email: EmailMessage,
@@ -1135,42 +1195,38 @@ The following material has been successfully processed:
 
 Unfortunately, your email address ({email.sender.email}) is not authorized to query the knowledge base.
 
-If you believe you should have access, please contact the administrator at {org}.
+If you believe you should have access, please contact your administrator.
 
 ---
-{inst_name}
-{org}"""
+{inst_name}"""
 
                 body_html = f"""<p>Thank you for your message to <strong>{inst_name}</strong>.</p>
 
 <p>Unfortunately, your email address (<code>{email.sender.email}</code>) is not authorized to query the knowledge base.</p>
 
-<p>If you believe you should have access, please contact the administrator at <em>{org}</em>.</p>
+<p>If you believe you should have access, please contact your administrator.</p>
 
 <hr>
-<p><em>{inst_name}</em><br>
-<em>{org}</em></p>"""
+<p><em>{inst_name}</em></p>"""
 
             else:  # rejection_type == "teach"
                 body_text = f"""Thank you for your message to {inst_name}.
 
 Unfortunately, your email address ({email.sender.email}) is not authorized to add content to the knowledge base.
 
-If you believe you should have access, please contact the administrator at {org}.
+If you believe you should have access, please contact your administrator.
 
 ---
-{inst_name}
-{org}"""
+{inst_name}"""
 
                 body_html = f"""<p>Thank you for your message to <strong>{inst_name}</strong>.</p>
 
 <p>Unfortunately, your email address (<code>{email.sender.email}</code>) is not authorized to add content to the knowledge base.</p>
 
-<p>If you believe you should have access, please contact the administrator at <em>{org}</em>.</p>
+<p>If you believe you should have access, please contact your administrator.</p>
 
 <hr>
-<p><em>{inst_name}</em><br>
-<em>{org}</em></p>"""
+<p><em>{inst_name}</em></p>"""
 
             # Send rejection message
             self.email_sender.send_reply(

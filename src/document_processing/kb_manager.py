@@ -16,6 +16,8 @@ from llama_index.core.schema import TextNode
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
+from chromadb.errors import NotFoundError
+
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -109,6 +111,23 @@ class KnowledgeBaseManager:
                 embed_model=self.embed_model,
             )
 
+    def _refresh_collection(self) -> None:
+        """Re-fetch the ChromaDB collection and rebuild the index.
+
+        This recovers from stale collection references that occur when another
+        process (e.g. the app container) recreates the collection while this
+        process holds an old UUID in memory.
+        """
+        logger.warning("Refreshing ChromaDB collection reference")
+        self.collection = self.chroma_client.get_or_create_collection(
+            name=self.collection_name
+        )
+        self.vector_store = ChromaVectorStore(chroma_collection=self.collection)
+        self.storage_context = StorageContext.from_defaults(
+            vector_store=self.vector_store
+        )
+        self._initialize_index()
+
     def add_nodes(self, nodes: List[TextNode]) -> None:
         """
         Add text nodes to the knowledge base.
@@ -127,6 +146,11 @@ class KnowledgeBaseManager:
             # Insert nodes into index
             self.index.insert_nodes(nodes)
             logger.info(f"Added {len(nodes)} nodes to knowledge base")
+        except NotFoundError:
+            logger.warning("Collection not found, refreshing and retrying")
+            self._refresh_collection()
+            self.index.insert_nodes(nodes)
+            logger.info(f"Added {len(nodes)} nodes after collection refresh")
         except Exception as e:
             logger.error(f"Failed to add nodes to knowledge base: {e}")
             raise
@@ -143,6 +167,10 @@ class KnowledgeBaseManager:
         """
         try:
             # Query collection for documents with this hash
+            results = self.collection.get(where={"file_hash": file_hash})
+            return len(results["ids"]) > 0
+        except NotFoundError:
+            self._refresh_collection()
             results = self.collection.get(where={"file_hash": file_hash})
             return len(results["ids"]) > 0
         except Exception as e:
