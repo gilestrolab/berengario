@@ -10,13 +10,12 @@ from typing import List, Optional
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
+from chromadb.errors import NotFoundError
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.schema import TextNode
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
-
-from chromadb.errors import NotFoundError
 
 from src.config import settings
 

@@ -12,8 +12,8 @@ from llama_index.core.schema import TextNode
 from openai import OpenAI
 
 from src.config import settings
-from src.llm_utils import llm_call_with_fallback
 from src.email.db_models import DocumentDescription
+from src.llm_utils import llm_call_with_fallback
 
 logger = logging.getLogger(__name__)
 

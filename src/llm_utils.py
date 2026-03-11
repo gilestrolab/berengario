@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 
 from openai import OpenAI as OpenAIClient
+from openai.types.chat import ChatCompletion
 
 from src.config import settings
 
@@ -15,7 +16,7 @@ def llm_call_with_fallback(
     model: str,
     fallback_model: Optional[str] = None,
     **kwargs,
-) -> "openai.types.chat.ChatCompletion":
+) -> ChatCompletion:
     """
     Make an LLM API call with automatic fallback to a secondary model.
 
@@ -47,7 +48,15 @@ def llm_call_with_fallback(
         # Retry on server errors (5xx), rate limits (429), or timeout
         is_retriable = any(
             indicator in error_str
-            for indicator in ["500", "502", "503", "504", "429", "timeout", "overloaded"]
+            for indicator in [
+                "500",
+                "502",
+                "503",
+                "504",
+                "429",
+                "timeout",
+                "overloaded",
+            ]
         )
         if not is_retriable:
             raise

@@ -106,9 +106,7 @@ def create_auth_router(
         if email in bot_addresses or (
             platform_domain and email.endswith(f"@{platform_domain.lower()}")
         ):
-            logger.warning(
-                f"OTP request blocked for bot/platform email: {email}"
-            )
+            logger.warning(f"OTP request blocked for bot/platform email: {email}")
             return AuthResponse(
                 success=False,
                 message="This email address cannot be used for login. "

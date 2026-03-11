@@ -13,9 +13,8 @@ from typing import Optional
 from openai import OpenAI as OpenAIClient
 from openai import OpenAIError
 
-from src.llm_utils import llm_call_with_fallback
-
 from src.config import settings
+from src.llm_utils import llm_call_with_fallback
 
 logger = logging.getLogger(__name__)
 

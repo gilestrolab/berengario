@@ -405,9 +405,7 @@ class RAGEngine:
 
             full_query = query_text
             if conversation_history:
-                full_query = (
-                    f"{conversation_history}\n\nCurrent query: {query_text}"
-                )
+                full_query = f"{conversation_history}\n\nCurrent query: {query_text}"
                 logger.debug("Added conversation history to RAG query")
 
             response = self._query_with_fallback(full_query)
@@ -434,9 +432,7 @@ class RAGEngine:
                     all_sources.append(source_info)
 
                 # Deduplicate sources by filename/subject, keeping highest score
-                logger.info(
-                    f"Before deduplication: {len(all_sources)} source nodes"
-                )
+                logger.info(f"Before deduplication: {len(all_sources)} source nodes")
                 seen = {}
                 for source in all_sources:
                     if source.get("subject") and source.get("sender"):
@@ -446,9 +442,7 @@ class RAGEngine:
                     if key not in seen or source["score"] > seen[key]["score"]:
                         seen[key] = source
 
-                sources = sorted(
-                    seen.values(), key=lambda x: x["score"], reverse=True
-                )
+                sources = sorted(seen.values(), key=lambda x: x["score"], reverse=True)
                 logger.info(
                     f"After deduplication: {len(sources)} unique sources from {len(seen)} unique keys"
                 )
@@ -464,9 +458,7 @@ class RAGEngine:
                 )
                 if function_result.get("has_tool_calls"):
                     attachments = function_result.get("attachments", [])
-                    skip_email_reply = function_result.get(
-                        "skip_email_reply", False
-                    )
+                    skip_email_reply = function_result.get("skip_email_reply", False)
                     if attachments:
                         logger.info(
                             f"Tool produced {len(attachments)} attachment(s) — "
