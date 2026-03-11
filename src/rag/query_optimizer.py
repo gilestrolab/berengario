@@ -13,6 +13,8 @@ from typing import Optional
 from openai import OpenAI as OpenAIClient
 from openai import OpenAIError
 
+from src.llm_utils import llm_call_with_fallback
+
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -173,7 +175,8 @@ Optimized query:"""
             OpenAIError: If API call fails.
         """
         try:
-            response = self.client.chat.completions.create(
+            response = llm_call_with_fallback(
+                client=self.client,
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=self.max_tokens,

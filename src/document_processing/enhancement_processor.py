@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 from openai import OpenAI as OpenAIClient
 
 from src.config import settings
+from src.llm_utils import llm_call_with_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +151,8 @@ Structured Data:
 Narrative Description:"""
 
         try:
-            response = self.client.chat.completions.create(
+            response = llm_call_with_fallback(
+                client=self.client,
                 model=self.llm_model,
                 messages=[
                     {
@@ -201,7 +203,8 @@ Document Content:
 Q&A Pairs:"""
 
         try:
-            response = self.client.chat.completions.create(
+            response = llm_call_with_fallback(
+                client=self.client,
                 model=self.llm_model,
                 messages=[
                     {

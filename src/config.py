@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     openrouter_model: str = Field(
         default="anthropic/claude-3.5-sonnet", description="OpenRouter model"
     )
+    openrouter_fallback_model: Optional[str] = Field(
+        default=None,
+        description="Fallback LLM model if primary model fails (e.g. overloaded)",
+    )
 
     # Email Configuration - Inbox (IMAP)
     imap_server: str = Field(

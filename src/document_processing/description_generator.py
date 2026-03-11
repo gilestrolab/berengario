@@ -12,6 +12,7 @@ from llama_index.core.schema import TextNode
 from openai import OpenAI
 
 from src.config import settings
+from src.llm_utils import llm_call_with_fallback
 from src.email.db_models import DocumentDescription
 
 logger = logging.getLogger(__name__)
@@ -83,7 +84,8 @@ Provide only the 2-sentence summary, nothing else:"""
 
         try:
             # Call LLM to generate description
-            response = self.client.chat.completions.create(
+            response = llm_call_with_fallback(
+                client=self.client,
                 model=self.model,
                 messages=[
                     {

@@ -194,6 +194,52 @@ class RAGEngine:
 
         logger.info(f"RAGEngine initialized with model {self.llm_model}")
 
+    def _query_with_fallback(self, query_text: str):
+        """Run LlamaIndex query, falling back to secondary model on server errors."""
+        try:
+            return self.query_engine.query(query_text)
+        except Exception as e:
+            fallback = settings.openrouter_fallback_model
+            if not fallback or fallback == self.llm_model:
+                raise
+
+            error_str = str(e)
+            is_retriable = any(
+                ind in error_str
+                for ind in ["500", "502", "503", "504", "429", "timeout", "overloaded"]
+            )
+            if not is_retriable:
+                raise
+
+            logger.warning(
+                f"Primary model {self.llm_model} failed ({error_str[:100]}), "
+                f"retrying with fallback model {fallback}"
+            )
+
+            # Swap LLM to fallback model and rebuild query engine
+            fallback_llm = OpenAI(
+                model="gpt-4",
+                api_key=settings.openrouter_api_key,
+                api_base=settings.openrouter_api_base,
+                temperature=0.1,
+                context_window=200000,
+                max_tokens=4096,
+                is_chat_model=True,
+                default_headers={
+                    "HTTP-Referer": "https://github.com/gilestrolab/berengario",
+                },
+                additional_kwargs={"model": fallback},
+            )
+            ctx = self.tenant_context
+            top_k = ctx.top_k_retrieval if ctx else settings.top_k_retrieval
+            fallback_engine = self.kb_manager.get_query_engine(
+                top_k=top_k, llm=fallback_llm
+            )
+            fallback_engine.update_prompts(
+                {"response_synthesizer:text_qa_template": self.prompt_template}
+            )
+            return fallback_engine.query(query_text)
+
     def _check_for_function_calls(
         self, query_text: str, conversation_history: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -364,7 +410,7 @@ class RAGEngine:
                 )
                 logger.debug("Added conversation history to RAG query")
 
-            response = self.query_engine.query(full_query)
+            response = self._query_with_fallback(full_query)
             response_text = str(response)
 
             # Extract source information
