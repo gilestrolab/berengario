@@ -112,7 +112,7 @@ class RAGEngine:
         self,
         kb_manager: Optional[KnowledgeBaseManager] = None,
         llm_model: Optional[str] = None,
-        enable_function_calling: bool = True,
+        enable_function_calling: bool = False,
         tenant_context: Optional["TenantContext"] = None,  # noqa: F821
     ):
         """

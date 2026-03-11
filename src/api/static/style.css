@@ -566,6 +566,22 @@ body {
     border-color: #A3423A;
 }
 
+.message-actions {
+    margin-top: 0.5rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.feedback-regenerate {
+    margin-left: auto;
+    font-size: 1.25rem;
+}
+
+.feedback-regenerate:hover:not(:disabled) {
+    background: #E0E6EE;
+    border-color: #5B6E8C;
+}
+
 .feedback-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;

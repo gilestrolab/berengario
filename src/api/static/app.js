@@ -438,10 +438,28 @@ class ChatApp {
             contentDiv.appendChild(attachmentsDiv);
         }
 
-        // Feedback buttons for assistant messages
+        // Feedback buttons for assistant messages (only for fresh responses with messageId)
         if (role === 'assistant' && messageId) {
             const feedbackDiv = this.createFeedbackSection(messageId);
             contentDiv.appendChild(feedbackDiv);
+        }
+
+        // Regenerate button for all assistant messages
+        if (role === 'assistant' && !messageId) {
+            const regenDiv = document.createElement('div');
+            regenDiv.className = 'message-actions';
+            const regenerateBtn = document.createElement('button');
+            regenerateBtn.className = 'feedback-btn feedback-regenerate';
+            regenerateBtn.innerHTML = '&#x21bb;';
+            regenerateBtn.title = 'Regenerate response';
+            regenerateBtn.onclick = () => this.regenerateResponse(regenerateBtn);
+            regenDiv.appendChild(regenerateBtn);
+            contentDiv.appendChild(regenDiv);
+        }
+
+        // Store query text on user messages for regeneration
+        if (role === 'user') {
+            messageDiv.dataset.query = content;
         }
 
         messageDiv.appendChild(avatar);
@@ -556,9 +574,16 @@ class ChatApp {
         thumbsDownBtn.title = 'No, this was not helpful';
         thumbsDownBtn.onclick = () => this.submitFeedback(messageId, false, feedbackDiv);
 
+        const regenerateBtn = document.createElement('button');
+        regenerateBtn.className = 'feedback-btn feedback-regenerate';
+        regenerateBtn.innerHTML = '&#x21bb;';
+        regenerateBtn.title = 'Regenerate response';
+        regenerateBtn.onclick = () => this.regenerateResponse(regenerateBtn);
+
         feedbackDiv.appendChild(feedbackText);
         feedbackDiv.appendChild(thumbsUpBtn);
         feedbackDiv.appendChild(thumbsDownBtn);
+        feedbackDiv.appendChild(regenerateBtn);
 
         return feedbackDiv;
     }
@@ -608,6 +633,72 @@ class ChatApp {
             alert('Error submitting feedback. Please try again.');
             const buttons = feedbackDiv.querySelectorAll('.feedback-btn');
             buttons.forEach(btn => btn.disabled = false);
+        }
+    }
+
+    async regenerateResponse(btn) {
+        if (this.isLoading) return;
+
+        // Find the assistant message containing this button
+        const assistantMsg = btn.closest('.message.assistant-message');
+        if (!assistantMsg) return;
+
+        // Find the preceding user message to get the original query
+        let userMsg = assistantMsg.previousElementSibling;
+        while (userMsg && !userMsg.classList.contains('user-message')) {
+            userMsg = userMsg.previousElementSibling;
+        }
+        const query = userMsg?.dataset?.query;
+        if (!query) {
+            this.showToast('Could not find the original query', 'error');
+            return;
+        }
+
+        // Remove the assistant message
+        assistantMsg.remove();
+
+        // Resend the query
+        this.setLoading(true);
+        try {
+            const requestBody = { query };
+            if (this.currentConversationId) {
+                requestBody.conversation_id = this.currentConversationId;
+            }
+
+            const response = await fetch('/api/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody),
+                credentials: 'include',
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.displayMessage(
+                    'assistant', data.response, data.sources,
+                    data.attachments, data.timestamp, data.message_id
+                );
+                this.sessionId = data.session_id;
+            } else {
+                this.displayMessage(
+                    'assistant',
+                    `Error: ${data.error || 'Unknown error occurred'}`,
+                    null, null, data.timestamp
+                );
+                this.showToast('Failed to regenerate response', 'error');
+            }
+        } catch (error) {
+            console.error('Error regenerating response:', error);
+            this.displayMessage(
+                'assistant',
+                'Sorry, I encountered an error. Please try again.',
+                null, null, new Date().toISOString()
+            );
+            this.showToast('Network error', 'error');
+        } finally {
+            this.setLoading(false);
+            this.queryInput.focus();
         }
     }
 
