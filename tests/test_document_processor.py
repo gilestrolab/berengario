@@ -11,6 +11,7 @@ import openpyxl
 import pandas as pd
 import pytest
 from docx import Document as DocxDocument
+from pptx import Presentation
 
 from src.document_processing.document_processor import DocumentProcessor
 
@@ -130,6 +131,57 @@ class TestDocumentProcessor:
 
         assert "First paragraph." in extracted
         assert "Second paragraph." in extracted
+
+    def test_extract_text_from_pptx(self, processor, temp_dir):
+        """Test text extraction from PPTX file."""
+        test_file = temp_dir / "test.pptx"
+
+        prs = Presentation()
+        slide_layout = prs.slide_layouts[1]  # Title and Content layout
+
+        slide1 = prs.slides.add_slide(slide_layout)
+        slide1.shapes.title.text = "Introduction"
+        slide1.placeholders[1].text = "Welcome to the presentation."
+
+        slide2 = prs.slides.add_slide(slide_layout)
+        slide2.shapes.title.text = "Details"
+        slide2.placeholders[1].text = "Here are the details."
+
+        prs.save(test_file)
+
+        extracted = processor.extract_text_from_pptx(test_file)
+
+        assert "Slide 1:" in extracted
+        assert "Introduction" in extracted
+        assert "Welcome to the presentation." in extracted
+        assert "Slide 2:" in extracted
+        assert "Details" in extracted
+
+    def test_extract_text_from_pptx_with_notes(self, processor, temp_dir):
+        """Test that speaker notes are extracted from PPTX."""
+        test_file = temp_dir / "test_notes.pptx"
+
+        prs = Presentation()
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        slide.shapes.title.text = "Slide with notes"
+        slide.notes_slide.notes_text_frame.text = "These are speaker notes."
+        prs.save(test_file)
+
+        extracted = processor.extract_text_from_pptx(test_file)
+
+        assert "Notes: These are speaker notes." in extracted
+
+    def test_extract_text_from_pptx_empty(self, processor, temp_dir):
+        """Test extraction from PPTX with no text content."""
+        test_file = temp_dir / "empty.pptx"
+
+        prs = Presentation()
+        prs.slides.add_slide(prs.slide_layouts[6])  # Blank layout
+        prs.save(test_file)
+
+        extracted = processor.extract_text_from_pptx(test_file)
+
+        assert isinstance(extracted, str)
 
     def test_extract_text_unsupported_format(self, processor, temp_dir):
         """

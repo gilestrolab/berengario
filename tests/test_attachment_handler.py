@@ -343,4 +343,4 @@ class TestAttachmentHandler:
         assert ".txt" in SUPPORTED_EXTENSIONS
         assert ".csv" in SUPPORTED_EXTENSIONS
         assert ".xlsx" in SUPPORTED_EXTENSIONS
-        assert ".pptx" not in SUPPORTED_EXTENSIONS
+        assert ".pptx" in SUPPORTED_EXTENSIONS

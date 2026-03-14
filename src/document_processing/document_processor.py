@@ -1,7 +1,7 @@
 """
 Document processor for parsing and chunking various document formats.
 
-Supports: PDF, DOCX, TXT, CSV, XLS, XLSX.
+Supports: PDF, DOCX, PPTX, TXT, CSV, XLS, XLSX.
 """
 
 import hashlib
@@ -14,6 +14,7 @@ from docx import Document as DocxDocument
 from llama_index.core import Document
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import TextNode
+from pptx import Presentation
 from pypdf import PdfReader
 
 from src.config import settings
@@ -22,7 +23,15 @@ logger = logging.getLogger(__name__)
 
 # Canonical set of file extensions that the document processor can handle.
 # All other modules should reference this constant instead of defining their own.
-SUPPORTED_EXTENSIONS: Set[str] = {".pdf", ".docx", ".txt", ".csv", ".xls", ".xlsx"}
+SUPPORTED_EXTENSIONS: Set[str] = {
+    ".pdf",
+    ".docx",
+    ".pptx",
+    ".txt",
+    ".csv",
+    ".xls",
+    ".xlsx",
+}
 
 # Lazy import to avoid circular dependencies and API key errors during initialization
 _enhancement_processor = None
@@ -155,6 +164,60 @@ class DocumentProcessor:
             return "\n\n".join(text)
         except Exception as e:
             logger.error(f"Error extracting text from DOCX {file_path}: {e}")
+            raise
+
+    def extract_text_from_pptx(self, file_path: Path) -> str:
+        """
+        Extract text from PowerPoint PPTX file.
+
+        Extracts text from slide shapes (titles, text boxes, tables)
+        and speaker notes.
+
+        Args:
+            file_path: Path to PPTX file.
+
+        Returns:
+            Extracted text content.
+
+        Raises:
+            Exception: If PPTX reading fails.
+        """
+        try:
+            prs = Presentation(file_path)
+            text_parts = []
+
+            for slide_num, slide in enumerate(prs.slides, 1):
+                slide_text = []
+
+                for shape in slide.shapes:
+                    if shape.has_text_frame:
+                        for paragraph in shape.text_frame.paragraphs:
+                            para_text = paragraph.text.strip()
+                            if para_text:
+                                slide_text.append(para_text)
+                    if shape.has_table:
+                        table = shape.table
+                        for row in table.rows:
+                            row_text = " | ".join(
+                                cell.text.strip()
+                                for cell in row.cells
+                                if cell.text.strip()
+                            )
+                            if row_text:
+                                slide_text.append(row_text)
+
+                # Extract speaker notes
+                if slide.has_notes_slide:
+                    notes_text = slide.notes_slide.notes_text_frame.text.strip()
+                    if notes_text:
+                        slide_text.append(f"Notes: {notes_text}")
+
+                if slide_text:
+                    text_parts.append(f"Slide {slide_num}:\n" + "\n".join(slide_text))
+
+            return "\n\n".join(text_parts)
+        except Exception as e:
+            logger.error(f"Error extracting text from PPTX {file_path}: {e}")
             raise
 
     def extract_text_from_txt(self, file_path: Path) -> str:
@@ -414,6 +477,8 @@ class DocumentProcessor:
             return self.extract_text_from_pdf(file_path)
         elif suffix == ".docx":
             return self.extract_text_from_docx(file_path)
+        elif suffix == ".pptx":
+            return self.extract_text_from_pptx(file_path)
         elif suffix == ".txt":
             return self.extract_text_from_txt(file_path)
         elif suffix == ".csv":
