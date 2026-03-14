@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+#
+# Pre-commit hook for Berengario.
+# Runs Black, Ruff, and Pytest in the Docker dev container.
+#
+# Install with: scripts/install-hooks.sh
+
+set -e
+
+echo "Running pre-commit checks..."
+
+# Check if Docker dev container is available
+if ! docker compose ps --status running 2>/dev/null | grep -q berengario-dev; then
+    echo ""
+    echo "⚠️  Docker development container 'berengario-dev' is not running!"
+    echo "   Start it with: docker-compose --profile dev up -d"
+    echo ""
+    echo "   The pre-commit hook requires the dev container to run:"
+    echo "   - Black (code formatting)"
+    echo "   - Ruff (linting)"
+    echo "   - Pytest (test suite)"
+    echo ""
+    echo "❌ Cannot commit without running checks."
+    exit 1
+fi
+
+# Get staged Python files
+STAGED_PY_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$' || true)
+
+if [ -z "$STAGED_PY_FILES" ]; then
+    echo "No Python files staged. Skipping checks."
+    exit 0
+fi
+
+echo "Checking Python files..."
+
+# 1. Black formatting check
+echo "Running Black formatter..."
+if ! docker exec berengario-dev black --check src/ tests/ 2>&1; then
+    echo ""
+    echo "❌ Black formatting check failed!"
+    echo "Run: docker exec berengario-dev black src/ tests/"
+    echo "Or locally if installed: black src/ tests/"
+    exit 1
+fi
+
+# 2. Ruff linting check
+echo "Running Ruff linter..."
+if ! docker exec berengario-dev ruff check src/ tests/ 2>&1; then
+    echo ""
+    echo "❌ Ruff linting check failed!"
+    echo "Run: docker exec berengario-dev ruff check src/ tests/ --fix"
+    echo "Or locally if installed: ruff check src/ tests/ --fix"
+    exit 1
+fi
+
+# 3. Pytest
+echo "Running pytest..."
+if ! docker exec berengario-dev pytest tests/ -v 2>&1; then
+    echo ""
+    echo "❌ Pytest failed!"
+    echo "Fix the failing tests before committing."
+    echo "Run: docker exec berengario-dev pytest tests/ -v"
+    exit 1
+fi
+
+echo ""
+echo "✅ All pre-commit checks passed!"

@@ -12,12 +12,13 @@ The pre-commit hook runs three checks on all staged Python files in the `berenga
 
 ## Installation
 
-The pre-commit hook is located at `.git/hooks/pre-commit` and should be automatically executable. If you've cloned the repository, the hook is already in place.
+The hook script lives in version control at `scripts/pre-commit`. After cloning, install it by running:
 
-If the hook is not executable, run:
 ```bash
-chmod +x .git/hooks/pre-commit
+scripts/install-hooks.sh
 ```
+
+This creates a symlink from `.git/hooks/pre-commit` → `scripts/pre-commit`. Git doesn't track hooks, so this step is required after every fresh clone.
 
 ## Usage
 
@@ -140,9 +141,8 @@ The same checks run automatically in GitHub Actions CI:
 
 ### Hook doesn't run
 ```bash
-# Check if hook exists and is executable
-ls -la .git/hooks/pre-commit
-chmod +x .git/hooks/pre-commit
+# Install (or reinstall) the hook
+scripts/install-hooks.sh
 ```
 
 ### Dev container not found
