@@ -495,6 +495,8 @@ class KnowledgeBaseManager:
                         # Include enhancement metadata
                         "enhanced": metadata.get("enhanced", False),
                         "enhancement_count": metadata.get("enhancement_count", 0),
+                        # Include upload ownership
+                        "uploaded_by": metadata.get("uploaded_by"),
                     }
 
             return list(unique_docs.values())

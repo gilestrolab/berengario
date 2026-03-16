@@ -38,6 +38,7 @@ def create_admin_router(
     query_handler,
     settings,
     require_admin,
+    require_admin_or_teacher=None,
     component_resolver=None,
     storage_backend=None,
 ):
@@ -105,13 +106,16 @@ def create_admin_router(
             return tenant_config / "example_questions.json"
         return None
 
+    # Teachers can access document endpoints (with ownership restrictions on delete)
+    _require_doc_access = require_admin_or_teacher or require_admin
+
     # ============================================================================
     # Document Management
     # ============================================================================
 
     @router.get("/documents", response_model=DocumentListResponse)
     def list_documents(
-        session=Depends(require_admin),
+        session=Depends(_require_doc_access),
     ):
         """
         List all documents in knowledge base.
@@ -142,7 +146,7 @@ def create_admin_router(
 
     @router.get("/documents/descriptions")
     def get_document_descriptions(
-        session=Depends(require_admin),
+        session=Depends(_require_doc_access),
     ):
         """
         Get AI-generated descriptions for all documents.
@@ -175,7 +179,7 @@ def create_admin_router(
     def delete_document(
         file_hash: str,
         archive: bool = True,
-        session=Depends(require_admin),
+        session=Depends(_require_doc_access),
     ):
         """
         Delete document from knowledge base.
@@ -195,6 +199,22 @@ def create_admin_router(
         """
         try:
             doc_mgr = _get_doc_mgr(session)
+
+            # Teachers can only delete their own documents
+            if not session.is_admin:
+                kb = _get_kb(session)
+                docs = kb.get_unique_documents()
+                doc = next((d for d in docs if d.get("file_hash") == file_hash), None)
+                if not doc:
+                    raise HTTPException(
+                        status_code=404, detail=f"Document not found: {file_hash}"
+                    )
+                if doc.get("uploaded_by") != session.email:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="You can only delete documents you uploaded.",
+                    )
+
             result = doc_mgr.delete_document(file_hash, archive=archive)
 
             # Log the action
@@ -236,7 +256,7 @@ def create_admin_router(
     @router.get("/documents/{file_hash}/view")
     def view_document(
         file_hash: str,
-        session=Depends(require_admin),
+        session=Depends(_require_doc_access),
     ):
         """
         View the text content of a document from the knowledge base.
@@ -304,7 +324,7 @@ def create_admin_router(
     @router.get("/documents/{file_hash}/download")
     def download_document(
         file_hash: str,
-        session=Depends(require_admin),
+        session=Depends(_require_doc_access),
     ):
         """
         Download a document file from the knowledge base.
@@ -390,7 +410,7 @@ def create_admin_router(
     @router.post("/documents/upload")
     async def upload_document(
         file: UploadFile = File(...),
-        session=Depends(require_admin),
+        session=Depends(_require_doc_access),
     ):
         """
         Upload and process a document into the knowledge base.

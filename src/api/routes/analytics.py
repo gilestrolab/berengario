@@ -83,6 +83,7 @@ def create_analytics_router(
     component_resolver=None,
     kb_manager=None,
     app_settings=None,
+    require_admin_or_teacher=None,
 ):
     """
     Create analytics router with dependency injection.
@@ -94,10 +95,14 @@ def create_analytics_router(
         component_resolver: ComponentResolver for MT mode (optional)
         kb_manager: KnowledgeBaseManager instance (for KB health metrics)
         app_settings: Application settings (for similarity threshold)
+        require_admin_or_teacher: Read-only auth dependency (admin or teacher)
 
     Returns:
         Configured APIRouter
     """
+    # Use require_admin_or_teacher for all read-only analytics endpoints;
+    # fall back to require_admin if not provided (backward compat)
+    require_read = require_admin_or_teacher or require_admin
 
     def _get_cm(session):
         return resolve_component(
@@ -119,7 +124,7 @@ def create_analytics_router(
     @router.get("/usage/analytics", response_model=UsageAnalyticsResponse)
     def get_usage_analytics(
         days: Optional[int] = None,
-        session=Depends(require_admin),
+        session=Depends(require_read),
     ):
         """
         Get comprehensive usage analytics.
@@ -156,7 +161,7 @@ def create_analytics_router(
         sender: str,
         days: Optional[int] = None,
         limit: Optional[int] = 100,
-        session=Depends(require_admin),
+        session=Depends(require_read),
     ):
         """
         Get detailed query list for a specific user.
@@ -201,7 +206,7 @@ def create_analytics_router(
     @router.get("/analytics/optimization")
     def get_optimization_analytics(
         days: Optional[int] = None,
-        session=Depends(require_admin),
+        session=Depends(require_read),
     ):
         """
         Get query optimization analytics.
@@ -256,7 +261,7 @@ def create_analytics_router(
     @router.get("/analytics/sources")
     def get_source_analytics(
         days: Optional[int] = None,
-        session=Depends(require_admin),
+        session=Depends(require_read),
     ):
         """
         Get source document usage analytics.
@@ -302,7 +307,7 @@ def create_analytics_router(
     @router.get("/feedback/analytics", response_model=FeedbackAnalyticsResponse)
     def get_feedback_analytics(
         days: Optional[int] = None,
-        session=Depends(require_admin),
+        session=Depends(require_read),
     ):
         """
         Get comprehensive feedback analytics.
@@ -433,7 +438,7 @@ def create_analytics_router(
     @router.post("/usage/topics", response_model=TopicClusteringResponse)
     def cluster_query_topics(
         days: Optional[int] = 30,
-        session=Depends(require_admin),
+        session=Depends(require_read),
     ):
         """
         Analyze and cluster query topics using LLM.
@@ -512,7 +517,7 @@ def create_analytics_router(
     @router.get("/kb/health")
     def get_kb_health(
         days: Optional[int] = None,
-        session=Depends(require_admin),
+        session=Depends(require_read),
     ):
         """
         Get knowledge base health metrics combining structural and retrieval data.

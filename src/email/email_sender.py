@@ -730,7 +730,7 @@ def format_welcome_email(
                 f"this address in the To, CC, or BCC field of your email and "
                 f"{instance_name} will process both the email content and any "
                 f"attachments, adding them to the knowledge base.\n\n"
-                f"Supported file types: PDF, DOCX, TXT, CSV, XLS, and XLSX."
+                f"Supported file types: PDF, DOCX, PPTX, TXT, CSV, XLS, and XLSX."
             )
         else:
             teach_section = (
@@ -739,7 +739,7 @@ def format_welcome_email(
                 f"documents and emails. CC or BCC {query_address} on any email "
                 f"you'd like to add to the knowledge base. {instance_name} will "
                 f"process both the email content and any attachments.\n\n"
-                f"Supported file types: PDF, DOCX, TXT, CSV, XLS, and XLSX."
+                f"Supported file types: PDF, DOCX, PPTX, TXT, CSV, XLS, and XLSX."
             )
         sections_plain.append(teach_section)
 
@@ -839,7 +839,7 @@ def format_welcome_email(
             f"Sharing Knowledge</h3>"
             f"{teach_body}"
             f'<p style="margin: 8px 0 0 0; font-size: 0.92em; color: #5C554D;">'
-            f"Supported file types: PDF, DOCX, TXT, CSV, XLS, and XLSX.</p>"
+            f"Supported file types: PDF, DOCX, PPTX, TXT, CSV, XLS, and XLSX.</p>"
             f"</div>"
         )
 
@@ -962,6 +962,8 @@ def fetch_tenant_welcome_params(
         "organization": "",
         "instance_description": "",
         "admin_emails": None,
+        "query_address": None,
+        "teach_address": None,
     }
 
     own_session = False
@@ -978,6 +980,11 @@ def fetch_tenant_welcome_params(
             result["instance_name"] = tenant.name
             result["organization"] = tenant.organization or ""
             result["instance_description"] = tenant.description or ""
+            if tenant.email_address:
+                result["query_address"] = tenant.email_address
+                # Derive teach address from platform domain
+                domain = tenant.email_address.split("@", 1)[-1]
+                result["teach_address"] = f"teach@{domain}"
 
         admins = (
             db_session.query(TenantUser.email)

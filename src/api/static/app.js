@@ -168,8 +168,8 @@ class ChatApp {
                 this.userEmailSpan.title = `Logged in as ${this.userEmail}`;
             }
 
-            // Show admin button if user is admin
-            if (data.is_admin) {
+            // Show admin button if user is admin or teacher
+            if (data.is_admin || data.is_teacher) {
                 const adminBtn = document.getElementById('admin-btn');
                 if (adminBtn) {
                     adminBtn.style.display = 'block';

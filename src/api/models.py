@@ -156,6 +156,7 @@ class AuthStatusResponse(BaseModel):
     email: Optional[str] = None
     session_id: Optional[str] = None
     is_admin: bool = False
+    is_teacher: bool = False
     tenant_id: Optional[str] = None
     tenant_name: Optional[str] = None
     tenant_slug: Optional[str] = None

@@ -107,7 +107,18 @@ class EmailService:
             component_factory=component_factory,
         )
 
+        # In MT mode, derive the teach address from the platform domain
+        # so EmailParser can recognise teach@<domain> emails as KB ingestion.
+        from src.email.email_parser import EmailParser
+
+        teach_address = settings.email_teach_address
+        if not teach_address and settings.platform_domain:
+            teach_address = f"teach@{settings.platform_domain}"
+
+        parser = EmailParser(teach_address=teach_address)
+
         processor = EmailProcessor(
+            parser=parser,
             tenant_email_router=router,
             storage_backend=infra.storage,
         )

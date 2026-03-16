@@ -26,10 +26,12 @@ class AdminPanel {
         // Setup event listeners
         this.setupEventListeners();
 
-        // Load initial data
+        // Load initial data (skip write-only tabs for teachers, but documents are allowed)
         await this.loadDocuments();
-        await this.loadBackups();
-        await this.loadSettings();
+        if (!this.isTeacher) {
+            await this.loadBackups();
+            await this.loadSettings();
+        }
     }
 
     async checkAuth() {
@@ -43,13 +45,24 @@ class AdminPanel {
                 return;
             }
 
-            if (!data.is_admin) {
-                // Not an admin, redirect to main chat
-                this.showToast('Access denied. Admin privileges required.', 'error');
+            if (!data.is_admin && !data.is_teacher) {
+                // Not an admin or teacher, redirect to main chat
+                this.showToast('Access denied. Admin or teacher privileges required.', 'error');
                 setTimeout(() => {
                     window.location.href = '/';
                 }, 2000);
                 return;
+            }
+
+            // Teachers get read-only access: hide write tabs (documents allowed)
+            this.isTeacher = data.is_teacher && !data.is_admin;
+            this.userEmail = data.email;
+            if (this.isTeacher) {
+                const writeTabs = ['webcrawl', 'backups', 'settings', 'team', 'billing'];
+                writeTabs.forEach(tab => {
+                    const btn = document.querySelector(`.tab[data-tab="${tab}"]`);
+                    if (btn) btn.style.display = 'none';
+                });
             }
         } catch (error) {
             console.error('Auth check failed:', error);
@@ -81,13 +94,15 @@ class AdminPanel {
                 document.getElementById('admin-title').textContent = headerText;
             }
 
-            // Multi-tenant mode: show Team tab
+            // Multi-tenant mode: show Team tab (admins only)
             if (config.multi_tenant) {
                 this.multiTenant = true;
-                const teamTabBtn = document.getElementById('team-tab-btn');
-                if (teamTabBtn) teamTabBtn.style.display = '';
-                this.switchTab('team');
-                this.loadTeamData();
+                if (!this.isTeacher) {
+                    const teamTabBtn = document.getElementById('team-tab-btn');
+                    if (teamTabBtn) teamTabBtn.style.display = '';
+                    this.switchTab('team');
+                    this.loadTeamData();
+                }
             }
         } catch (error) {
             console.error('Error loading config:', error);
@@ -301,9 +316,11 @@ class AdminPanel {
                     <td class="doc-actions">
                         ${viewButton}
                         ${downloadButton}
+                        ${(!this.isTeacher || doc.uploaded_by === this.userEmail) ? `
                         <button class="btn-delete" onclick="adminPanel.deleteDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(displayName)}')" title="Delete">
                             <i class="fas fa-trash"></i>
                         </button>
+                        ` : ''}
                     </td>
                 </tr>
             `;
@@ -459,9 +476,11 @@ class AdminPanel {
                     <td class="doc-actions">
                         ${viewButton}
                         ${downloadButton}
+                        ${(!this.isTeacher || doc.uploaded_by === this.userEmail) ? `
                         <button class="btn-delete" onclick="adminPanel.deleteDocument('${this.escapeHtml(doc.file_hash)}', '${this.escapeHtml(displayName)}')" title="Delete">
                             <i class="fas fa-trash"></i>
                         </button>
+                        ` : ''}
                     </td>
                 </tr>
             `;

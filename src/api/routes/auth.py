@@ -332,6 +332,7 @@ def create_auth_router(
             email=session.email,
             session_id=session.session_id,
             is_admin=session.is_admin,
+            is_teacher=session.role == "teacher",
             tenant_id=session.tenant_id,
             tenant_name=session.tenant_name,
             tenant_slug=session.tenant_slug,

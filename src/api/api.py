@@ -277,6 +277,30 @@ def require_admin(request: Request) -> Session:
     return session
 
 
+def require_admin_or_teacher(request: Request) -> Session:
+    """
+    Dependency to require admin or teacher privileges for read-only endpoints.
+
+    Args:
+        request: FastAPI request object
+
+    Returns:
+        Authenticated session with admin or teacher role
+
+    Raises:
+        HTTPException: If not authenticated or lacks admin/teacher role
+    """
+    session = require_auth(request)
+
+    if not session.is_admin and session.role != "teacher":
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden. Admin or teacher privileges required.",
+        )
+
+    return session
+
+
 # Setup routers that depend on require_auth
 feedback_router = create_feedback_router(
     conversation_manager=conversation_manager,
@@ -313,6 +337,7 @@ admin_router = create_admin_router(
     query_handler=query_handler,
     settings=settings,
     require_admin=require_admin,
+    require_admin_or_teacher=require_admin_or_teacher,
     component_resolver=component_resolver,
     storage_backend=storage_backend,
 )
@@ -324,6 +349,7 @@ analytics_router = create_analytics_router(
     component_resolver=component_resolver,
     kb_manager=kb_manager,
     app_settings=settings,
+    require_admin_or_teacher=require_admin_or_teacher,
 )
 
 # Team management router (always available — uses TenantUser DB)
@@ -433,7 +459,7 @@ def admin_panel(request: Request):
     if not session or not session.is_authenticated():
         return RedirectResponse(url="/static/login.html", status_code=303)
 
-    if not session.is_admin:
+    if not session.is_admin and session.role != "teacher":
         return RedirectResponse(url="/", status_code=303)
 
     admin_file = static_dir / "admin.html"
