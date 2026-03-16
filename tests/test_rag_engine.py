@@ -177,7 +177,7 @@ class TestGetSystemPrompt:
 
         # Check structure sections
         assert "You are TestBot" in prompt
-        assert "Your role is to help users" in prompt
+        assert "AI assistant powered by a knowledge base" in prompt
         assert "Context information is provided below:" in prompt
         assert "Based on the context above" in prompt
         assert "Query:" in prompt

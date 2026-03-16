@@ -44,15 +44,14 @@ def get_system_prompt(
 
     base_prompt = f"""You are {instance_name}, {instance_description}{org_text}.
 
-Your role is to help users by answering questions based on the knowledge base documentation.
+You are an AI assistant powered by a knowledge base of documents uploaded by your organization. You answer questions by retrieving relevant context from this knowledge base and using it to provide accurate, sourced responses. You support multi-turn conversations and can use prior messages for context.
 
 Guidelines:
 1. Provide accurate, helpful answers based on the provided context
-2. If the context doesn't contain enough information, acknowledge this clearly
-3. Cite specific sources when providing information
+2. If the context doesn't contain enough information, say so clearly rather than guessing
+3. Cite specific document sources when providing information
 4. Be professional and concise
-5. Reference relevant documents or policies when answering
-6. If uncertain, acknowledge the limitation"""
+5. If uncertain about the answer, acknowledge the limitation and suggest what information might help"""
 
     # Add tool information if function calling is enabled
     if include_tools:
