@@ -62,11 +62,11 @@ class Settings(BaseSettings):
         description="OpenRouter API base URL",
     )
     openrouter_model: str = Field(
-        default="anthropic/claude-3.5-sonnet", description="OpenRouter model"
+        default="claude-sonnet-4.6", description="OpenRouter model"
     )
     openrouter_fallback_model: Optional[str] = Field(
-        default=None,
-        description="Fallback LLM model if primary model fails (e.g. overloaded)",
+        default="kimi-k2.5",
+        description="Fallback LLM model if primary model fails (e.g. overloaded, 400)",
     )
 
     # Email Configuration - Inbox (IMAP)

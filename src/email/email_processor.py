@@ -906,13 +906,24 @@ class EmailProcessor:
             logger.debug(f"Stored user query in conversation {thread_id}")
 
             if not result["success"]:
-                logger.error(
-                    f"RAG query failed for {message_id}: {result.get('error')}"
-                )
+                error_msg = result.get("error", "")
+                logger.error(f"RAG query failed for {message_id}: {error_msg}")
+
+                # Alert admins if this looks like a model failure
+                from src.llm_utils import is_model_error, send_model_failure_alert
+
+                if is_model_error(str(error_msg)):
+                    send_model_failure_alert(
+                        error=str(error_msg),
+                        model=settings.openrouter_model,
+                        context=f"email query from {email.sender.email}, "
+                        f"message_id={message_id}",
+                    )
+
                 return ProcessingResult(
                     message_id=message_id,
                     success=False,
-                    error=result.get("error"),
+                    error=error_msg,
                     action="query",
                 )
 

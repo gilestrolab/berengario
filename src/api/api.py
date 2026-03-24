@@ -432,9 +432,9 @@ def root(request: Request):
     index_file = static_dir / "index.html"
     if index_file.exists():
         return templates.TemplateResponse(
+            request,
             "index.html",
-            {
-                "request": request,
+            context={
                 "instance_name": settings.instance_name,
                 "instance_description": settings.instance_description,
                 "organization": settings.organization or "",
@@ -465,9 +465,9 @@ def admin_panel(request: Request):
     admin_file = static_dir / "admin.html"
     if admin_file.exists():
         return templates.TemplateResponse(
+            request,
             "admin.html",
-            {
-                "request": request,
+            context={
                 "instance_name": settings.instance_name,
                 "version": get_version(),
             },
@@ -489,6 +489,38 @@ def _try_resolve_tenant(request: Request):
         if not session or not session.is_authenticated():
             return None
         return component_resolver.resolve(session)
+    except Exception:
+        return None
+
+
+def _try_resolve_tenant_context(request: Request):
+    """
+    Lightweight tenant context resolution — no component stack build.
+
+    Returns TenantContext if user has a tenant selected, otherwise None.
+    Use this for endpoints that only need tenant metadata (name, description).
+    """
+    try:
+        session_id = get_session_id(request)
+        if not session_id:
+            return None
+        session = session_manager.get_session(session_id)
+        if not session or not session.is_authenticated():
+            return None
+        slug = getattr(session, "tenant_slug", None)
+        if not slug:
+            return None
+        # Check if components are already cached (fast path)
+        components = component_factory._cache.get(slug)
+        if components:
+            return components.components.context
+        # Build just the context without the heavy component stack
+        tenant = platform_db_manager.get_tenant_by_slug(slug)
+        if not tenant:
+            return None
+        from src.platform.tenant_context import TenantContext
+
+        return TenantContext.from_tenant(tenant, storage_backend)
     except Exception:
         return None
 
@@ -525,10 +557,10 @@ def get_config(request: Request):
     Get public instance configuration.
 
     Tenant-aware: returns tenant-specific name/description when session exists.
+    Uses lightweight context resolution (no RAG component build).
     """
-    components = _try_resolve_tenant(request)
-    if components:
-        ctx = components.context
+    ctx = _try_resolve_tenant_context(request)
+    if ctx:
         return {
             "instance_name": ctx.instance_name,
             "instance_description": ctx.instance_description,

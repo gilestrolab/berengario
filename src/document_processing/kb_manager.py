@@ -5,6 +5,7 @@ Handles ChromaDB storage, retrieval, and updates.
 """
 
 import logging
+import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -49,6 +50,9 @@ class KnowledgeBaseManager:
         """
         self.db_path = db_path or settings.chroma_db_path
         self.collection_name = collection_name
+        self._unique_docs_cache: Optional[List[dict]] = None
+        self._unique_docs_cache_time: float = 0.0
+        self._UNIQUE_DOCS_CACHE_TTL = 300  # 5 minutes
 
         # Ensure DB directory exists
         self.db_path.mkdir(parents=True, exist_ok=True)
@@ -144,11 +148,13 @@ class KnowledgeBaseManager:
         try:
             # Insert nodes into index
             self.index.insert_nodes(nodes)
+            self._invalidate_docs_cache()
             logger.info(f"Added {len(nodes)} nodes to knowledge base")
         except NotFoundError:
             logger.warning("Collection not found, refreshing and retrying")
             self._refresh_collection()
             self.index.insert_nodes(nodes)
+            self._invalidate_docs_cache()
             logger.info(f"Added {len(nodes)} nodes after collection refresh")
         except Exception as e:
             logger.error(f"Failed to add nodes to knowledge base: {e}")
@@ -274,6 +280,7 @@ class KnowledgeBaseManager:
 
             # Delete nodes
             self.collection.delete(ids=node_ids)
+            self._invalidate_docs_cache()
             logger.info(f"Deleted {len(node_ids)} nodes for hash {file_hash}")
 
             return len(node_ids)
@@ -332,6 +339,7 @@ class KnowledgeBaseManager:
 
             # Delete nodes
             self.collection.delete(ids=node_ids)
+            self._invalidate_docs_cache()
             logger.info(f"Deleted {len(node_ids)} nodes for filename {filename}")
 
             return len(node_ids)
@@ -445,6 +453,7 @@ class KnowledgeBaseManager:
 
             # Delete nodes
             self.collection.delete(ids=node_ids)
+            self._invalidate_docs_cache()
             logger.info(f"Deleted {len(node_ids)} nodes for url_hash {url_hash}")
 
             return len(node_ids)
@@ -465,13 +474,26 @@ class KnowledgeBaseManager:
             logger.error(f"Error getting document count: {e}")
             return 0
 
+    def _invalidate_docs_cache(self) -> None:
+        """Invalidate the unique documents cache."""
+        self._unique_docs_cache = None
+
     def get_unique_documents(self) -> List[dict]:
         """
         Get list of unique documents in the knowledge base.
 
+        Uses a TTL cache to avoid scanning all metadata on every call.
+
         Returns:
             List of dictionaries containing document metadata.
         """
+        now = time.time()
+        if (
+            self._unique_docs_cache is not None
+            and now - self._unique_docs_cache_time < self._UNIQUE_DOCS_CACHE_TTL
+        ):
+            return self._unique_docs_cache
+
         try:
             # Get all documents
             results = self.collection.get(include=["metadatas"])
@@ -499,7 +521,9 @@ class KnowledgeBaseManager:
                         "uploaded_by": metadata.get("uploaded_by"),
                     }
 
-            return list(unique_docs.values())
+            self._unique_docs_cache = list(unique_docs.values())
+            self._unique_docs_cache_time = now
+            return self._unique_docs_cache
         except Exception as e:
             logger.error(f"Error getting unique documents: {e}")
             return []
@@ -697,6 +721,7 @@ class KnowledgeBaseManager:
             )
             self._initialize_index()
 
+            self._invalidate_docs_cache()
             logger.info("Cleared all documents from knowledge base")
         except Exception as e:
             logger.error(f"Failed to clear knowledge base: {e}")

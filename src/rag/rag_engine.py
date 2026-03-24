@@ -182,16 +182,25 @@ class RAGEngine:
         )
         self.prompt_template = PromptTemplate(system_prompt)
 
-        # Get query engine from KB manager (pass our LLM)
-        top_k = ctx.top_k_retrieval if ctx else settings.top_k_retrieval
-        self.query_engine = self.kb_manager.get_query_engine(top_k=top_k, llm=self.llm)
-
-        # Update query engine with custom prompt
-        self.query_engine.update_prompts(
-            {"response_synthesizer:text_qa_template": self.prompt_template}
-        )
+        # Query engine is built lazily on first use to avoid slow BM25
+        # index construction during component init
+        self._query_engine = None
 
         logger.info(f"RAGEngine initialized with model {self.llm_model}")
+
+    @property
+    def query_engine(self):
+        """Lazily build the query engine on first access."""
+        if self._query_engine is None:
+            ctx = self.tenant_context
+            top_k = ctx.top_k_retrieval if ctx else settings.top_k_retrieval
+            self._query_engine = self.kb_manager.get_query_engine(
+                top_k=top_k, llm=self.llm
+            )
+            self._query_engine.update_prompts(
+                {"response_synthesizer:text_qa_template": self.prompt_template}
+            )
+        return self._query_engine
 
     def _query_with_fallback(self, query_text: str):
         """Run LlamaIndex query, falling back to secondary model on server errors."""
@@ -205,7 +214,16 @@ class RAGEngine:
             error_str = str(e)
             is_retriable = any(
                 ind in error_str
-                for ind in ["500", "502", "503", "504", "429", "timeout", "overloaded"]
+                for ind in [
+                    "400",
+                    "500",
+                    "502",
+                    "503",
+                    "504",
+                    "429",
+                    "timeout",
+                    "overloaded",
+                ]
             )
             if not is_retriable:
                 raise

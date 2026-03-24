@@ -210,7 +210,7 @@ def _count_queries_this_month(platform_db_manager, tenant) -> int:
     """Count query messages in the tenant DB for the current month."""
     from datetime import datetime
 
-    from src.email.db_models import ConversationMessage
+    from src.email.db_models import ConversationMessage, MessageType
 
     now = datetime.utcnow()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -220,8 +220,8 @@ def _count_queries_this_month(platform_db_manager, tenant) -> int:
             count = (
                 db.query(ConversationMessage)
                 .filter(
-                    ConversationMessage.role == "user",
-                    ConversationMessage.created_at >= month_start,
+                    ConversationMessage.message_type == MessageType.QUERY,
+                    ConversationMessage.timestamp >= month_start,
                 )
                 .count()
             )

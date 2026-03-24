@@ -259,6 +259,16 @@ def create_query_router(
             error_response = f"Error: {error_msg}"
             session.add_message("assistant", error_response)
 
+            # Alert admins if this looks like a model failure
+            from src.llm_utils import is_model_error, send_model_failure_alert
+
+            if is_model_error(error_msg):
+                send_model_failure_alert(
+                    error=error_msg,
+                    model=settings.openrouter_model,
+                    context=f"web API query, session={session.session_id}",
+                )
+
             # Store exception error in conversation database
             cm.add_message(
                 thread_id=thread_id,
