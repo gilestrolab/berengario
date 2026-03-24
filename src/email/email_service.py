@@ -243,13 +243,17 @@ class EmailService:
                                 f"Your {tenant.name} trial expires in {days_left} day"
                                 f"{'s' if days_left != 1 else ''}"
                             )
+                            from src.email.email_sender import get_email_signature
+
+                            plain_sig, html_sig = get_email_signature()
                             body_text = (
                                 f"Hi,\n\n"
                                 f"Your free trial for {tenant.name} on Berengario "
                                 f"expires in {days_left} day{'s' if days_left != 1 else ''}.\n\n"
                                 f"To continue using the service without interruption, "
                                 f"please visit the admin panel and choose a plan.\n\n"
-                                f"Best regards,\nThe Berengario Team"
+                                f"Best regards,\nThe Berengario Team\n\n"
+                                f"{plain_sig}"
                             )
                             body_html = (
                                 f"<p>Hi,</p>"
@@ -258,6 +262,7 @@ class EmailService:
                                 f"<p>To continue using the service without interruption, "
                                 f"please visit the admin panel and choose a plan.</p>"
                                 f"<p>Best regards,<br>The Berengario Team</p>"
+                                f"{html_sig}"
                             )
                             sender.send_reply(
                                 to_address=admin.email,

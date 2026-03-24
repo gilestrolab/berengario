@@ -56,9 +56,10 @@ def send_model_failure_alert(error: str, model: str, context: str = "") -> None:
         return
 
     try:
-        from src.email.email_sender import EmailSender
+        from src.email.email_sender import EmailSender, get_email_signature
 
         sender = EmailSender()
+        plain_sig, html_sig = get_email_signature()
         subject = f"[Berengario] LLM model failure: {model}"
         body_text = (
             f"A model failure was detected.\n\n"
@@ -67,7 +68,8 @@ def send_model_failure_alert(error: str, model: str, context: str = "") -> None:
             f"Context: {context or 'N/A'}\n"
             f"Time: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}\n\n"
             f"The system attempted to use the fallback model. "
-            f"Please check your LLM provider configuration."
+            f"Please check your LLM provider configuration.\n\n"
+            f"{plain_sig}"
         )
         body_html = (
             f"<h3>LLM Model Failure Alert</h3>"
@@ -77,6 +79,7 @@ def send_model_failure_alert(error: str, model: str, context: str = "") -> None:
             f"<p><strong>Time:</strong> {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}</p>"
             f"<p>The system attempted to use the fallback model. "
             f"Please check your LLM provider configuration.</p>"
+            f"{html_sig}"
         )
 
         for admin_email in admin_emails:
