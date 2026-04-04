@@ -114,6 +114,7 @@ key_manager = infra.key_manager
 component_factory = TenantComponentFactory(
     storage_backend=storage_backend,
     db_manager=platform_db_manager,
+    start_background_evictor=True,
 )
 component_resolver = ComponentResolver(
     component_factory=component_factory,

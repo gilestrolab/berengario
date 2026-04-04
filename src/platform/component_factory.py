@@ -72,6 +72,9 @@ class TenantComponentFactory:
         db_manager: Optional["TenantDBManager"] = None,  # noqa: F821
         max_cached: int = 5,
         idle_ttl_seconds: int = 1800,
+        query_engine_idle_seconds: int = 600,
+        start_background_evictor: bool = False,
+        evictor_interval_seconds: int = 300,
     ):
         """
         Initialize the component factory.
@@ -80,18 +83,39 @@ class TenantComponentFactory:
             storage_backend: Storage backend for path resolution.
             db_manager: TenantDBManager for tenant lookups.
             max_cached: Maximum tenant component stacks to cache.
+            idle_ttl_seconds: Evict whole tenant stacks idle this long.
+            query_engine_idle_seconds: Evict RAGEngine._query_engine idle
+                this long (releases BM25 retriever + LlamaIndex wrappers).
+            start_background_evictor: Launch a daemon thread that runs
+                periodic eviction. Enable in long-running services.
+            evictor_interval_seconds: Sleep between background evictor runs.
         """
         self._storage_backend = storage_backend
         self._db_manager = db_manager
         self._max_cached = max_cached
         self._idle_ttl = idle_ttl_seconds
+        self._query_engine_idle = query_engine_idle_seconds
         self._cache: OrderedDict[str, _CacheEntry] = OrderedDict()
         self._lock = threading.Lock()
 
         logger.info(
             f"TenantComponentFactory initialized: max_cached={max_cached}, "
-            f"idle_ttl={idle_ttl_seconds}s"
+            f"idle_ttl={idle_ttl_seconds}s, "
+            f"query_engine_idle={query_engine_idle_seconds}s"
         )
+
+        if start_background_evictor:
+            self._evictor_stop = threading.Event()
+            self._evictor_thread = threading.Thread(
+                target=self._evictor_loop,
+                args=(evictor_interval_seconds,),
+                daemon=True,
+                name="component-evictor",
+            )
+            self._evictor_thread.start()
+            logger.info(
+                f"Background evictor started (interval={evictor_interval_seconds}s)"
+            )
 
     def get_components(self, ctx: TenantContext) -> TenantComponents:
         """
@@ -204,6 +228,44 @@ class TenantComponentFactory:
         if evicted:
             logger.info(f"Evicted {evicted} idle tenant(s) from component cache")
         return evicted
+
+    def evict_idle_query_engines(self, max_idle_seconds: Optional[int] = None) -> int:
+        """Drop RAGEngine._query_engine from cached components that are idle.
+
+        Tenant stacks stay cached (cheap to keep), but the fat query engine
+        (BM25 retriever + LlamaIndex wrappers) is released. Next query
+        rebuilds it lazily.
+
+        Returns:
+            Number of query engines evicted.
+        """
+        threshold = (
+            max_idle_seconds
+            if max_idle_seconds is not None
+            else self._query_engine_idle
+        )
+        evicted = 0
+        with self._lock:
+            entries = list(self._cache.values())
+        for entry in entries:
+            rag_engine = entry.components.rag_engine
+            if rag_engine.evict_query_engine_if_idle(threshold):
+                evicted += 1
+        return evicted
+
+    def _evictor_loop(self, interval_seconds: int) -> None:
+        """Background loop that periodically evicts idle state."""
+        while not self._evictor_stop.wait(interval_seconds):
+            try:
+                self.evict_idle()
+                self.evict_idle_query_engines()
+            except Exception as exc:  # noqa: BLE001
+                logger.error(f"Evictor loop error: {exc}", exc_info=True)
+
+    def stop_background_evictor(self) -> None:
+        """Signal the background evictor thread to stop. For shutdown/tests."""
+        if hasattr(self, "_evictor_stop"):
+            self._evictor_stop.set()
 
     def evict(self, slug: str) -> None:
         """

@@ -101,6 +101,7 @@ class EmailService:
         component_factory = TenantComponentFactory(
             storage_backend=infra.storage,
             db_manager=infra.db_manager,
+            start_background_evictor=True,
         )
         router = TenantEmailRouter(
             db_manager=infra.db_manager,

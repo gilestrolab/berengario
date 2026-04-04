@@ -6,6 +6,7 @@ Handles query execution, context retrieval, and response generation.
 
 import json
 import logging
+import time
 from typing import Any, Dict, Optional
 
 from llama_index.core import PromptTemplate
@@ -164,6 +165,7 @@ class RAGEngine:
         # Query engine is built lazily on first use to avoid slow BM25
         # index construction during component init
         self._query_engine = None
+        self._query_engine_last_used: float = 0.0
 
         logger.info(f"RAGEngine initialized with model {self.llm_model}")
 
@@ -179,7 +181,29 @@ class RAGEngine:
             self._query_engine.update_prompts(
                 {"response_synthesizer:text_qa_template": self.prompt_template}
             )
+        self._query_engine_last_used = time.time()
         return self._query_engine
+
+    def evict_query_engine_if_idle(self, max_idle_seconds: int) -> bool:
+        """Drop the cached query engine if idle longer than threshold.
+
+        The query engine wraps the BM25 retriever (all chunks tokenized) and
+        LlamaIndex index wrappers, which together can hold hundreds of MB.
+        On an idle container this memory is pure waste. Calling this
+        periodically releases it; the next query rebuilds lazily.
+
+        Returns True if the engine was evicted.
+        """
+        if self._query_engine is None:
+            return False
+        idle = time.time() - self._query_engine_last_used
+        if idle < max_idle_seconds:
+            return False
+        self._query_engine = None
+        logger.info(
+            f"Evicted idle query engine (idle {idle:.0f}s >= {max_idle_seconds}s)"
+        )
+        return True
 
     def _query_with_fallback(self, query_text: str):
         """Run LlamaIndex query, falling back to secondary model on server errors."""
