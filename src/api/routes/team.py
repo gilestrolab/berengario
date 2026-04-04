@@ -56,6 +56,7 @@ def create_team_router(
                 db_session.query(TenantUser)
                 .filter(TenantUser.tenant_id == session.tenant_id)
                 .order_by(TenantUser.created_at)
+                .limit(500)
                 .all()
             )
 

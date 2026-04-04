@@ -25,6 +25,13 @@ services:
       retries: 3
       start_period: 30s
 
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+
     networks:
       - berengario-network
 
@@ -106,7 +113,7 @@ services:
       resources:
         limits:
           cpus: '2.0'
-          memory: 4G
+          memory: 2G
         reservations:
           cpus: '0.5'
           memory: 1G
@@ -159,7 +166,7 @@ services:
       resources:
         limits:
           cpus: '2.0'
-          memory: 4G
+          memory: 2G
         reservations:
           cpus: '0.5'
           memory: 1G

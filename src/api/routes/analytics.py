@@ -341,12 +341,11 @@ def create_analytics_router(
                 if start_date:
                     query = query.filter(ResponseFeedback.submitted_at >= start_date)
 
-                # Get all feedback
-                all_feedback = query.all()
-
-                # Calculate overview stats
-                total_feedback = len(all_feedback)
-                positive_count = sum(1 for f in all_feedback if f.is_positive)
+                # Calculate overview stats via SQL aggregation
+                total_feedback = query.count()
+                positive_count = query.filter(
+                    ResponseFeedback.is_positive.is_(True)
+                ).count()
                 negative_count = total_feedback - positive_count
                 positive_rate = (
                     (positive_count / total_feedback * 100) if total_feedback > 0 else 0
@@ -379,7 +378,7 @@ def create_analytics_router(
                 )
 
                 negative_responses = []
-                for feedback, message in negative_query.all():
+                for feedback, message in negative_query.limit(100).all():
                     negative_responses.append(
                         {
                             "id": feedback.id,
@@ -407,10 +406,14 @@ def create_analytics_router(
                         "end": datetime.utcnow().date().isoformat(),
                     }
                 else:
-                    if all_feedback:
-                        earliest = min(f.submitted_at for f in all_feedback)
+                    earliest_row = (
+                        query.order_by(ResponseFeedback.submitted_at.asc())
+                        .limit(1)
+                        .first()
+                    )
+                    if earliest_row:
                         date_range = {
-                            "start": earliest.date().isoformat(),
+                            "start": earliest_row.submitted_at.date().isoformat(),
                             "end": datetime.utcnow().date().isoformat(),
                         }
                     else:
@@ -488,6 +491,7 @@ def create_analytics_router(
                         ConversationMessage.message_type == MessageType.QUERY,
                         ConversationMessage.timestamp >= start_date,
                     )
+                    .limit(5000)
                     .all()
                 )
 

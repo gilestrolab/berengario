@@ -80,6 +80,9 @@ class TestKBHealthMetrics:
 
             kb = KnowledgeBaseManager.__new__(KnowledgeBaseManager)
             kb.collection = MagicMock()
+            kb._health_metrics_cache = None
+            kb._health_metrics_cache_time = 0.0
+            kb._HEALTH_METRICS_CACHE_TTL = 300
             return kb
 
     def test_empty_kb(self):

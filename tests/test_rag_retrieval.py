@@ -184,12 +184,23 @@ class TestContextualEnrichmentIntegration:
 class TestHybridSearch:
     """Test BM25 + vector hybrid search functionality."""
 
-    def test_build_bm25_retriever_with_documents(self):
-        """Test BM25 retriever construction from ChromaDB data."""
+    def _make_kb_mock(self):
+        """Create a KnowledgeBaseManager mock with cache attributes."""
         from src.document_processing.kb_manager import KnowledgeBaseManager
 
         kb = MagicMock(spec=KnowledgeBaseManager)
         kb.collection = MagicMock()
+        kb._bm25_retriever_cache = None
+        kb._bm25_retriever_cache_time = 0.0
+        kb._bm25_cache_top_k = None
+        kb._BM25_CACHE_TTL = 300
+        return kb
+
+    def test_build_bm25_retriever_with_documents(self):
+        """Test BM25 retriever construction from ChromaDB data."""
+        from src.document_processing.kb_manager import KnowledgeBaseManager
+
+        kb = self._make_kb_mock()
         kb.collection.get.return_value = {
             "ids": ["id1", "id2"],
             "documents": ["First document text", "Second document text"],
@@ -206,8 +217,7 @@ class TestHybridSearch:
         """Test BM25 retriever returns None for empty collection."""
         from src.document_processing.kb_manager import KnowledgeBaseManager
 
-        kb = MagicMock(spec=KnowledgeBaseManager)
-        kb.collection = MagicMock()
+        kb = self._make_kb_mock()
         kb.collection.get.return_value = {
             "ids": [],
             "documents": [],

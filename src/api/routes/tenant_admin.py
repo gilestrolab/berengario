@@ -194,6 +194,7 @@ def create_tenant_admin_router(
                     JoinRequest.status == JoinRequestStatus.PENDING,
                 )
                 .order_by(JoinRequest.created_at.desc())
+                .limit(500)
                 .all()
             )
 

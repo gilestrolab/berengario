@@ -103,6 +103,8 @@ class ConversationsResponse(BaseModel):
 
     conversations: List[ConversationListItem]
     total_count: int
+    limit: int = 100
+    offset: int = 0
 
 
 class ConversationMessagesResponse(BaseModel):

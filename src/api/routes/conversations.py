@@ -98,9 +98,11 @@ def create_conversations_router(
     @router.get("/conversations", response_model=ConversationsResponse)
     def list_conversations(
         session=Depends(require_auth),
+        limit: int = 100,
+        offset: int = 0,
     ):
         """
-        Get list of all conversations for authenticated user.
+        Get list of conversations for authenticated user (paginated).
 
         Returns conversations from database (both email and webchat) sorted by
         most recent activity.
@@ -109,10 +111,15 @@ def create_conversations_router(
 
         Args:
             session: Authenticated session (injected by dependency)
+            limit: Maximum number of conversations to return (default 100)
+            offset: Number of conversations to skip (default 0)
 
         Returns:
             ConversationsResponse with list of conversations
         """
+        limit = min(max(limit, 1), 500)
+        offset = max(offset, 0)
+
         user_email = (
             session.email if hasattr(session, "email") and session.email else None
         )
@@ -127,7 +134,8 @@ def create_conversations_router(
                 .order_by(desc(Conversation.last_message_at))
             )
 
-            conversations = conversations_query.all()
+            total_count = conversations_query.count()
+            conversations = conversations_query.limit(limit).offset(offset).all()
             conversation_items = []
 
             for conv in conversations:
@@ -177,7 +185,9 @@ def create_conversations_router(
 
             return ConversationsResponse(
                 conversations=conversation_items,
-                total_count=len(conversation_items),
+                total_count=total_count,
+                limit=limit,
+                offset=offset,
             )
 
     @router.get(
@@ -226,11 +236,11 @@ def create_conversations_router(
                     detail="Access denied. You can only view your own conversations.",
                 )
 
-            # Get all messages ordered by message_order
             messages = (
                 db_session.query(ConversationMessage)
                 .filter(ConversationMessage.conversation_id == conversation_id)
                 .order_by(ConversationMessage.message_order)
+                .limit(500)
                 .all()
             )
 
@@ -323,6 +333,7 @@ def create_conversations_router(
     def search_conversations(
         q: str,
         session=Depends(require_auth),
+        limit: int = 50,
     ):
         """
         Search conversations by content, subject, or sender.
@@ -371,7 +382,8 @@ def create_conversations_router(
                 .order_by(desc(Conversation.last_message_at))
             )
 
-            conversations = conversations_query.all()
+            limit = min(max(limit, 1), 200)
+            conversations = conversations_query.limit(limit).all()
             results = []
 
             for conv in conversations:

@@ -54,6 +54,17 @@ class KnowledgeBaseManager:
         self._unique_docs_cache_time: float = 0.0
         self._UNIQUE_DOCS_CACHE_TTL = 300  # 5 minutes
 
+        # BM25 retriever cache (avoids reloading all chunks per query)
+        self._bm25_retriever_cache = None
+        self._bm25_retriever_cache_time: float = 0.0
+        self._bm25_cache_top_k: Optional[int] = None
+        self._BM25_CACHE_TTL = 300  # 5 minutes
+
+        # Health metrics cache
+        self._health_metrics_cache: Optional[dict] = None
+        self._health_metrics_cache_time: float = 0.0
+        self._HEALTH_METRICS_CACHE_TTL = 300  # 5 minutes
+
         # Ensure DB directory exists
         self.db_path.mkdir(parents=True, exist_ok=True)
 
@@ -475,8 +486,10 @@ class KnowledgeBaseManager:
             return 0
 
     def _invalidate_docs_cache(self) -> None:
-        """Invalidate the unique documents cache."""
+        """Invalidate all document-related caches."""
         self._unique_docs_cache = None
+        self._bm25_retriever_cache = None
+        self._health_metrics_cache = None
 
     def get_unique_documents(self) -> List[dict]:
         """
@@ -545,6 +558,13 @@ class KnowledgeBaseManager:
         """
         import statistics
         import time
+
+        now = time.time()
+        if (
+            self._health_metrics_cache is not None
+            and now - self._health_metrics_cache_time < self._HEALTH_METRICS_CACHE_TTL
+        ):
+            return self._health_metrics_cache
 
         try:
             results = self.collection.get(include=["metadatas"])
@@ -660,7 +680,7 @@ class KnowledgeBaseManager:
                 else 0.0
             )
 
-            return {
+            result = {
                 "total_documents": total_documents,
                 "total_chunks": total_chunks,
                 "avg_chunks_per_doc": round(avg_chunks, 1),
@@ -676,6 +696,9 @@ class KnowledgeBaseManager:
                 "chunk_distribution": chunk_dist,
                 "documents": doc_list,
             }
+            self._health_metrics_cache = result
+            self._health_metrics_cache_time = time.time()
+            return result
 
         except Exception as e:
             logger.error(f"Error computing KB health metrics: {e}", exc_info=True)
@@ -731,7 +754,7 @@ class KnowledgeBaseManager:
         """
         Build a BM25 retriever from all ChromaDB documents.
 
-        Loads all stored chunks into memory for keyword-based retrieval.
+        Uses a TTL cache to avoid reloading all chunks on every query.
 
         Args:
             top_k: Number of top results to retrieve.
@@ -739,6 +762,16 @@ class KnowledgeBaseManager:
         Returns:
             BM25Retriever instance, or None if no documents exist.
         """
+        import time as _time
+
+        now = _time.time()
+        if (
+            self._bm25_retriever_cache is not None
+            and self._bm25_cache_top_k == top_k
+            and now - self._bm25_retriever_cache_time < self._BM25_CACHE_TTL
+        ):
+            return self._bm25_retriever_cache
+
         try:
             results = self.collection.get(include=["documents", "metadatas"])
 
@@ -757,6 +790,10 @@ class KnowledgeBaseManager:
 
             retriever = BM25Retriever.from_defaults(nodes=nodes, similarity_top_k=top_k)
             logger.info(f"BM25 retriever built with {len(nodes)} nodes")
+
+            self._bm25_retriever_cache = retriever
+            self._bm25_retriever_cache_time = now
+            self._bm25_cache_top_k = top_k
             return retriever
 
         except Exception as e:

@@ -218,7 +218,7 @@ class TestJoinRequests:
         @contextmanager
         def fake_session():
             s = MagicMock()
-            s.query.return_value.filter.return_value.order_by.return_value.all.return_value = [
+            s.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [
                 jr
             ]
             yield s

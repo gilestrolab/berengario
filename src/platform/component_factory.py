@@ -70,7 +70,8 @@ class TenantComponentFactory:
         self,
         storage_backend: Optional["StorageBackend"] = None,  # noqa: F821
         db_manager: Optional["TenantDBManager"] = None,  # noqa: F821
-        max_cached: int = 20,
+        max_cached: int = 5,
+        idle_ttl_seconds: int = 1800,
     ):
         """
         Initialize the component factory.
@@ -83,10 +84,14 @@ class TenantComponentFactory:
         self._storage_backend = storage_backend
         self._db_manager = db_manager
         self._max_cached = max_cached
+        self._idle_ttl = idle_ttl_seconds
         self._cache: OrderedDict[str, _CacheEntry] = OrderedDict()
         self._lock = threading.Lock()
 
-        logger.info(f"TenantComponentFactory initialized: max_cached={max_cached}")
+        logger.info(
+            f"TenantComponentFactory initialized: max_cached={max_cached}, "
+            f"idle_ttl={idle_ttl_seconds}s"
+        )
 
     def get_components(self, ctx: TenantContext) -> TenantComponents:
         """
@@ -98,6 +103,7 @@ class TenantComponentFactory:
         Returns:
             TenantComponents with fully initialized component stack.
         """
+        self.evict_idle()
         slug = ctx.tenant_slug
 
         with self._lock:
@@ -149,6 +155,7 @@ class TenantComponentFactory:
         if not self._storage_backend:
             raise ValueError("storage_backend required for slug-based lookup")
 
+        self.evict_idle()
         # Check cache first to avoid DB lookup
         with self._lock:
             if slug in self._cache:
@@ -171,6 +178,32 @@ class TenantComponentFactory:
 
         ctx = TenantContext.from_tenant(tenant, self._storage_backend)
         return self.get_components(ctx)
+
+    def evict_idle(self, max_idle_seconds: Optional[int] = None) -> int:
+        """
+        Remove entries idle longer than threshold.
+
+        Args:
+            max_idle_seconds: Override idle threshold (default: self._idle_ttl).
+
+        Returns:
+            Number of entries evicted.
+        """
+        threshold = max_idle_seconds if max_idle_seconds is not None else self._idle_ttl
+        now = time.time()
+        evicted = 0
+        with self._lock:
+            stale_keys = [
+                k
+                for k, entry in self._cache.items()
+                if now - entry.last_used > threshold
+            ]
+            for key in stale_keys:
+                self._cache.pop(key)
+                evicted += 1
+        if evicted:
+            logger.info(f"Evicted {evicted} idle tenant(s) from component cache")
+        return evicted
 
     def evict(self, slug: str) -> None:
         """
