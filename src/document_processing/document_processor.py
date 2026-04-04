@@ -6,6 +6,7 @@ Supports: PDF, DOCX, PPTX, TXT, CSV, XLS, XLSX.
 
 import hashlib
 import logging
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
@@ -32,6 +33,79 @@ SUPPORTED_EXTENSIONS: Set[str] = {
     ".xls",
     ".xlsx",
 }
+
+# Chunks shorter than this are dropped after splitting — they carry no
+# useful semantic signal and bloat the index. Applied only when a document
+# produces multiple chunks (single-chunk docs are kept as-is).
+MIN_CHUNK_CHARS = 50
+
+# A document is "pathologically chunked" when it produces many chunks
+# whose average size is far below the configured target. Both conditions
+# must hold: enough chunks to be meaningful, and avg-vs-configured far off.
+PATHOLOGICAL_MIN_CHUNKS = 20
+PATHOLOGICAL_SIZE_RATIO = 0.2  # avg chunk < 20% of configured chunk_size
+
+# Line endings that indicate a sentence/clause boundary — lines ending in
+# these are preserved; others are joined with the following line.
+_SENTENCE_TERMINATORS = (".", "!", "?", ":", ";")
+
+
+def _normalize_extracted_text(text: str) -> str:
+    """Collapse fragmented PDF/DOCX extraction into coherent paragraphs.
+
+    Many PDF extractors return text with visual line breaks that don't
+    correspond to real paragraph boundaries (wrapped lines, multi-column
+    layouts, tables, template placeholders). Feeding this directly to a
+    sentence splitter produces pathologically tiny chunks with heavy
+    overlap. This helper rejoins wrapped lines while preserving real
+    paragraph separators.
+
+    - strip trailing whitespace from each line
+    - join consecutive non-empty lines into one paragraph unless the
+      preceding line ends in a sentence terminator
+    - collapse runs of 3+ newlines to exactly two
+    - collapse runs of 2+ spaces to a single space
+    """
+    if not text:
+        return text
+
+    out_lines: List[str] = []
+    for raw_line in text.split("\n"):
+        line = raw_line.rstrip()
+        if not line:
+            # Blank line → paragraph break
+            if out_lines and out_lines[-1] != "":
+                out_lines.append("")
+            continue
+        if (
+            out_lines
+            and out_lines[-1]
+            and not out_lines[-1].rstrip().endswith(_SENTENCE_TERMINATORS)
+        ):
+            # Join with previous line (un-wrap)
+            out_lines[-1] = out_lines[-1].rstrip() + " " + line
+        else:
+            out_lines.append(line)
+
+    # Rebuild: blank entries become paragraph separators
+    rebuilt_parts: List[str] = []
+    current_para: List[str] = []
+    for entry in out_lines:
+        if entry == "":
+            if current_para:
+                rebuilt_parts.append(" ".join(current_para))
+                current_para = []
+        else:
+            current_para.append(entry)
+    if current_para:
+        rebuilt_parts.append(" ".join(current_para))
+
+    result = "\n\n".join(rebuilt_parts)
+    # Final whitespace cleanup
+    result = re.sub(r" {2,}", " ", result)
+    result = re.sub(r"\n{3,}", "\n\n", result)
+    return result.strip()
+
 
 # Lazy import to avoid circular dependencies and API key errors during initialization
 _enhancement_processor = None
@@ -137,7 +211,7 @@ class DocumentProcessor:
                 page_text = page.extract_text()
                 if page_text:
                     text.append(page_text)
-            return "\n\n".join(text)
+            return _normalize_extracted_text("\n\n".join(text))
         except Exception as e:
             logger.error(f"Error extracting text from PDF {file_path}: {e}")
             raise
@@ -161,7 +235,7 @@ class DocumentProcessor:
             for paragraph in doc.paragraphs:
                 if paragraph.text.strip():
                     text.append(paragraph.text)
-            return "\n\n".join(text)
+            return _normalize_extracted_text("\n\n".join(text))
         except Exception as e:
             logger.error(f"Error extracting text from DOCX {file_path}: {e}")
             raise
@@ -587,6 +661,41 @@ class DocumentProcessor:
 
             # Split into chunks
             nodes = self.splitter.get_nodes_from_documents([document])
+
+            # Drop chunks too short to carry meaning (bullet markers, page
+            # numbers, stray punctuation left over from PDF extraction).
+            # Only filter when we'd still be left with chunks — never drop
+            # a document to zero chunks via filtering.
+            if len(nodes) > 1:
+                original_count = len(nodes)
+                filtered = [n for n in nodes if len(n.text.strip()) >= MIN_CHUNK_CHARS]
+                if filtered:
+                    nodes = filtered
+                    dropped = original_count - len(nodes)
+                    if dropped:
+                        logger.info(
+                            f"Filtered {dropped} tiny chunks "
+                            f"(<{MIN_CHUNK_CHARS} chars) from {file_path.name}"
+                        )
+
+            # Sanity guard: many chunks whose average size is far below the
+            # configured chunk_size indicates broken extraction (handbook bug).
+            if len(nodes) >= PATHOLOGICAL_MIN_CHUNKS:
+                avg_size = sum(len(n.text) for n in nodes) / len(nodes)
+                min_avg = self.chunk_size * PATHOLOGICAL_SIZE_RATIO
+                if avg_size < min_avg:
+                    logger.error(
+                        f"Pathological chunking detected for {file_path.name}: "
+                        f"{len(nodes)} chunks with avg size {avg_size:.0f} chars "
+                        f"(configured chunk_size={self.chunk_size}, "
+                        f"minimum acceptable avg={min_avg:.0f}). "
+                        f"Rejecting document — extraction quality is broken."
+                    )
+                    raise ValueError(
+                        f"Document {file_path.name} produced {len(nodes)} "
+                        f"chunks of avg {avg_size:.0f} chars "
+                        f"(expected >={min_avg:.0f}); extraction is broken"
+                    )
 
             # Prepend contextual headers to each chunk for improved retrieval
             if settings.contextual_enrichment_enabled:
