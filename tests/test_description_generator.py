@@ -15,7 +15,7 @@ class TestDescriptionGeneratorDBScoping:
 
     def _make_generator(self, db_manager=None):
         """Create a DescriptionGenerator with mocked LLM client."""
-        with patch("src.document_processing.description_generator.OpenAI"):
+        with patch("src.document_processing.description_generator.get_openai_client"):
             from src.document_processing.description_generator import (
                 DescriptionGenerator,
             )
@@ -49,7 +49,7 @@ class TestDescriptionGeneratorDBScoping:
     def test_falls_back_to_global_db_manager(self):
         """Test that default db_manager is used when none injected."""
         with (
-            patch("src.document_processing.description_generator.OpenAI"),
+            patch("src.document_processing.description_generator.get_openai_client"),
             patch("src.email.db_manager.db_manager") as mock_global_db,
         ):
             from src.document_processing.description_generator import (

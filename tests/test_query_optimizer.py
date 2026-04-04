@@ -31,7 +31,7 @@ class TestQueryOptimizer:
     @pytest.fixture
     def mock_openai_client(self):
         """Create a mock OpenAI client."""
-        with patch("src.rag.query_optimizer.OpenAIClient") as mock:
+        with patch("src.rag.query_optimizer.get_openai_client") as mock:
             client_instance = MagicMock()
             mock.return_value = client_instance
 
@@ -66,7 +66,7 @@ class TestQueryOptimizer:
         """Test optimizer initialization when disabled."""
         mock_settings.query_optimization_enabled = False
 
-        with patch("src.rag.query_optimizer.OpenAIClient"):
+        with patch("src.rag.query_optimizer.get_openai_client"):
             optimizer = QueryOptimizer()
 
         assert optimizer.enabled is False

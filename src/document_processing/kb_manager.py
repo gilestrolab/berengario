@@ -15,10 +15,10 @@ from chromadb.errors import NotFoundError
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.schema import TextNode
-from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
 from src.config import settings
+from src.shared_clients import get_embedding_model
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +68,11 @@ class KnowledgeBaseManager:
         # Ensure DB directory exists
         self.db_path.mkdir(parents=True, exist_ok=True)
 
-        # Initialize embedding model (uses Naga.ac via OpenAI-compatible API)
-        self.embed_model = OpenAIEmbedding(
-            model=embedding_model or settings.openai_embedding_model,
-            api_key=embedding_api_key or settings.openai_api_key,
-            api_base=embedding_api_base or settings.openai_api_base,
+        # Use shared embedding model singleton (keyed by model/key/base)
+        self.embed_model = get_embedding_model(
+            model=embedding_model,
+            api_key=embedding_api_key,
+            api_base=embedding_api_base,
         )
 
         # Initialize ChromaDB client

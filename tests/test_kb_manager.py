@@ -28,7 +28,7 @@ class TestKnowledgeBaseManager:
     def kb_manager(self, temp_db_path):
         """Create a KnowledgeBaseManager instance for testing."""
         with patch(
-            "src.document_processing.kb_manager.OpenAIEmbedding",
+            "src.document_processing.kb_manager.get_embedding_model",
             return_value=MockEmbedding(),
         ):
             manager = KnowledgeBaseManager(
@@ -44,7 +44,7 @@ class TestKnowledgeBaseManager:
             temp_db_path: Temporary DB path fixture.
         """
         with patch(
-            "src.document_processing.kb_manager.OpenAIEmbedding",
+            "src.document_processing.kb_manager.get_embedding_model",
             return_value=MockEmbedding(),
         ):
             manager = KnowledgeBaseManager(

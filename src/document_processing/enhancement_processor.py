@@ -8,10 +8,9 @@ for better RAG retrieval.
 import logging
 from typing import Dict, List, Optional
 
-from openai import OpenAI as OpenAIClient
-
 from src.config import settings
 from src.llm_utils import llm_call_with_fallback
+from src.shared_clients import get_openai_client
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +38,8 @@ class EnhancementProcessor:
         self.llm_model = llm_model or settings.openrouter_model
         self.max_tokens = max_tokens
 
-        # Initialize OpenAI-compatible client (OpenRouter)
-        self.client = OpenAIClient(
-            api_key=settings.openrouter_api_key,
-            base_url=settings.openrouter_api_base,
-        )
+        # Use shared OpenAI client
+        self.client = get_openai_client()
 
         logger.info(f"EnhancementProcessor initialized with model: {self.llm_model}")
 

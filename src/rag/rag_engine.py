@@ -9,12 +9,11 @@ import logging
 from typing import Any, Dict, Optional
 
 from llama_index.core import PromptTemplate
-from llama_index.llms.openai import OpenAI
-from openai import OpenAI as OpenAIClient
 
 from src.config import settings
 from src.document_processing.kb_manager import KnowledgeBaseManager
 from src.rag.tools import ToolExecutor, get_registry
+from src.shared_clients import get_llama_llm, get_openai_client
 
 logger = logging.getLogger(__name__)
 
@@ -130,25 +129,8 @@ class RAGEngine:
         self.enable_function_calling = enable_function_calling
         self.tenant_context = tenant_context
 
-        # Initialize LLM (uses OpenAI-compatible API like Naga.ac)
-        # WORKAROUND: Use "gpt-4" to pass validation, but actual model is sent to API
-        # The custom api_base will route to the correct model (self.llm_model)
-        self.llm = OpenAI(
-            model="gpt-4",  # Dummy model name for validation
-            api_key=settings.openrouter_api_key,
-            api_base=settings.openrouter_api_base,
-            temperature=0.1,  # Low temperature for factual responses
-            context_window=200000,  # Large context window
-            max_tokens=4096,
-            is_chat_model=True,
-            default_headers={
-                "HTTP-Referer": "https://github.com/gilestrolab/berengario",
-            },
-            # Additional model parameters to override in API calls
-            additional_kwargs={
-                "model": self.llm_model
-            },  # Pass actual model in API calls
-        )
+        # Use shared LLM client (cached by model name; api_key/base are global)
+        self.llm = get_llama_llm(self.llm_model)
 
         # Initialize tool system for function calling
         if self.enable_function_calling:
@@ -156,11 +138,8 @@ class RAGEngine:
             self.tool_executor = ToolExecutor(self.tool_registry)
             self.tools = self.tool_registry.get_openai_functions()
 
-            # Create OpenAI client for function calling
-            self.openai_client = OpenAIClient(
-                api_key=settings.openrouter_api_key,
-                base_url=settings.openrouter_api_base,
-            )
+            # Use shared raw OpenAI client for function calling
+            self.openai_client = get_openai_client()
             logger.info(f"Function calling enabled with {len(self.tools)} tools")
         else:
             self.tool_registry = None
@@ -233,20 +212,8 @@ class RAGEngine:
                 f"retrying with fallback model {fallback}"
             )
 
-            # Swap LLM to fallback model and rebuild query engine
-            fallback_llm = OpenAI(
-                model="gpt-4",
-                api_key=settings.openrouter_api_key,
-                api_base=settings.openrouter_api_base,
-                temperature=0.1,
-                context_window=200000,
-                max_tokens=4096,
-                is_chat_model=True,
-                default_headers={
-                    "HTTP-Referer": "https://github.com/gilestrolab/berengario",
-                },
-                additional_kwargs={"model": fallback},
-            )
+            # Swap LLM to fallback model (shared, cached by model name)
+            fallback_llm = get_llama_llm(fallback)
             ctx = self.tenant_context
             top_k = ctx.top_k_retrieval if ctx else settings.top_k_retrieval
             fallback_engine = self.kb_manager.get_query_engine(

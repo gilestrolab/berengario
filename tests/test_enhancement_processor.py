@@ -18,7 +18,7 @@ class TestEnhancementProcessor:
     def mock_openai_client(self):
         """Create a mock OpenAI client."""
         with patch(
-            "src.document_processing.enhancement_processor.OpenAIClient"
+            "src.document_processing.enhancement_processor.get_openai_client"
         ) as mock:
             client_instance = MagicMock()
             mock.return_value = client_instance

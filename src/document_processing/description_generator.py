@@ -9,11 +9,11 @@ from datetime import datetime
 from typing import List, Optional
 
 from llama_index.core.schema import TextNode
-from openai import OpenAI
 
 from src.config import settings
 from src.email.db_models import DocumentDescription
 from src.llm_utils import llm_call_with_fallback
+from src.shared_clients import get_openai_client
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +35,8 @@ class DescriptionGenerator:
                 When None, uses the global default db_manager (ST mode).
                 In MT mode, pass a TenantDBSessionAdapter for tenant isolation.
         """
-        # Use OpenRouter for LLM calls
-        self.client = OpenAI(
-            base_url=settings.openrouter_api_base,
-            api_key=settings.openrouter_api_key,
-        )
+        # Use shared OpenAI client
+        self.client = get_openai_client()
         self.model = settings.openrouter_model
 
         if db_manager is not None:

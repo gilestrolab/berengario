@@ -10,11 +10,11 @@ Uses LLM-based optimization to enhance user queries through:
 import logging
 from typing import Optional
 
-from openai import OpenAI as OpenAIClient
 from openai import OpenAIError
 
 from src.config import settings
 from src.llm_utils import llm_call_with_fallback
+from src.shared_clients import get_openai_client
 
 logger = logging.getLogger(__name__)
 
@@ -58,12 +58,8 @@ class QueryOptimizer:
         self.timeout = timeout or settings.query_optimization_timeout
 
         if self.enabled:
-            # Initialize OpenAI client for LLM calls
-            self.client = OpenAIClient(
-                api_key=settings.openrouter_api_key,
-                base_url=settings.openrouter_api_base,
-                timeout=self.timeout,
-            )
+            # Use shared OpenAI client (per-call timeout passed at call time)
+            self.client = get_openai_client()
             logger.info(
                 f"QueryOptimizer initialized with model {self.model} (enabled={self.enabled})"
             )
@@ -180,6 +176,7 @@ Optimized query:"""
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=self.max_tokens,
                 temperature=self.temperature,
+                timeout=self.timeout,
                 extra_headers={
                     "HTTP-Referer": "https://github.com/gilestrolab/berengario"
                 },
