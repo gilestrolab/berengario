@@ -221,6 +221,33 @@ class TenantDBManager:
         TenantBase.metadata.create_all(bind=engine)
         logger.info(f"Tenant database tables created for: {db_name}")
 
+    def migrate_existing_tenant_schemas(self) -> None:
+        """Run create_all against every active tenant DB to add missing tables.
+
+        SQLAlchemy's create_all is idempotent: existing tables are left
+        untouched, only new ones (e.g., pending_teach_submissions added
+        post-launch) are created. Safe to call on every startup.
+        """
+        try:
+            tenants = self.get_active_tenants()
+        except Exception as e:
+            logger.warning("Could not enumerate tenants for schema migration: %s", e)
+            return
+
+        for tenant in tenants:
+            db_name = tenant.db_name
+            if not db_name:
+                continue
+            try:
+                self.init_tenant_db(db_name)
+            except Exception as e:
+                logger.warning(
+                    "Tenant schema migration failed for %s (%s): %s",
+                    tenant.slug,
+                    db_name,
+                    e,
+                )
+
     def create_tenant_database(self, db_name: str) -> bool:
         """
         Create a new tenant database (MariaDB CREATE DATABASE).

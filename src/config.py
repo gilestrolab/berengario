@@ -118,6 +118,13 @@ class Settings(BaseSettings):
         description="Send welcome emails when users are added to a team",
     )
 
+    # Teach Moderation
+    teach_moderation_enabled: bool = Field(
+        default=True,
+        description="Queue teach attempts from non-teacher users (role=querier) "
+        "for admin review instead of silently dropping them",
+    )
+
     # Forwarded Email Detection
     forward_to_kb_enabled: bool = Field(
         default=True,

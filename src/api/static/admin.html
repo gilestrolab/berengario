@@ -86,6 +86,74 @@
             display: block;
         }
 
+        .tab-badge {
+            display: inline-block;
+            min-width: 1.4rem;
+            margin-left: 0.4rem;
+            padding: 0.05rem 0.45rem;
+            background: #c0392b;
+            color: white;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            line-height: 1.2;
+            text-align: center;
+            vertical-align: 1px;
+        }
+
+        .moderation-list {
+            border: 1px solid var(--border, #D5C9B8);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .moderation-row {
+            display: grid;
+            grid-template-columns: minmax(180px, 1fr) minmax(220px, 2fr) auto auto;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border, #D5C9B8);
+            cursor: pointer;
+            background: white;
+            align-items: center;
+        }
+
+        .moderation-row:hover { background: #faf6f0; }
+        .moderation-row.empty { color: var(--text-secondary, #8C8279); cursor: default; text-align: center; display: block; padding: 1.5rem; }
+        .moderation-row .meta { color: var(--text-secondary, #8C8279); font-size: 0.85rem; }
+        .moderation-row .status-pending { color: #c0392b; font-weight: 600; }
+        .moderation-row .status-approved { color: #27ae60; font-weight: 600; }
+        .moderation-row .status-rejected { color: #7f8c8d; font-weight: 600; }
+
+        .moderation-detail {
+            border: 1px solid var(--border, #D5C9B8);
+            border-radius: 6px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1rem;
+            background: white;
+        }
+
+        .moderation-detail h4 { margin: 0 0 0.5rem 0; }
+        .moderation-detail .field-label { color: var(--text-secondary, #8C8279); font-size: 0.85rem; margin-top: 0.5rem; }
+        .moderation-detail pre.body-preview {
+            white-space: pre-wrap;
+            background: #faf6f0;
+            padding: 0.75rem;
+            border-radius: 4px;
+            max-height: 240px;
+            overflow: auto;
+        }
+
+        .moderation-actions { display: flex; gap: 0.5rem; margin-top: 1rem; align-items: center; flex-wrap: wrap; }
+        .moderation-actions textarea { flex: 1; min-width: 220px; padding: 0.5rem; border: 1px solid var(--border, #D5C9B8); border-radius: 4px; font-family: inherit; }
+        .moderation-actions .approve-btn { background: #27ae60; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
+        .moderation-actions .reject-btn { background: #c0392b; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
+        .moderation-actions label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; }
+        .moderation-filters { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+        .moderation-filters button { padding: 0.4rem 0.8rem; border: 1px solid var(--border, #D5C9B8); background: white; cursor: pointer; border-radius: 4px; }
+        .moderation-filters button.active { background: var(--primary, #7A5C3E); color: white; border-color: var(--primary, #7A5C3E); }
+
         .team-section {
             margin-bottom: 2rem;
         }
@@ -2414,6 +2482,7 @@
             <button class="tab" data-tab="kbhealth">KB Health</button>
             <button class="tab" data-tab="feedback">Feedback</button>
             <button class="tab" data-tab="documents">Documents</button>
+            <button class="tab" data-tab="moderation">Moderation <span id="moderation-badge" class="tab-badge" style="display:none;">0</span></button>
             <button class="tab" data-tab="webcrawl">Web Crawling</button>
             <button class="tab" data-tab="backups">Backups</button>
             <button class="tab" data-tab="settings">Settings</button>
@@ -2791,6 +2860,20 @@
         </div>
 
         <!-- Web Crawling Tab -->
+        <!-- Moderation Tab -->
+        <div id="moderation-tab" class="tab-content">
+            <h3><i class="fas fa-user-shield"></i> Teaching Submissions Awaiting Review</h3>
+            <p class="section-description">Material sent to the teach address by users who don't currently have permission to teach. Approve to add to the knowledge base; optionally promote the sender to teacher.</p>
+            <div class="moderation-filters">
+                <button class="active" data-mod-filter="pending">Pending</button>
+                <button data-mod-filter="approved">Approved</button>
+                <button data-mod-filter="rejected">Rejected</button>
+                <button data-mod-filter="all">All</button>
+            </div>
+            <div id="moderation-detail-container"></div>
+            <div id="moderation-list" class="moderation-list"></div>
+        </div>
+
         <div id="webcrawl-tab" class="tab-content">
             <div class="webcrawl-section">
                 <div class="upload-section">
@@ -2999,5 +3082,6 @@
     <script src="/static/admin-kb-health.js?v=20260303-1"></script>
     <script src="/static/admin-feedback.js?v=20260305"></script>
     <script src="/static/admin-billing.js?v=20260306"></script>
+    <script src="/static/admin-moderation.js?v=20260501"></script>
 </body>
 </html>

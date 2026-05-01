@@ -107,6 +107,7 @@ def bootstrap_platform(*, include_provisioner: bool = False) -> PlatformInfra:
 
     db_manager = TenantDBManager()
     db_manager.init_platform_db()
+    db_manager.migrate_existing_tenant_schemas()
 
     storage = create_storage_backend()
 

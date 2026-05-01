@@ -652,3 +652,126 @@ class ResponseFeedback(Base):
                 else self.channel
             ),
         }
+
+
+class PendingSubmissionStatus(enum.Enum):
+    """Status of a pending teach submission awaiting moderation."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class PendingTeachSubmission(Base):
+    """
+    Teach attempts from users without teach permission, queued for admin review.
+
+    When a registered tenant user with role=querier emails the teach address,
+    the submission lands here instead of being silently dropped. An admin can
+    review the material, then approve (optionally promoting the sender to
+    teacher) or reject it.
+
+    Attributes:
+        id: UUID primary key.
+        submitter_email: Email of the user who attempted to teach.
+        subject: Subject line of the original email.
+        body_text: Body text of the original email.
+        attachment_keys: JSON list of {filename, key, size, mime_type} for
+            attachments stored in the storage backend.
+        original_message_id: Original RFC822 Message-ID of the email.
+        status: PENDING, APPROVED, or REJECTED.
+        created_at: When the submission was queued.
+        reviewed_at: When admin made a decision (nullable).
+        reviewed_by: Email of the admin who decided (nullable).
+        promoted_to_teacher: Whether approval also promoted the sender's role.
+        decision_notes: Free-text notes from the admin (nullable).
+    """
+
+    __tablename__ = "pending_teach_submissions"
+
+    id = Column(String(36), primary_key=True, nullable=False)
+    submitter_email = Column(String(255), nullable=False, index=True)
+    subject = Column(String(500), nullable=True)
+    body_text = Column(Text, nullable=True)
+    attachment_keys = Column(JSON, nullable=False, default=list)
+    original_message_id = Column(String(255), nullable=True, index=True)
+    status = Column(
+        Enum(PendingSubmissionStatus),
+        nullable=False,
+        default=PendingSubmissionStatus.PENDING,
+        index=True,
+    )
+    created_at = Column(DateTime, nullable=False, index=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    reviewed_by = Column(String(255), nullable=True)
+    promoted_to_teacher = Column(Boolean, nullable=False, default=False)
+    decision_notes = Column(Text, nullable=True)
+
+    __table_args__ = (Index("idx_status_created", "status", "created_at"),)
+
+    def __init__(
+        self,
+        id: str,
+        submitter_email: str,
+        attachment_keys: Optional[list] = None,
+        subject: Optional[str] = None,
+        body_text: Optional[str] = None,
+        original_message_id: Optional[str] = None,
+        status: PendingSubmissionStatus = PendingSubmissionStatus.PENDING,
+        created_at: Optional[datetime] = None,
+        reviewed_at: Optional[datetime] = None,
+        reviewed_by: Optional[str] = None,
+        promoted_to_teacher: bool = False,
+        decision_notes: Optional[str] = None,
+    ):
+        """Initialize PendingTeachSubmission with defaults."""
+        self.id = id
+        self.submitter_email = submitter_email
+        self.subject = subject
+        self.body_text = body_text
+        self.attachment_keys = attachment_keys or []
+        self.original_message_id = original_message_id
+        self.status = status
+        self.created_at = created_at or datetime.utcnow()
+        self.reviewed_at = reviewed_at
+        self.reviewed_by = reviewed_by
+        self.promoted_to_teacher = promoted_to_teacher
+        self.decision_notes = decision_notes
+
+    def __repr__(self) -> str:
+        """String representation of PendingTeachSubmission."""
+        status = (
+            self.status.value
+            if isinstance(self.status, PendingSubmissionStatus)
+            else self.status
+        )
+        return (
+            f"<PendingTeachSubmission(id='{self.id}', "
+            f"submitter='{self.submitter_email}', status='{status}')>"
+        )
+
+    def to_dict(self) -> dict:
+        """
+        Convert model to dictionary.
+
+        Returns:
+            Dictionary representation of the model.
+        """
+        return {
+            "id": self.id,
+            "submitter_email": self.submitter_email,
+            "subject": self.subject,
+            "body_text": self.body_text,
+            "attachment_keys": self.attachment_keys or [],
+            "original_message_id": self.original_message_id,
+            "status": (
+                self.status.value
+                if isinstance(self.status, PendingSubmissionStatus)
+                else self.status
+            ),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "reviewed_at": (self.reviewed_at.isoformat() if self.reviewed_at else None),
+            "reviewed_by": self.reviewed_by,
+            "promoted_to_teacher": self.promoted_to_teacher,
+            "decision_notes": self.decision_notes,
+        }

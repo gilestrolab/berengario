@@ -38,6 +38,7 @@ from src.api.routes.analytics import create_analytics_router
 from src.api.routes.auth import create_auth_router
 from src.api.routes.conversations import create_conversations_router
 from src.api.routes.feedback import create_feedback_router
+from src.api.routes.moderation import create_moderation_router
 from src.api.routes.query import create_query_router
 from src.api.routes.team import create_team_router
 from src.config import settings
@@ -360,6 +361,16 @@ team_router = create_team_router(
     email_sender=email_sender,
 )
 
+moderation_router = create_moderation_router(
+    platform_db_manager=platform_db_manager,
+    require_admin=require_admin,
+    component_resolver=component_resolver,
+    storage_backend=storage_backend,
+    email_sender=email_sender,
+    kb_manager=kb_manager,
+    document_processor=document_processor,
+)
+
 # Include routers
 app.include_router(feedback_router)
 app.include_router(conversations_router)
@@ -367,6 +378,7 @@ app.include_router(query_router)
 app.include_router(admin_router)
 app.include_router(analytics_router)
 app.include_router(team_router)
+app.include_router(moderation_router)
 
 # Billing router (always available — uses platform DB for subscription management)
 from src.billing.router import create_billing_router  # noqa: E402

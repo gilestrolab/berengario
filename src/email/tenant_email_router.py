@@ -111,6 +111,56 @@ class TenantEmailRouter:
             return role in self._QUERY_ROLES
         return False
 
+    def get_tenant_admin_emails(self, tenant_id) -> List[str]:
+        """
+        Look up admin emails for a given tenant.
+
+        Args:
+            tenant_id: Tenant UUID.
+
+        Returns:
+            List of email addresses for users with role=admin in that tenant.
+        """
+        from src.platform.models import TenantUser, TenantUserRole
+
+        with self._db_manager.get_platform_session() as session:
+            rows = (
+                session.query(TenantUser)
+                .filter(
+                    TenantUser.tenant_id == tenant_id,
+                    TenantUser.role == TenantUserRole.ADMIN,
+                )
+                .all()
+            )
+            return [r.email for r in rows]
+
+    def promote_to_teacher(self, sender_email: str, tenant_id) -> bool:
+        """
+        Promote a sender's TenantUser role from querier to teacher.
+
+        Args:
+            sender_email: User's email address.
+            tenant_id: Tenant UUID.
+
+        Returns:
+            True if a row was updated, False otherwise.
+        """
+        from src.platform.models import TenantUser, TenantUserRole
+
+        with self._db_manager.get_platform_session() as session:
+            row = (
+                session.query(TenantUser)
+                .filter(
+                    TenantUser.email == sender_email,
+                    TenantUser.tenant_id == tenant_id,
+                )
+                .first()
+            )
+            if row is None:
+                return False
+            row.role = TenantUserRole.TEACHER
+            return True
+
     def get_components(self, tenant_slug: str) -> TenantComponents:
         """
         Get component stack for a tenant.

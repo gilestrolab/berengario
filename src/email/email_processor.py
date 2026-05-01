@@ -266,6 +266,36 @@ class EmailProcessor:
             role = mapping["role"]
 
             if not router.check_permission(role, action):
+                if (
+                    action == "teach"
+                    and role == "querier"
+                    and settings.teach_moderation_enabled
+                ):
+                    try:
+                        components = router.get_components(tenant_slug)
+                        ctx = components.context
+                        self._queue_for_moderation(
+                            email=email,
+                            mail_message=mail_message,
+                            mapping=mapping,
+                            components=components,
+                            from_address=settings.email_target_address,
+                            from_name=ctx.email_display_name or ctx.instance_name,
+                            instance_name=ctx.instance_name,
+                            admin_emails=router.get_tenant_admin_emails(
+                                mapping["tenant_id"]
+                            ),
+                        )
+                        successes += 1
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to queue moderation for tenant "
+                            f"'{tenant_slug}': {e}",
+                            exc_info=True,
+                        )
+                        failures += 1
+                    continue
+
                 logger.info(
                     f"Sender {email.sender.email} has role '{role}' in "
                     f"tenant '{tenant_slug}' — insufficient for '{action}', skipping"
@@ -1184,6 +1214,224 @@ The following material has been successfully processed:
             )
         except Exception as e:
             logger.error("Failed to send limit exceeded email: %s", e)
+
+    def _queue_for_moderation(
+        self,
+        email: EmailMessage,
+        mail_message: MailMessage,
+        mapping: dict,
+        components,
+        from_address: Optional[str],
+        from_name: Optional[str],
+        instance_name: str,
+        admin_emails: List[str],
+    ) -> None:
+        """
+        Queue an unauthorized teach attempt for admin moderation.
+
+        Extracts the email's attachments, stores them via the storage backend
+        (or the local moderation directory in ST mode), inserts a
+        PendingTeachSubmission row in the tenant DB, and sends two emails:
+        an acknowledgement to the submitter and a notification to the tenant
+        admins.
+
+        Args:
+            email: Parsed EmailMessage.
+            mail_message: Raw MailMessage for attachment extraction.
+            mapping: Resolved tenant mapping (tenant_slug, tenant_id, role).
+            components: TenantComponents for the target tenant (used for tenant DB session).
+            from_address: From-address for outgoing emails.
+            from_name: From-name for outgoing emails.
+            instance_name: Tenant display name.
+            admin_emails: Admin recipients for the notification email.
+        """
+        import uuid
+        from datetime import datetime
+
+        from src.email.db_models import (
+            PendingSubmissionStatus,
+            PendingTeachSubmission,
+        )
+
+        submission_id = str(uuid.uuid4())
+        tenant_slug = mapping["tenant_slug"]
+
+        attachments = self.attachment_handler.extract_attachments(
+            mail_message, email.message_id
+        )
+
+        attachment_records: List[dict] = []
+        try:
+            for att in attachments:
+                key = f"moderation/{submission_id}/{att.filename}"
+                data = att.filepath.read_bytes()
+                if self.storage_backend and tenant_slug:
+                    self.storage_backend.put(
+                        tenant_slug,
+                        key,
+                        data,
+                        metadata={
+                            "submission_id": submission_id,
+                            "submitter_email": email.sender.email,
+                        },
+                    )
+                else:
+                    local_dest = Path("data/moderation") / submission_id / att.filename
+                    local_dest.parent.mkdir(parents=True, exist_ok=True)
+                    local_dest.write_bytes(data)
+                attachment_records.append(
+                    {
+                        "filename": att.filename,
+                        "key": key,
+                        "size": att.size,
+                        "mime_type": att.mime_type,
+                        "extension": att.extension,
+                    }
+                )
+
+            body_text = email.get_body(prefer_text=True) or ""
+
+            submission = PendingTeachSubmission(
+                id=submission_id,
+                submitter_email=email.sender.email,
+                subject=email.subject,
+                body_text=body_text,
+                attachment_keys=attachment_records,
+                original_message_id=email.message_id,
+                status=PendingSubmissionStatus.PENDING,
+                created_at=datetime.utcnow(),
+            )
+
+            with components.conversation_manager.db_manager.get_session() as session:
+                session.add(submission)
+
+            logger.info(
+                "Queued moderation submission %s for tenant '%s' "
+                "from %s with %d attachment(s)",
+                submission_id,
+                tenant_slug,
+                email.sender.email,
+                len(attachment_records),
+            )
+
+            self._send_moderation_acknowledgement(
+                email=email,
+                instance_name=instance_name,
+                from_address=from_address,
+                from_name=from_name,
+            )
+
+            if admin_emails:
+                self._send_moderation_admin_notification(
+                    email=email,
+                    submission_id=submission_id,
+                    attachment_records=attachment_records,
+                    instance_name=instance_name,
+                    admin_emails=admin_emails,
+                    from_address=from_address,
+                    from_name=from_name,
+                )
+            else:
+                logger.warning(
+                    "No tenant admins found for tenant '%s'; skipping notification",
+                    tenant_slug,
+                )
+        finally:
+            self.attachment_handler.cleanup_attachments(attachments)
+
+    def _send_moderation_acknowledgement(
+        self,
+        email: EmailMessage,
+        instance_name: str,
+        from_address: Optional[str],
+        from_name: Optional[str],
+    ) -> None:
+        """Tell the submitter their material is under admin review."""
+        try:
+            subject = f"Re: {email.subject}"
+            body_text = (
+                f"Thank you for your message to {instance_name}.\n\n"
+                "Your material has been received and is awaiting review by an "
+                "administrator. You will be notified once a decision has been "
+                "made.\n\n"
+                f"---\n{instance_name}"
+            )
+            body_html = (
+                f"<p>Thank you for your message to <strong>{instance_name}</strong>.</p>"
+                "<p>Your material has been received and is awaiting review by an "
+                "administrator. You will be notified once a decision has been "
+                "made.</p>"
+                f"<hr><p><em>{instance_name}</em></p>"
+            )
+            self.email_sender.send_reply(
+                to_address=email.sender.email,
+                subject=subject,
+                body_text=body_text,
+                body_html=body_html,
+                in_reply_to=email.message_id,
+                from_address=from_address,
+                from_name=from_name,
+            )
+            logger.info("Sent moderation acknowledgement to %s", email.sender.email)
+        except Exception as e:
+            logger.error("Failed to send moderation acknowledgement: %s", e)
+
+    def _send_moderation_admin_notification(
+        self,
+        email: EmailMessage,
+        submission_id: str,
+        attachment_records: List[dict],
+        instance_name: str,
+        admin_emails: List[str],
+        from_address: Optional[str],
+        from_name: Optional[str],
+    ) -> None:
+        """Notify tenant admins that a submission needs review."""
+        try:
+            admin_url = f"{settings.web_base_url.rstrip('/')}/admin#moderation"
+            attachment_summary = (
+                ", ".join(a["filename"] for a in attachment_records)
+                if attachment_records
+                else "(no attachments)"
+            )
+            subject = (
+                f"[{instance_name}] Submission awaiting moderation "
+                f"from {email.sender.email}"
+            )
+            body_text = (
+                f"A user has submitted material to the knowledge base that "
+                f"requires your review.\n\n"
+                f"Submitter: {email.sender.email}\n"
+                f"Subject: {email.subject}\n"
+                f"Attachments: {attachment_summary}\n\n"
+                f"Review and approve/reject in the admin panel:\n{admin_url}\n\n"
+                f"---\n{instance_name}"
+            )
+            body_html = (
+                "<p>A user has submitted material to the knowledge base that "
+                "requires your review.</p>"
+                f"<p><strong>Submitter:</strong> {email.sender.email}<br>"
+                f"<strong>Subject:</strong> {email.subject}<br>"
+                f"<strong>Attachments:</strong> {attachment_summary}</p>"
+                f'<p><a href="{admin_url}">Review in the admin panel</a></p>'
+                f"<hr><p><em>{instance_name}</em></p>"
+            )
+            for admin_email in admin_emails:
+                self.email_sender.send_reply(
+                    to_address=admin_email,
+                    subject=subject,
+                    body_text=body_text,
+                    body_html=body_html,
+                    from_address=from_address,
+                    from_name=from_name,
+                )
+            logger.info(
+                "Sent moderation notification for submission %s to %d admin(s)",
+                submission_id,
+                len(admin_emails),
+            )
+        except Exception as e:
+            logger.error("Failed to send moderation admin notification: %s", e)
 
     def _send_rejection_email(
         self,

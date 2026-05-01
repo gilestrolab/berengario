@@ -199,9 +199,14 @@ class TestDispatch:
         processor.message_tracker.mark_processed.assert_called()
 
     def test_querier_cannot_teach(
-        self, processor, mock_router, mock_mail_message, mock_email
+        self, processor, mock_router, mock_mail_message, mock_email, monkeypatch
     ):
-        """Should skip tenant where querier tries to teach."""
+        """Should skip tenant where querier tries to teach (moderation off)."""
+        # Disable moderation to assert the legacy silent-skip behavior.
+        from src.email import email_processor as ep_module
+
+        monkeypatch.setattr(ep_module.settings, "teach_moderation_enabled", False)
+
         processor.parser.parse.return_value = mock_email
         processor.message_tracker.is_processed.return_value = False
         processor.parser.should_process_as_query.return_value = False
